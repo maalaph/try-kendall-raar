@@ -10,27 +10,31 @@ export default function CalendarEmbed() {
   const calendlyPrimaryColor = colors.accent.replace('#', '');
 
   return (
-    <div 
+    <div
       data-calendar-embed
-      className="w-full h-full min-h-[400px] sm:min-h-[500px] lg:min-h-[600px]"
-      style={{ 
+      className="w-full flex items-center justify-center"
+      style={{
         backgroundColor: colors.secondary,
+        minHeight: '700px',
+        padding: '2rem',
       }}
     >
-      <InlineWidget 
-        url="https://calendly.com/admin-ordco/30min"
-        styles={{
-          height: '100%',
-          minHeight: '400px',
-        }}
-        pageSettings={{
-          backgroundColor: calendlyBgColor,
-          hideEventTypeDetails: false,
-          hideLandingPageDetails: false,
-          primaryColor: calendlyPrimaryColor,
-          textColor: calendlyTextColor,
-        }}
-      />
+      <div className="w-full max-w-4xl" style={{ height: '100%' }}>
+        <InlineWidget
+          url="https://calendly.com/admin-ordco/15"
+          styles={{
+            height: '700px',
+            width: '100%',
+          }}
+          pageSettings={{
+            backgroundColor: calendlyBgColor,
+            hideEventTypeDetails: false,
+            hideLandingPageDetails: false,
+            primaryColor: calendlyPrimaryColor,
+            textColor: calendlyTextColor,
+          }}
+        />
+      </div>
     </div>
   );
 }
