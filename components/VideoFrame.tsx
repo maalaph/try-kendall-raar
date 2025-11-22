@@ -47,18 +47,28 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               minHeight: '300px',
             }}
           >
-            <div className="text-center space-y-4 px-4">
+            <div className="text-center px-4" style={{ paddingTop: '1rem' }}>
               <div 
-                className="text-5xl sm:text-6xl mb-4"
+                className="text-6xl sm:text-7xl"
                 style={{ color: colors.accent, opacity: 0.3 }}
               >
                 ▶
               </div>
               <p 
-                className="text-sm font-light tracking-wide"
-                style={{ color: colors.text, opacity: 0.5 }}
+                className="text-base sm:text-lg font-light tracking-wide"
+                style={{ color: colors.text, opacity: 0.5, marginTop: '1.5rem' }}
               >
-                Kendall Live Demo
+                See{' '}
+                <span
+                  style={{
+                    fontFamily: 'var(--font-league-spartan), sans-serif',
+                    fontWeight: 700,
+                    color: colors.accent,
+                  }}
+                >
+                  Kendall
+                </span>
+                {' '}in action.
               </p>
             </div>
           </div>
