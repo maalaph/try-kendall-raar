@@ -47,16 +47,16 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               minHeight: '300px',
             }}
           >
-            <div className="text-center px-4" style={{ paddingTop: '1rem' }}>
+            <div className="text-center px-4" style={{ paddingTop: '0.5rem sm:1rem' }}>
               <div 
-                className="text-6xl sm:text-7xl"
+                className="text-5xl sm:text-6xl md:text-7xl"
                 style={{ color: colors.accent, opacity: 0.3 }}
               >
                 ▶
               </div>
               <p 
-                className="text-base sm:text-lg font-light tracking-wide"
-                style={{ color: colors.text, opacity: 0.5, marginTop: '1.5rem' }}
+                className="text-sm sm:text-base md:text-lg font-light tracking-wide"
+                style={{ color: colors.text, opacity: 0.5, marginTop: '1rem sm:1.5rem' }}
               >
                 See{' '}
                 <span

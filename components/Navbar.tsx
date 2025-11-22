@@ -6,17 +6,14 @@ export default function Navbar() {
   return (
     <nav 
       className="absolute top-0 left-0 z-50"
-      style={{
-        paddingTop: '24px',
-        paddingLeft: '32px',
-      }}
+      className="pt-4 sm:pt-6 pl-5 sm:pl-8"
     >
       <a
         href="/"
         className="inline-block transition-all duration-300"
         style={{
           fontFamily: 'var(--font-league-spartan), sans-serif',
-          fontSize: '60px', // Double the original size
+          fontSize: 'clamp(32px, 8vw, 60px)',
           color: colors.text,
           textDecoration: 'none',
           fontWeight: 700,

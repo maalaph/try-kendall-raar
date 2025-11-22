@@ -15,15 +15,16 @@ export default function CalendarEmbed() {
       className="w-full flex items-center justify-center"
       style={{
         backgroundColor: colors.secondary,
-        minHeight: '700px',
-        padding: '2rem',
+        minHeight: '600px sm:700px',
+        padding: '1rem sm:2rem',
       }}
     >
       <div className="w-full max-w-4xl" style={{ height: '100%' }}>
         <InlineWidget
           url="https://calendly.com/admin-ordco/15"
           styles={{
-            height: '700px',
+            height: '600px',
+            minHeight: '600px',
             width: '100%',
           }}
           pageSettings={{
