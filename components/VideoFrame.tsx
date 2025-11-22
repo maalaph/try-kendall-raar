@@ -41,22 +41,71 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
         ) : (
           /* Video placeholder - black frame with purple aura */
           <div 
-            className="w-full h-full flex items-center justify-center"
+            className="w-full h-full relative"
             style={{ 
               backgroundColor: colors.primary,
               minHeight: '300px',
             }}
           >
-            <div className="text-center px-4" style={{ paddingTop: '0.5rem sm:1rem' }}>
-              <div 
-                className="text-5xl sm:text-6xl md:text-7xl"
-                style={{ color: colors.accent, opacity: 0.3 }}
-              >
-                ▶
+            {/* Play button centered in video */}
+            <div 
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+            >
+              <div className="relative inline-block">
+                {/* Animated outer ring */}
+                <div
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    border: `3px solid ${colors.accent}`,
+                    opacity: 0.5,
+                    animation: 'pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    transform: 'scale(1.3)',
+                  }}
+                />
+                {/* Play button circle with glow */}
+                <div
+                  className="relative flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110"
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    backgroundColor: `${colors.accent}20`,
+                    border: `2px solid ${colors.accent}`,
+                    boxShadow: `0 0 30px ${colors.accent}50, 0 0 60px ${colors.accent}30`,
+                    animation: 'pulse-glow 2s ease-in-out infinite',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = `0 0 30px ${colors.accent}50, 0 0 60px ${colors.accent}30`;
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  {/* Play triangle */}
+                  <div
+                    style={{
+                      width: 0,
+                      height: 0,
+                      borderLeft: `20px solid ${colors.accent}`,
+                      borderTop: '12px solid transparent',
+                      borderBottom: '12px solid transparent',
+                      marginLeft: '4px',
+                    }}
+                  />
+                </div>
               </div>
+            </div>
+            
+            {/* Text below centered */}
+            <div 
+              className="absolute left-1/2 transform -translate-x-1/2 text-center px-4"
+              style={{ bottom: '2rem' }}
+            >
               <p 
                 className="text-sm sm:text-base md:text-lg font-light tracking-wide"
-                style={{ color: colors.text, opacity: 0.5, marginTop: '1rem sm:1.5rem' }}
+                style={{ color: colors.text }}
               >
                 See{' '}
                 <span

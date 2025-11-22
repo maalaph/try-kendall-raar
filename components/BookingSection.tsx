@@ -71,16 +71,13 @@ export default function BookingSection() {
               />
             </svg>
             <span className="text-sm sm:text-base font-light">
-              Web conferencing details provided upon confirmation.
+              Meeting information provided upon confirmation.
             </span>
           </div>
         </div>
 
         {/* Calendar only - centered and full width */}
-        <div
-          className="w-full"
-          style={{ marginTop: '2rem sm:3rem' }}
-        >
+        <div className="w-full mt-8 sm:mt-12">
           <CalendarEmbed />
         </div>
       </div>

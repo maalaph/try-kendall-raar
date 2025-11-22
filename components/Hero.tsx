@@ -14,21 +14,21 @@ export default function Hero() {
   return (
     <section className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
       <div className="w-full max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-16 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-24 items-center">
           {/* Left: Video Frame */}
           <div className="order-2 lg:order-1 w-full flex items-center lg:pr-0" style={{ maxWidth: '100%', marginRight: '0', marginLeft: '0' }}>
             <VideoFrame />
           </div>
 
           {/* Right: Headline, Bullets, CTA */}
-          <div className="order-1 lg:order-2 w-full flex flex-col justify-center lg:pl-8" style={{ paddingLeft: '0' }}>
+          <div className="order-1 lg:order-2 w-full flex flex-col justify-center lg:pl-8" style={{ paddingLeft: '0', paddingTop: '-1rem' }}>
             {/* Headline */}
             <h1 
               className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-light leading-tight tracking-tight"
               style={{ color: colors.text }}
             >
-              <span>Missed Calls & No Shows Are Costly.</span>
-              <span style={{ display: 'block', marginTop: '0.75rem sm:1.25rem' }}>
+              <span style={{ display: 'block' }}>Missed Calls & No Shows Are Costly.</span>
+              <span style={{ display: 'block', marginTop: '6rem sm:7rem' }}>
                 Meet{' '}
                 <span 
                   style={{ 
@@ -44,8 +44,8 @@ export default function Hero() {
 
             {/* Bullets */}
             <ul 
-              className="space-y-2 sm:space-y-2.5"
-              style={{ marginTop: '1.5rem sm:2rem' }}
+              className="space-y-3 sm:space-y-4"
+              style={{ marginTop: '5rem sm:6rem' }}
             >
               <li 
                 className="flex items-start gap-2 sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"

@@ -5,7 +5,11 @@ import { colors } from '@/lib/config';
 export default function Navbar() {
   return (
     <nav 
-      className="absolute top-0 left-0 z-50 pt-4 sm:pt-6 pl-5 sm:pl-8"
+      className="absolute top-0 z-50"
+      style={{
+        left: '3rem',
+        paddingTop: '1.5rem',
+      }}
     >
       <a
         href="/"
