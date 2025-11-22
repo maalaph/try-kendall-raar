@@ -1,0 +1,185 @@
+{
+  "brand": {
+    "name": "RAAR",
+    "platforms": [
+      "Instagram",
+      "Facebook"
+    ],
+    "link_in_bio_role": "Primary conversion funnel. All content on IG/FB pushes to this landing page.",
+    "voice": {
+      "tone": "direct, sharp, minimalistic, confident, psychological",
+      "style": "intentional, raw, no fluff, no cringe, no corporate language",
+      "avoid": [
+        "over-salesy tone",
+        "generic AI buzzwords",
+        "over-the-top hype",
+        "weak soft language"
+      ]
+    },
+    "visual": {
+      "palette": {
+        "primary": "#000000",
+        "accent": "#A855F7",
+        "secondary": "#111111",
+        "text": "#FFFFFF"
+      },
+      "vibe": "dark, premium, minimalistic, aura glow, subtle motion, high contrast",
+      "calendar_style": "black theme, thin typography, no borders, clean spacing"
+    },
+    "philosophy": {
+      "belief": "No human should waste time on repetitive admin in 2025.",
+      "obsession": "Restoring time and eliminating friction for small business owners.",
+      "emotional_reaction_target": [
+        "relief",
+        "clarity",
+        "professionalism",
+        "wow-this-is-clean",
+        "trust"
+      ],
+      "identity": "RAAR is not a tool \u2014 it is an advantage."
+    }
+  },
+  "product": {
+    "name": "Kendall",
+    "type": "24/7 AI receptionist",
+    "personality": {
+      "tone": "calm, precise, lightly witty, aware of the customer\u2019s patterns",
+      "jokes": "subtle, contextual, observational",
+      "goals": [
+        "make customers feel understood",
+        "reduce confusion",
+        "communicate clearly",
+        "handle situations without escalation"
+      ]
+    },
+    "core_capabilities": [
+      "answers every call instantly",
+      "books, confirms, reschedules, and cancels appointments",
+      "reads/writes to the business calendar",
+      "reduces no-shows via automated follow-ups",
+      "manages post-appointment engagement",
+      "adapts to the owner's voice and vibe",
+      "runs 24/7 without interruptions"
+    ],
+    "current_state": {
+      "backend": "fully functional",
+      "dashboard": "in development",
+      "landing_page": "being vibe-coded in Framer",
+      "demo_video": "in progress",
+      "sales_assets": [
+        "scripts done",
+        "blueprint done",
+        "copy direction defined"
+      ],
+      "stack": [
+        "VAPI",
+        "n8n",
+        "Framer",
+        "Base44"
+      ]
+    }
+  },
+  "target_market": {
+    "ideal_clients": [
+      "barbershops",
+      "hair salons",
+      "nail salons",
+      "med spas",
+      "small high-call-volume businesses"
+    ],
+    "dominant_pain_points": [
+      "missed calls = missed revenue",
+      "owner constantly interrupted",
+      "no receptionist or overwhelmed front desk",
+      "no-shows hurting revenue",
+      "manual repetitive tasks wasting hours",
+      "no client follow-up or review flow"
+    ],
+    "emotional_drivers": [
+      "wanting to feel in control",
+      "wanting predictable appointments",
+      "wanting fewer interruptions",
+      "wanting professionalism without cost"
+    ]
+  },
+  "positioning": {
+    "differentiation": [
+      "Kendall replaces interruptions, not people",
+      "unlike a human receptionist, she never misses calls",
+      "unlike Booksy/Square reminders, she truly HOLDs the conversation",
+      "unlike automations, she adapts dynamically to each client",
+      "unlike hiring, she costs nothing past the subscription"
+    ],
+    "core_pitch": "We remove the chaos so you can focus on what you do best."
+  },
+  "landing_page": {
+    "purpose": "Convert IG/FB interest into booked demos.",
+    "hero": {
+      "layout": "two-column",
+      "left": "Kendall live demo video (black frame, purple aura pulse)",
+      "right": {
+        "headline": "Ever wonder how much smoother your day could feel? Meet Kendall.",
+        "bullets": [
+          "Answers every call instantly",
+          "Confirms, reschedules, and follows up automatically",
+          "Handles customers after-hours",
+          "Fills your calendar without the back-and-forth",
+          "Built-in review & engagement flow"
+        ],
+        "cta": "Your move \u2192 Book your demo"
+      }
+    },
+    "booking_section": {
+      "headline": "Get your personalized Kendall demo",
+      "fields_required_before_demo": [
+        "full_name",
+        "business_website"
+      ],
+      "calendar_ui": "dark_minimalistic_black",
+      "notes": "Form + calendar sit side-by-side. Minimal, confident, no clutter."
+    }
+  },
+  "demo_process": {
+    "info_needed": [
+      "full_name",
+      "business_website"
+    ],
+    "flow": [
+      "User fills form",
+      "User books on calendar",
+      "RAAR team configures Kendall using the business website",
+      "Demo call shows Kendall handling THEIR workflow live"
+    ],
+    "signature_moment": "Owner realizes Kendall is actually working with their real business setup."
+  },
+  "lead_quality": {
+    "red_flags": [
+      "no website",
+      "owner unclear on what they want",
+      "business not using appointments at all"
+    ],
+    "ideal_flags": [
+      "high call volume",
+      "frustration with interruptions",
+      "receptionist recently quit or is overwhelmed",
+      "using manual booking flows"
+    ]
+  },
+  "what_raar_is_not": [
+    "not hype-driven",
+    "not Silicon Valley 'AI magic'",
+    "not a short-term trend",
+    "not a chatbot",
+    "not a receptionist replacement pitch with bad taste",
+    "not automation for automation's sake",
+    "not corporate, cheesy, or cringe"
+  ],
+  "future": {
+    "12_month_goal": "RAAR becomes the most trusted AI receptionist brand for small service businesses.",
+    "long_term": [
+      "expand to operational automation",
+      "regional dominance starting in State College then Middle East",
+      "suite of tools beyond receptionist: follow-ups, scheduling, management, analytics"
+    ]
+  }
+}
