@@ -9,6 +9,9 @@ export default function CalendarEmbed() {
   const calendlyTextColor = colors.text.replace('#', '');
   const calendlyPrimaryColor = colors.accent.replace('#', '');
 
+  // Get Calendly URL from environment variable or use default
+  const calendlyUrl = process.env.NEXT_PUBLIC_CALENDLY_URL || 'https://calendly.com/admin-ordco/15';
+
   return (
     <div
       data-calendar-embed
@@ -21,7 +24,7 @@ export default function CalendarEmbed() {
     >
       <div className="w-full max-w-4xl" style={{ height: '100%' }}>
         <InlineWidget
-          url="https://calendly.com/admin-ordco/15"
+          url={calendlyUrl}
           styles={{
             height: '600px',
             minHeight: '600px',
