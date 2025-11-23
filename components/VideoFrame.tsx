@@ -49,7 +49,7 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
         ) : (
           /* Video placeholder - black frame with purple aura */
           <div 
-            className="w-full h-full relative"
+            className="w-full h-full relative overflow-visible"
             style={{ 
               backgroundColor: colors.primary,
               minHeight: '300px',
@@ -94,30 +94,28 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               </div>
             </div>
             
-            {/* Text below centered */}
-            <div 
-              className="absolute left-1/2 transform -translate-x-1/2 text-center px-4"
-              style={{ bottom: '2rem' }}
-            >
-              <p 
-                className="text-base sm:text-base md:text-lg font-light tracking-wide"
-                style={{ color: colors.text }}
-              >
-                See{' '}
-                <span
-                  style={{
-                    fontFamily: 'var(--font-league-spartan), sans-serif',
-                    fontWeight: 700,
-                    color: colors.accent,
-                  }}
-                >
-                  Kendall
-                </span>
-                {' '}in action.
-              </p>
-            </div>
           </div>
         )}
+      </div>
+      
+      {/* Text below video - outside overflow container */}
+      <div className="text-center px-4 mt-4">
+        <p 
+          className="text-sm sm:text-base md:text-lg font-light tracking-wide"
+          style={{ color: colors.text }}
+        >
+          See{' '}
+          <span
+            style={{
+              fontFamily: 'var(--font-league-spartan), sans-serif',
+              fontWeight: 700,
+              color: colors.accent,
+            }}
+          >
+            Kendall
+          </span>
+          {' '}in action.
+        </p>
       </div>
 
       {/* Hear Kendall in action with phone button - matching structure and spacing */}
