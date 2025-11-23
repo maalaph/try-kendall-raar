@@ -12,9 +12,9 @@ export default function Hero() {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center" style={{ padding: '3rem 3rem' }}>
+    <section className="min-h-screen flex items-center justify-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-12 sm:py-16 md:py-20 lg:py-24">
       <div className="w-full max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 gap-48 items-end" style={{ minWidth: '1200px' }}>
+        <div className="grid grid-cols-2 gap-12 md:gap-16 lg:gap-24 xl:gap-32 2xl:gap-48 items-end">
           {/* Left: Video Frame */}
           <div className="w-full flex items-center" style={{ maxWidth: '100%' }}>
             <VideoFrame videoSrc="/landing-page-video.mp4" />
@@ -145,7 +145,7 @@ export default function Hero() {
             </ul>
 
             {/* CTA Button */}
-            <div className="flex justify-center absolute bottom-0 left-0 right-0" style={{ bottom: '2rem' }}>
+            <div className="flex justify-center absolute bottom-0 left-0 right-0" style={{ bottom: 'clamp(1.5rem, 3vw, 2rem)' }}>
               <button
                 onClick={scrollToBooking}
                 className="group relative flex items-center justify-center overflow-hidden w-full sm:w-auto touch-manipulation"

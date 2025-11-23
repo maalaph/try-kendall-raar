@@ -44,11 +44,8 @@ body {
   touch-action: manipulation;
 }
 
-/* Maintain desktop layout on all devices */
-html {
-  min-width: 1280px;
-}
-
+/* Responsive desktop layout - allow natural scaling */
+/* Mobile scaling preserved for screens below 1280px */
 @media (max-width: 1280px) {
   html {
     transform-origin: top left;
@@ -61,6 +58,28 @@ html {
   body {
     width: 1280px;
     min-height: calc(100vh / (100vw / 1280));
+  }
+}
+
+/* Desktop breakpoints for consistent spacing */
+@media (min-width: 1024px) {
+  :root {
+    --desktop-padding: clamp(2rem, 4vw, 6rem);
+    --desktop-gap: clamp(3rem, 6vw, 12rem);
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --desktop-padding: clamp(3rem, 5vw, 6rem);
+    --desktop-gap: clamp(4rem, 8vw, 12rem);
+  }
+}
+
+@media (min-width: 1536px) {
+  :root {
+    --desktop-padding: clamp(4rem, 6vw, 6rem);
+    --desktop-gap: clamp(6rem, 10vw, 12rem);
   }
 }
 

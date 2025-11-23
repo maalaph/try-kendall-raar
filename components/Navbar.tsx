@@ -5,14 +5,7 @@ import { colors, kendallPhoneNumber } from '@/lib/config';
 export default function Navbar() {
   return (
     <nav 
-      className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center"
-      style={{
-        paddingTop: '1.125rem',
-        paddingBottom: '1.125rem',
-        paddingLeft: '3rem',
-        paddingRight: '3rem',
-        minWidth: '1280px',
-      }}
+      className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-4 sm:py-5"
     >
       <a
         href="/"

@@ -17,7 +17,7 @@ export default function BookingSection() {
       <Fireworks trigger={showFireworks} onComplete={() => setShowFireworks(false)} />
       <section
       id="booking-section"
-      className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12 sm:py-20"
+      className="min-h-screen flex items-center justify-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-12 sm:py-16 md:py-20 lg:py-24"
     >
       <div className="w-full max-w-7xl mx-auto space-y-6 sm:space-y-8 md:space-y-12">
         {/* Headline */}
@@ -44,7 +44,7 @@ export default function BookingSection() {
         </div>
 
         {/* Calendar only - centered and full width */}
-        <div className="w-full mt-8 sm:mt-12">
+        <div className="w-full mt-8 sm:mt-12 md:mt-16 lg:mt-20">
           <CalendarEmbed onEventScheduled={handleEventScheduled} />
         </div>
       </div>
