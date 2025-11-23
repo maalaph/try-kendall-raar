@@ -17,8 +17,8 @@ export default function BookingSection() {
       <Fireworks trigger={showFireworks} onComplete={() => setShowFireworks(false)} />
       <section
       id="booking-section"
-      className="min-h-screen flex items-center justify-center py-12 sm:py-16 md:py-20 lg:py-24"
-      style={{ paddingLeft: 'clamp(1rem, 5vw, 6rem)', paddingRight: 'clamp(1rem, 5vw, 6rem)' }}
+      className="min-h-screen flex items-center justify-center"
+      style={{ padding: 'clamp(2rem, 6vw, 8rem) clamp(2rem, 8vw, 10rem)' }}
     >
       <div className="w-full max-w-7xl mx-auto space-y-6 sm:space-y-8 md:space-y-12">
         {/* Headline */}

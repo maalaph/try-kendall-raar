@@ -64,14 +64,13 @@ body {
 /* Desktop breakpoints for consistent spacing - ensures proportional scaling */
 /* For screens 1280px and above, maintain consistent visual proportions */
 @media (min-width: 1280px) {
+  /* Use percentage-based spacing to maintain exact proportions */
   :root {
-    --desktop-padding: clamp(1.5rem, 5vw, 6rem);
-    --desktop-gap: clamp(4rem, 12vw, 12rem);
-  }
-  
-  /* Ensure consistent spacing ratios across all desktop sizes */
-  body {
-    font-size: clamp(16px, 1vw, 18px);
+    --container-max-width: 1400px;
+    --section-padding-horizontal: 8%;
+    --section-padding-vertical: 6%;
+    --column-gap: 8%;
+    --column-internal-padding: 4%;
   }
 }
 
