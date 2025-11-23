@@ -5,10 +5,10 @@ import { colors, kendallPhoneNumber } from '@/lib/config';
 export default function Navbar() {
   return (
     <nav 
-      className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center px-4 sm:px-6 lg:px-12"
+      className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center px-5 sm:px-6 lg:px-12"
       style={{
-        paddingTop: '1rem',
-        paddingBottom: '1rem',
+        paddingTop: '1.125rem',
+        paddingBottom: '1.125rem',
       }}
     >
       <a
@@ -36,7 +36,7 @@ export default function Navbar() {
       {kendallPhoneNumber && (
         <a
           href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
-          className="group flex items-center gap-2 sm:gap-3 lg:gap-3 transition-all duration-300 px-3 py-2 sm:px-4 sm:py-2 lg:px-7 lg:py-3.5 text-sm sm:text-base lg:text-lg"
+          className="group flex items-center gap-2 sm:gap-3 lg:gap-3 transition-all duration-300 px-3 py-2.5 sm:px-4 sm:py-2 lg:px-7 lg:py-3.5 text-xs sm:text-base lg:text-lg"
           style={{
             color: colors.text,
             backgroundColor: `${colors.accent}15`,
@@ -46,7 +46,7 @@ export default function Navbar() {
             fontFamily: 'var(--font-inter), sans-serif',
             textDecoration: 'none',
             boxShadow: `0 0 15px ${colors.accent}30`,
-            minHeight: '44px',
+            minHeight: '48px',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
@@ -87,7 +87,7 @@ export default function Navbar() {
             </span>
             {' '}: {kendallPhoneNumber}
           </span>
-          <span className="sm:hidden">Call</span>
+          <span className="sm:hidden">{kendallPhoneNumber}</span>
         </a>
       )}
     </nav>

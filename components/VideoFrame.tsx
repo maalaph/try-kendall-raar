@@ -62,10 +62,8 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               <div className="relative inline-block">
                 {/* Play button circle */}
                 <div
-                  className="relative flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 touch-manipulation"
+                  className="relative flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 touch-manipulation w-[70px] h-[70px] lg:w-[80px] lg:h-[80px]"
                   style={{
-                    width: '80px',
-                    height: '80px',
                     borderRadius: '50%',
                     backgroundColor: `${colors.accent}20`,
                     border: `2px solid ${colors.accent}`,
@@ -82,12 +80,13 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
                 >
                   {/* Play triangle */}
                   <div
+                    className="play-triangle"
                     style={{
                       width: 0,
                       height: 0,
-                      borderLeft: `20px solid ${colors.accent}`,
-                      borderTop: '12px solid transparent',
-                      borderBottom: '12px solid transparent',
+                      borderLeft: '18px solid ' + colors.accent,
+                      borderTop: '10px solid transparent',
+                      borderBottom: '10px solid transparent',
                       marginLeft: '4px',
                     }}
                   />
@@ -101,7 +100,7 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               style={{ bottom: '2rem' }}
             >
               <p 
-                className="text-sm sm:text-base md:text-lg font-light tracking-wide"
+                className="text-base sm:text-base md:text-lg font-light tracking-wide"
                 style={{ color: colors.text }}
               >
                 See{' '}
@@ -124,7 +123,7 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
       {/* Hear Kendall in action with phone button - matching structure and spacing */}
       {kendallPhoneNumber && (
         <div 
-          className="relative w-full mt-12 sm:mt-16 lg:mt-20"
+          className="relative w-full mt-14 sm:mt-16 lg:mt-20"
           style={{ aspectRatio: '16/9' }}
         >
           {/* Phone icon button - centered above text with pulsing animation, matching play button position */}
@@ -145,10 +144,8 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               {/* Phone button circle with glow - matching play button exactly */}
               <a
                 href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
-                className="group relative flex items-center justify-center transition-all duration-300 cursor-pointer touch-manipulation"
+                className="group relative flex items-center justify-center transition-all duration-300 cursor-pointer touch-manipulation w-[70px] h-[70px] lg:w-[80px] lg:h-[80px]"
                 style={{
-                  width: '80px',
-                  height: '80px',
                   borderRadius: '50%',
                   backgroundColor: `${colors.accent}20`,
                   border: `2px solid ${colors.accent}`,
@@ -166,8 +163,7 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
                 }}
               >
                 <svg
-                  width="36"
-                  height="36"
+                  className="w-7 h-7 lg:w-9 lg:h-9"
                   viewBox="0 0 24 24"
                   fill="none"
                   style={{ color: colors.accent }}
@@ -190,7 +186,7 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
             style={{ bottom: '2rem' }}
           >
             <p 
-              className="text-sm sm:text-base md:text-lg font-light tracking-wide"
+              className="text-base sm:text-base md:text-lg font-light tracking-wide"
               style={{ color: colors.text }}
             >
               Hear{' '}

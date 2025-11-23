@@ -61,6 +61,22 @@ button, a {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
+  
+  /* Responsive play triangle for mobile */
+  .play-triangle {
+    border-left-width: 18px !important;
+    border-top-width: 10px !important;
+    border-bottom-width: 10px !important;
+  }
+}
+
+/* Desktop play triangle size */
+@media (min-width: 1024px) {
+  .play-triangle {
+    border-left-width: 20px !important;
+    border-top-width: 12px !important;
+    border-bottom-width: 12px !important;
+  }
 }
 
 /* Thin typography for RAAR brand */
