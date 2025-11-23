@@ -10,22 +10,14 @@ interface VideoFrameProps {
 
 export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoFrameProps) {
   return (
-    <div className="relative w-full" style={{ marginTop: '2rem' }}>
+    <div className="relative w-full">
       {/* Purple aura glow effect */}
       <div 
-        className="relative rounded-lg overflow-hidden transition-all duration-300 cursor-pointer"
+        className="relative rounded-lg overflow-hidden"
         style={{
           border: `2px solid ${colors.primary}`,
           boxShadow: `0 0 20px ${colors.accent}30, 0 0 40px ${colors.accent}20, 0 0 60px ${colors.accent}10`,
           aspectRatio: '16/9',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50, 0 0 120px ${colors.accent}30`;
-          e.currentTarget.style.transform = 'scale(1.02)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}30, 0 0 40px ${colors.accent}20, 0 0 60px ${colors.accent}10`;
-          e.currentTarget.style.transform = 'scale(1)';
         }}
       >
         {videoSrc ? (
@@ -49,7 +41,7 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
         ) : (
           /* Video placeholder - black frame with purple aura */
           <div 
-            className="w-full h-full relative overflow-visible"
+            className="w-full h-full relative"
             style={{ 
               backgroundColor: colors.primary,
               minHeight: '300px',
@@ -58,20 +50,18 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
             {/* Play button centered in video */}
             <div 
               className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-              style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
             >
-              <div className="relative inline-block" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <div className="relative inline-block">
                 {/* Play button circle */}
                 <div
-                  className="relative flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 touch-manipulation w-[70px] h-[70px] lg:w-[80px] lg:h-[80px]"
+                  className="relative flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 touch-manipulation"
                   style={{
+                    width: '80px',
+                    height: '80px',
                     borderRadius: '50%',
                     backgroundColor: `${colors.accent}20`,
                     border: `2px solid ${colors.accent}`,
                     boxShadow: `0 0 30px ${colors.accent}50, 0 0 60px ${colors.accent}30`,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
@@ -84,13 +74,12 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
                 >
                   {/* Play triangle */}
                   <div
-                    className="play-triangle"
                     style={{
                       width: 0,
                       height: 0,
-                      borderLeft: '18px solid ' + colors.accent,
-                      borderTop: '10px solid transparent',
-                      borderBottom: '10px solid transparent',
+                      borderLeft: `20px solid ${colors.accent}`,
+                      borderTop: '12px solid transparent',
+                      borderBottom: '12px solid transparent',
                       marginLeft: '4px',
                     }}
                   />
@@ -98,9 +87,9 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               </div>
             </div>
             
-            {/* Text below centered - desktop version */}
+            {/* Text below centered */}
             <div 
-              className="hidden lg:block absolute left-1/2 transform -translate-x-1/2 text-center px-4"
+              className="absolute left-1/2 transform -translate-x-1/2 text-center px-4"
               style={{ bottom: '2rem' }}
             >
               <p 
@@ -123,26 +112,6 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
           </div>
         )}
       </div>
-      
-      {/* Text below video - mobile only version outside overflow container */}
-      <div className="lg:hidden text-center px-4 mt-6">
-        <p 
-          className="text-base font-light tracking-wide"
-          style={{ color: colors.text }}
-        >
-          See{' '}
-          <span
-            style={{
-              fontFamily: 'var(--font-league-spartan), sans-serif',
-              fontWeight: 700,
-              color: colors.accent,
-            }}
-          >
-            Kendall
-          </span>
-          {' '}in action.
-        </p>
-      </div>
 
       {/* Hear Kendall in action with phone button - matching structure and spacing */}
       {kendallPhoneNumber && (
@@ -153,37 +122,31 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
           {/* Phone icon button - centered above text with pulsing animation, matching play button position */}
           <div 
             className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-            style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
           >
-            <div className="relative inline-block" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div className="relative inline-block">
               {/* Animated outer ring */}
               <div
-                className="absolute rounded-full"
+                className="absolute inset-0 rounded-full"
                 style={{
                   border: `3px solid ${colors.accent}`,
                   opacity: 0.5,
                   animation: 'pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                  width: '70px',
-                  height: '70px',
-                  left: '50%',
-                  top: '50%',
-                  transform: 'translate(-50%, -50%) scale(1.3)',
+                  transform: 'scale(1.3)',
                 }}
               />
               {/* Phone button circle with glow - matching play button exactly */}
               <a
                 href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
-                className="group relative flex items-center justify-center transition-all duration-300 cursor-pointer touch-manipulation w-[70px] h-[70px] lg:w-[80px] lg:h-[80px]"
+                className="group relative flex items-center justify-center transition-all duration-300 cursor-pointer touch-manipulation"
                 style={{
+                  width: '80px',
+                  height: '80px',
                   borderRadius: '50%',
                   backgroundColor: `${colors.accent}20`,
                   border: `2px solid ${colors.accent}`,
                   textDecoration: 'none',
                   boxShadow: `0 0 30px ${colors.accent}50, 0 0 60px ${colors.accent}30`,
                   animation: 'pulse-glow 4s ease-in-out infinite',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
@@ -195,7 +158,8 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
                 }}
               >
                 <svg
-                  className="w-7 h-7 lg:w-9 lg:h-9"
+                  width="36"
+                  height="36"
                   viewBox="0 0 24 24"
                   fill="none"
                   style={{ color: colors.accent }}
@@ -218,8 +182,8 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
             style={{ bottom: '2rem' }}
           >
             <p 
-              className="text-base sm:text-base md:text-lg font-light tracking-wide"
-              style={{ color: colors.text, textAlign: 'center' }}
+              className="text-sm sm:text-base md:text-lg font-light tracking-wide"
+              style={{ color: colors.text }}
             >
               Hear{' '}
               <span
