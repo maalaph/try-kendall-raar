@@ -55,9 +55,10 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
                 {/* Play button circle */}
                 <div
                   className="relative flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110"
+                  className="touch-manipulation"
                   style={{
-                    width: '80px',
-                    height: '80px',
+                    width: 'clamp(70px, 12vw, 80px)',
+                    height: 'clamp(70px, 12vw, 80px)',
                     borderRadius: '50%',
                     backgroundColor: `${colors.accent}20`,
                     border: `2px solid ${colors.accent}`,
@@ -90,10 +91,10 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
             {/* Text below centered */}
             <div 
               className="absolute left-1/2 transform -translate-x-1/2 text-center px-4"
-              style={{ bottom: '2rem' }}
+              style={{ bottom: '1.5rem' }}
             >
               <p 
-                className="text-sm sm:text-base md:text-lg font-light tracking-wide"
+                className="text-base sm:text-base md:text-lg font-light tracking-wide"
                 style={{ color: colors.text }}
               >
                 See{' '}
@@ -138,9 +139,10 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               <a
                 href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
                 className="group relative flex items-center justify-center transition-all duration-300 cursor-pointer"
+                className="touch-manipulation"
                 style={{
-                  width: '80px',
-                  height: '80px',
+                  width: 'clamp(70px, 12vw, 80px)',
+                  height: 'clamp(70px, 12vw, 80px)',
                   borderRadius: '50%',
                   backgroundColor: `${colors.accent}20`,
                   border: `2px solid ${colors.accent}`,
@@ -176,13 +178,13 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
             </div>
           </div>
 
-          {/* Text below centered - exact same spacing as "See Kendall in action." (bottom: 2rem) */}
+          {/* Text below centered - exact same spacing as "See Kendall in action." */}
           <div 
             className="absolute left-1/2 transform -translate-x-1/2 text-center px-4"
-            style={{ bottom: '2rem' }}
+            style={{ bottom: '1.5rem' }}
           >
             <p 
-              className="text-sm sm:text-base md:text-lg font-light tracking-wide"
+              className="text-base sm:text-base md:text-lg font-light tracking-wide"
               style={{ color: colors.text }}
             >
               Hear{' '}

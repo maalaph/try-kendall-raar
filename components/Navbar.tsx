@@ -6,8 +6,10 @@ export default function Navbar() {
   return (
     <nav 
       className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center"
+      className="px-4 sm:px-6 lg:px-12"
       style={{
-        padding: '1rem 1rem',
+        paddingTop: '1.25rem',
+        paddingBottom: '1.25rem',
       }}
     >
       <a
@@ -35,20 +37,19 @@ export default function Navbar() {
       {kendallPhoneNumber && (
         <a
           href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
-          className="group flex items-center gap-3 transition-all duration-300"
-          className="flex items-center gap-2 sm:gap-3"
+          className="group flex items-center gap-2 sm:gap-3 transition-all duration-300"
           style={{
             color: colors.text,
             backgroundColor: `${colors.accent}15`,
             border: `2px solid ${colors.accent}`,
             borderRadius: '12px',
-            padding: '0.75rem 1rem',
-            fontSize: '0.9rem',
+            padding: '0.875rem 1.25rem',
+            fontSize: '0.95rem',
             fontWeight: 500,
             fontFamily: 'var(--font-inter), sans-serif',
             textDecoration: 'none',
             boxShadow: `0 0 15px ${colors.accent}30`,
-            minHeight: '44px', // iOS touch target minimum
+            minHeight: '48px', // iOS touch target minimum
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
