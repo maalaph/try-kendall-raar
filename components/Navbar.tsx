@@ -49,13 +49,13 @@ export default function Navbar() {
             boxShadow: `0 0 15px ${colors.accent}30`,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = `0 0 25px ${colors.accent}50, 0 0 50px ${colors.accent}30`;
-            e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
+            e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
+            e.currentTarget.style.transform = 'scale(1.1)';
             e.currentTarget.style.backgroundColor = `${colors.accent}25`;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.boxShadow = `0 0 15px ${colors.accent}30`;
-            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+            e.currentTarget.style.transform = 'scale(1)';
             e.currentTarget.style.backgroundColor = `${colors.accent}15`;
           }}
         >

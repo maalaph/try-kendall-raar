@@ -16,7 +16,7 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
         className="relative rounded-lg overflow-hidden"
         style={{
           border: `2px solid ${colors.primary}`,
-          animation: 'aura-pulse 3s ease-in-out infinite',
+          boxShadow: `0 0 20px ${colors.accent}30, 0 0 40px ${colors.accent}20, 0 0 60px ${colors.accent}10`,
           aspectRatio: '16/9',
         }}
       >
@@ -146,7 +146,7 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
                   border: `2px solid ${colors.accent}`,
                   textDecoration: 'none',
                   boxShadow: `0 0 30px ${colors.accent}50, 0 0 60px ${colors.accent}30`,
-                  animation: 'pulse-glow 2s ease-in-out infinite',
+                  animation: 'pulse-glow 4s ease-in-out infinite',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;

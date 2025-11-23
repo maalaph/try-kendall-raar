@@ -31,10 +31,13 @@ export default function Hero() {
               <span style={{ display: 'block', marginTop: '3rem' }}>
                 Meet{' '}
                 <span 
+                  className="kendall-glow"
                   style={{ 
                     color: colors.accent,
+                    opacity: 0.75,
                     fontFamily: 'var(--font-league-spartan), sans-serif',
                     fontWeight: 700,
+                    display: 'inline-block',
                   }}
                 >
                   Kendall
@@ -125,17 +128,15 @@ export default function Hero() {
                   fontFamily: 'var(--font-inter), sans-serif',
                   cursor: 'pointer',
                   minWidth: 'auto',
-                  animation: 'breathe 3s ease-in-out infinite',
                   transition: 'all 0.3s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.animation = 'none';
-                  e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}60, 0 0 40px ${colors.accent}40`;
-                  e.currentTarget.style.transform = 'translateY(-2px) scale(1.03)';
+                  e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
+                  e.currentTarget.style.transform = 'scale(1.1)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.animation = 'breathe 3s ease-in-out infinite';
-                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
                 <span style={{ position: 'relative', zIndex: 1, transition: 'all 0.3s ease' }}>

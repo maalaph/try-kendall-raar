@@ -1,11 +1,21 @@
 'use client';
 
+import { useState } from 'react';
 import CalendarEmbed from './CalendarEmbed';
+import Fireworks from './Fireworks';
 import { bookingContent, colors, kendallPhoneNumber } from '@/lib/config';
 
 export default function BookingSection() {
+  const [showFireworks, setShowFireworks] = useState(false);
+
+  const handleEventScheduled = () => {
+    setShowFireworks(true);
+  };
+
   return (
-    <section
+    <>
+      <Fireworks trigger={showFireworks} onComplete={() => setShowFireworks(false)} />
+      <section
       id="booking-section"
       className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12 sm:py-20"
     >
@@ -78,10 +88,11 @@ export default function BookingSection() {
 
         {/* Calendar only - centered and full width */}
         <div className="w-full mt-8 sm:mt-12">
-          <CalendarEmbed />
+          <CalendarEmbed onEventScheduled={handleEventScheduled} />
         </div>
       </div>
     </section>
+    </>
   );
 }
 

@@ -4,7 +4,11 @@ import { useEffect } from 'react';
 import { InlineWidget } from 'react-calendly';
 import { colors } from '@/lib/config';
 
-export default function CalendarEmbed() {
+interface CalendarEmbedProps {
+  onEventScheduled?: () => void;
+}
+
+export default function CalendarEmbed({ onEventScheduled }: CalendarEmbedProps) {
   // Remove # from hex colors for Calendly pageSettings
   const calendlyBgColor = colors.primary.replace('#', ''); // Use pure black instead of gray
   const calendlyTextColor = colors.text.replace('#', '');
@@ -12,6 +16,25 @@ export default function CalendarEmbed() {
 
   // Get Calendly URL from environment variable or use default
   const calendlyUrl = process.env.NEXT_PUBLIC_CALENDLY_URL || 'https://calendly.com/admin-ordco/15';
+
+  // Listen for Calendly events
+  useEffect(() => {
+    const handleCalendlyEvent = (e: MessageEvent) => {
+      if (e.data.event && e.data.event.indexOf('calendly') === 0) {
+        if (e.data.event === 'calendly.event_scheduled' || e.data.event === 'calendly.event_type_viewed') {
+          // Trigger fireworks when event is scheduled
+          if (e.data.event === 'calendly.event_scheduled' && onEventScheduled) {
+            onEventScheduled();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleCalendlyEvent);
+    return () => {
+      window.removeEventListener('message', handleCalendlyEvent);
+    };
+  }, [onEventScheduled]);
 
   // Inject custom CSS to make Calendly blend seamlessly
   useEffect(() => {

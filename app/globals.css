@@ -77,6 +77,25 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* Minimalistic breathing glow for Kendall text - subtle fade in and out */
+@keyframes kendall-breathe {
+  0%, 100% {
+    text-shadow: 0 0 8px rgba(168, 85, 247, 0.25),
+                 0 0 16px rgba(168, 85, 247, 0.2),
+                 0 0 24px rgba(168, 85, 247, 0.15);
+  }
+  50% {
+    text-shadow: 0 0 12px rgba(168, 85, 247, 0.35),
+                 0 0 24px rgba(168, 85, 247, 0.25),
+                 0 0 36px rgba(168, 85, 247, 0.2);
+  }
+}
+
+.kendall-glow {
+  animation: kendall-breathe 4s ease-in-out infinite;
+  position: relative;
+}
+
 /* Pulse glow animation for play button */
 @keyframes pulse-glow {
   0%, 100% {
@@ -118,3 +137,111 @@ h1, h2, h3, h4, h5, h6 {
                 0 0 150px rgba(168, 85, 247, 0.3);
   }
 }
+
+/* Sparkle twinkle animation for background stars */
+@keyframes sparkle-twinkle {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(1) translate(0, 0);
+  }
+  25% {
+    opacity: 0.5;
+    transform: scale(1.2) translate(2px, -2px);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.4) translate(-1px, 1px);
+  }
+  75% {
+    opacity: 0.4;
+    transform: scale(1.1) translate(1px, 2px);
+  }
+}
+
+/* Sparkle fade for shooting star trail */
+@keyframes sparkle-fade {
+  0% {
+    opacity: 0.8;
+    transform: translateX(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.5);
+  }
+}
+
+/* Shooting star pulse animation */
+@keyframes shooting-star-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: rotate(135deg) scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: rotate(135deg) scale(1.05);
+  }
+}
+
+/* Dancing fire stick man animations */
+@keyframes dance {
+  0%, 100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  25% {
+    transform: translateY(-8px) rotate(2deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(-1deg);
+  }
+  75% {
+    transform: translateY(-10px) rotate(3deg);
+  }
+}
+
+@keyframes fire-flicker {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes arm-wave-left {
+  0%, 100% {
+    transform: translateX(-50%) rotate(-30deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(10deg);
+  }
+}
+
+@keyframes arm-wave-right {
+  0%, 100% {
+    transform: translateX(-50%) rotate(30deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(-10deg);
+  }
+}
+
+@keyframes leg-kick-left {
+  0%, 100% {
+    transform: translateX(-50%) rotate(-15deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(20deg);
+  }
+}
+
+@keyframes leg-kick-right {
+  0%, 100% {
+    transform: translateX(-50%) rotate(15deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(-20deg);
+  }
+}
+
