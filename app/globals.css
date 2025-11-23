@@ -44,23 +44,44 @@ body {
   touch-action: manipulation;
 }
 
-/* Maintain desktop layout on all devices */
+/* Maintain desktop layout on all devices - fixed width approach */
 html {
-  min-width: 1280px;
+  width: 1280px;
+  margin: 0 auto;
+  overflow-x: hidden;
 }
 
-@media (max-width: 1280px) {
+body {
+  width: 1280px;
+  margin: 0 auto;
+}
+
+/* Scale down on smaller screens */
+@media (max-width: 1279px) {
   html {
-    transform-origin: top left;
+    transform-origin: top center;
     transform: scale(calc(100vw / 1280));
     width: 1280px;
     height: calc(100vh / (100vw / 1280));
-    overflow-x: hidden;
+    margin: 0;
+    position: relative;
+    left: 50%;
+    margin-left: -640px;
   }
   
   body {
     width: 1280px;
     min-height: calc(100vh / (100vw / 1280));
+    margin: 0;
+  }
+}
+
+/* For very small screens, adjust transform origin */
+@media (max-width: 640px) {
+  html {
+    transform-origin: top left;
+    left: 0;
+    margin-left: 0;
   }
 }
 

@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     ...config.target_market.ideal_clients,
   ].join(", "),
   viewport: {
-    width: 1280,
+    width: 'device-width',
     initialScale: 1,
     maximumScale: 1,
     userScalable: false,
