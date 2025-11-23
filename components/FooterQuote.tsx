@@ -5,10 +5,12 @@ import { colors } from '@/lib/config';
 export default function FooterQuote() {
   return (
     <footer 
-      className="px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-12 sm:py-16 md:py-20 lg:py-24 border-t flex items-center justify-center"
+      className="py-12 sm:py-16 md:py-20 lg:py-24 border-t flex items-center justify-center"
       style={{ 
         borderColor: colors.secondary,
         backgroundColor: colors.primary,
+        paddingLeft: 'clamp(1rem, 5vw, 6rem)',
+        paddingRight: 'clamp(1rem, 5vw, 6rem)',
       }}
     >
       <div className="w-full max-w-7xl mx-auto flex items-center justify-center">

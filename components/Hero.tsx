@@ -12,16 +12,16 @@ export default function Hero() {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-24 py-12 sm:py-16 md:py-20 lg:py-24">
-      <div className="w-full max-w-7xl mx-auto">
-        <div className="grid grid-cols-2 gap-12 md:gap-16 lg:gap-24 xl:gap-32 2xl:gap-48 items-end">
+    <section className="min-h-screen flex items-center justify-center py-12 sm:py-16 md:py-20 lg:py-24" style={{ paddingLeft: 'clamp(1rem, 5vw, 6rem)', paddingRight: 'clamp(1rem, 5vw, 6rem)' }}>
+      <div className="w-full mx-auto" style={{ maxWidth: 'clamp(1200px, 90vw, 1600px)' }}>
+        <div className="grid grid-cols-2 items-end" style={{ gap: 'clamp(4rem, 12vw, 12rem)' }}>
           {/* Left: Video Frame */}
-          <div className="w-full flex items-center" style={{ maxWidth: '100%' }}>
+          <div className="w-full flex items-center" style={{ maxWidth: '100%', paddingRight: 'clamp(1rem, 3vw, 2rem)' }}>
             <VideoFrame videoSrc="/landing-page-video.mp4" />
           </div>
 
           {/* Right: Headline, Bullets, CTA */}
-          <div className="w-full flex flex-col justify-start relative" style={{ paddingLeft: '0', paddingTop: '0', minHeight: '100%' }}>
+          <div className="w-full flex flex-col justify-start relative" style={{ paddingLeft: 'clamp(1rem, 3vw, 2rem)', paddingTop: '0', minHeight: '100%' }}>
             {/* Headline */}
             <h1 
               className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-light leading-tight tracking-tight"

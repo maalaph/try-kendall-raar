@@ -61,25 +61,17 @@ body {
   }
 }
 
-/* Desktop breakpoints for consistent spacing */
-@media (min-width: 1024px) {
-  :root {
-    --desktop-padding: clamp(2rem, 4vw, 6rem);
-    --desktop-gap: clamp(3rem, 6vw, 12rem);
-  }
-}
-
+/* Desktop breakpoints for consistent spacing - ensures proportional scaling */
+/* For screens 1280px and above, maintain consistent visual proportions */
 @media (min-width: 1280px) {
   :root {
-    --desktop-padding: clamp(3rem, 5vw, 6rem);
-    --desktop-gap: clamp(4rem, 8vw, 12rem);
+    --desktop-padding: clamp(1.5rem, 5vw, 6rem);
+    --desktop-gap: clamp(4rem, 12vw, 12rem);
   }
-}
-
-@media (min-width: 1536px) {
-  :root {
-    --desktop-padding: clamp(4rem, 6vw, 6rem);
-    --desktop-gap: clamp(6rem, 10vw, 12rem);
+  
+  /* Ensure consistent spacing ratios across all desktop sizes */
+  body {
+    font-size: clamp(16px, 1vw, 18px);
   }
 }
 
