@@ -27,63 +27,20 @@ export default function BookingSection() {
             style={{ color: colors.text }}
           >
             Try{' '}
-            <span
+            <span 
+              className="kendall-glow"
               style={{
                 color: colors.accent,
+                opacity: 0.75,
                 fontFamily: 'var(--font-league-spartan), sans-serif',
                 fontWeight: 700,
+                display: 'inline-block',
               }}
             >
               Kendall
             </span>
             {' '}For Free.
           </h2>
-        </div>
-
-        {/* Meeting Details */}
-        <div className="flex flex-col items-center justify-center gap-3 sm:gap-4 px-4">
-          <div className="flex items-center gap-2" style={{ color: colors.text }}>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ color: colors.text }}
-            >
-              <path
-                d="M8 0C3.589 0 0 3.589 0 8s3.589 8 8 8 8-3.589 8-8-3.589-8-8-8zm0 14c-3.309 0-6-2.691-6-6s2.691-6 6-6 6 2.691 6 6-2.691 6-6 6z"
-                fill="currentColor"
-              />
-              <path
-                d="M8.5 4H7v4.5l3.5 2.1.8-1.3-3.2-1.9V4z"
-                fill="currentColor"
-              />
-            </svg>
-            <span className="text-sm sm:text-base font-light">15 min</span>
-          </div>
-          <div className="flex items-center gap-2" style={{ color: colors.text }}>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              style={{ color: colors.text }}
-            >
-              <path
-                d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2z"
-                fill="currentColor"
-              />
-              <path
-                d="M2 3h12v1H2V3zm0 2h12v1H2V5zm0 2h8v1H2V7zm0 2h12v1H2V9zm0 2h12v1H2v-1zm0 2h8v1H2v-1z"
-                fill="currentColor"
-              />
-            </svg>
-            <span className="text-sm sm:text-base font-light">
-              Meeting information provided upon booking.
-            </span>
-          </div>
         </div>
 
         {/* Calendar only - centered and full width */}

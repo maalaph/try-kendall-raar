@@ -11,6 +11,7 @@ export default function Navbar() {
         paddingBottom: '1.125rem',
         paddingLeft: '3rem',
         paddingRight: '3rem',
+        minWidth: '1280px',
       }}
     >
       <a
@@ -38,17 +39,19 @@ export default function Navbar() {
       {kendallPhoneNumber && (
         <a
           href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
-          className="group flex items-center gap-2 sm:gap-3 lg:gap-3 transition-all duration-300 px-3 py-2 sm:px-4 sm:py-2 lg:px-7 lg:py-3.5 text-sm sm:text-base lg:text-lg"
+          className="group flex items-center gap-2 sm:gap-3 lg:gap-3 transition-all duration-300 px-5 py-2 sm:px-6 sm:py-2 lg:px-10 lg:py-3.5 text-sm sm:text-base lg:text-lg"
           style={{
             color: colors.text,
             backgroundColor: `${colors.accent}15`,
-            border: `2px solid ${colors.accent}`,
+            border: `2.5px solid ${colors.accent}`,
             borderRadius: '12px',
             fontWeight: 500,
             fontFamily: 'var(--font-inter), sans-serif',
             textDecoration: 'none',
             boxShadow: `0 0 15px ${colors.accent}30`,
             minHeight: '44px',
+            minWidth: '220px',
+            marginLeft: 'auto',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
@@ -78,11 +81,14 @@ export default function Navbar() {
             />
           </svg>
           <span className="hidden sm:inline">
-            <span
+            <span 
+              className="kendall-glow"
               style={{
+                color: colors.accent,
+                opacity: 0.75,
                 fontFamily: 'var(--font-league-spartan), sans-serif',
                 fontWeight: 700,
-                color: colors.accent,
+                display: 'inline-block',
               }}
             >
               Kendall

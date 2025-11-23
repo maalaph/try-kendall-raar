@@ -12,16 +12,16 @@ export default function Hero() {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
+    <section className="min-h-screen flex items-center justify-center" style={{ padding: '3rem 3rem' }}>
       <div className="w-full max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-48 items-end">
+        <div className="grid grid-cols-2 gap-48 items-end" style={{ minWidth: '1200px' }}>
           {/* Left: Video Frame */}
-          <div className="order-2 lg:order-1 w-full flex items-center lg:pr-0" style={{ maxWidth: '100%', marginRight: '0', marginLeft: '0' }}>
-            <VideoFrame />
+          <div className="w-full flex items-center" style={{ maxWidth: '100%' }}>
+            <VideoFrame videoSrc="/landing-page-video.mp4" />
           </div>
 
           {/* Right: Headline, Bullets, CTA */}
-          <div className="order-1 lg:order-2 w-full flex flex-col justify-start lg:pl-0 relative" style={{ paddingLeft: '0', paddingTop: '0', minHeight: '100%' }}>
+          <div className="w-full flex flex-col justify-start relative" style={{ paddingLeft: '0', paddingTop: '0', minHeight: '100%' }}>
             {/* Headline */}
             <h1 
               className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-light leading-tight tracking-tight"
@@ -151,7 +151,7 @@ export default function Hero() {
                 className="group relative flex items-center justify-center overflow-hidden w-full sm:w-auto touch-manipulation"
                 style={{
                   color: colors.text,
-                  backgroundColor: 'transparent',
+                  backgroundColor: `${colors.accent}15`,
                   border: `2px solid ${colors.accent}`,
                   borderRadius: '12px',
                   padding: '1.125rem 2rem',
@@ -162,14 +162,18 @@ export default function Hero() {
                   minWidth: 'auto',
                   minHeight: '52px',
                   transition: 'all 0.3s ease',
+                  boxShadow: `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`,
+                  transform: 'scale(1.1)',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
-                  e.currentTarget.style.transform = 'scale(1.1)';
+                  e.currentTarget.style.boxShadow = `0 0 60px ${colors.accent}90, 0 0 120px ${colors.accent}70, 0 0 160px ${colors.accent}50`;
+                  e.currentTarget.style.transform = 'scale(1.15)';
+                  e.currentTarget.style.backgroundColor = `${colors.accent}25`;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = 'none';
-                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                  e.currentTarget.style.backgroundColor = `${colors.accent}15`;
                 }}
               >
                 <span style={{ 
@@ -178,13 +182,17 @@ export default function Hero() {
                   transition: 'all 0.3s ease',
                   textShadow: '0 2px 8px rgba(0, 0, 0, 0.4)'
                 }}>
-                  Feel{' '}
-                  <span style={{ 
-                    fontFamily: 'var(--font-league-spartan), sans-serif',
-                    fontWeight: 700,
-                    color: colors.accent,
-                    textShadow: `0 2px 10px ${colors.accent}50, 0 4px 20px ${colors.accent}30`
-                  }}>
+                  <span style={{ fontStyle: 'italic' }}>Feel</span>{' '}
+                  <span 
+                    className="kendall-glow"
+                    style={{ 
+                      fontFamily: 'var(--font-league-spartan), sans-serif',
+                      fontWeight: 700,
+                      color: colors.accent,
+                      opacity: 0.75,
+                      display: 'inline-block',
+                    }}
+                  >
                     Kendall
                   </span>
                   {' '}in action. → Free Trial

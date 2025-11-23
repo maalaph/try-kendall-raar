@@ -44,6 +44,26 @@ body {
   touch-action: manipulation;
 }
 
+/* Maintain desktop layout on all devices */
+html {
+  min-width: 1280px;
+}
+
+@media (max-width: 1280px) {
+  html {
+    transform-origin: top left;
+    transform: scale(calc(100vw / 1280));
+    width: 1280px;
+    height: calc(100vh / (100vw / 1280));
+    overflow-x: hidden;
+  }
+  
+  body {
+    width: 1280px;
+    min-height: calc(100vh / (100vw / 1280));
+  }
+}
+
 /* Mobile touch optimizations */
 .touch-manipulation {
   touch-action: manipulation;
