@@ -11,10 +11,7 @@ export default function Navbar() {
         paddingBottom: '1.125rem',
         paddingLeft: '3rem',
         paddingRight: '3rem',
-        width: '100%',
-        maxWidth: '1280px',
-        left: '50%',
-        transform: 'translateX(-50%)',
+        minWidth: '1280px',
       }}
     >
       <a

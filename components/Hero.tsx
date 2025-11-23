@@ -12,9 +12,9 @@ export default function Hero() {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center" style={{ padding: '3rem 3rem', width: '100%' }}>
-      <div className="w-full max-w-7xl mx-auto" style={{ width: '100%', maxWidth: '1280px' }}>
-        <div className="grid grid-cols-2 gap-48 items-end" style={{ width: '100%' }}>
+    <section className="min-h-screen flex items-center justify-center" style={{ padding: '3rem 3rem' }}>
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="grid grid-cols-2 gap-48 items-end" style={{ minWidth: '1200px' }}>
           {/* Left: Video Frame */}
           <div className="w-full flex items-center" style={{ maxWidth: '100%' }}>
             <VideoFrame videoSrc="/landing-page-video.mp4" />
