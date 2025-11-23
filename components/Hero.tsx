@@ -28,7 +28,7 @@ export default function Hero() {
               style={{ color: colors.text }}
             >
               <span style={{ display: 'block' }}>Missed Calls & No Shows Are Costly.</span>
-              <span style={{ display: 'block', marginTop: '6rem sm:7rem' }}>
+              <span style={{ display: 'block', marginTop: '3rem' }}>
                 Meet{' '}
                 <span 
                   style={{ 
@@ -45,7 +45,7 @@ export default function Hero() {
             {/* Bullets */}
             <ul 
               className="space-y-3 sm:space-y-4"
-              style={{ marginTop: '5rem sm:6rem' }}
+              style={{ marginTop: '3rem' }}
             >
               <li 
                 className="flex items-start gap-2 sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
