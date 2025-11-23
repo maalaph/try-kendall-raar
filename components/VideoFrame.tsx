@@ -13,11 +13,20 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
     <div className="relative w-full">
       {/* Purple aura glow effect */}
       <div 
-        className="relative rounded-lg overflow-hidden"
+        className="relative rounded-lg overflow-hidden group"
         style={{
           border: `2px solid ${colors.primary}`,
           boxShadow: `0 0 20px ${colors.accent}30, 0 0 40px ${colors.accent}20, 0 0 60px ${colors.accent}10`,
           aspectRatio: '16/9',
+          transition: 'all 0.3s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = `0 0 30px ${colors.accent}50, 0 0 60px ${colors.accent}30, 0 0 90px ${colors.accent}20`;
+          e.currentTarget.style.transform = 'scale(1.02)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}30, 0 0 40px ${colors.accent}20, 0 0 60px ${colors.accent}10`;
+          e.currentTarget.style.transform = 'scale(1)';
         }}
       >
         {videoSrc ? (
@@ -119,10 +128,12 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
           className="relative w-full mt-12 sm:mt-16 lg:mt-20"
           style={{ aspectRatio: '16/9' }}
         >
-          {/* Phone icon button - centered above text with pulsing animation, matching play button position */}
+          {/* Phone icon and text on same line, centered at bottom */}
           <div 
-            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+            className="absolute left-1/2 transform -translate-x-1/2 flex items-center justify-center gap-6 lg:gap-8 px-4"
+            style={{ bottom: '2rem' }}
           >
+            {/* Phone button circle with glow */}
             <div className="relative inline-block">
               {/* Animated outer ring */}
               <div
@@ -134,13 +145,11 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
                   transform: 'scale(1.3)',
                 }}
               />
-              {/* Phone button circle with glow - matching play button exactly */}
+              {/* Phone button */}
               <a
                 href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
-                className="group relative flex items-center justify-center transition-all duration-300 cursor-pointer touch-manipulation"
+                className="group relative flex items-center justify-center transition-all duration-300 cursor-pointer touch-manipulation w-[60px] h-[60px] lg:w-[70px] lg:h-[70px]"
                 style={{
-                  width: '80px',
-                  height: '80px',
                   borderRadius: '50%',
                   backgroundColor: `${colors.accent}20`,
                   border: `2px solid ${colors.accent}`,
@@ -158,8 +167,7 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
                 }}
               >
                 <svg
-                  width="36"
-                  height="36"
+                  className="w-6 h-6 lg:w-8 lg:h-8"
                   viewBox="0 0 24 24"
                   fill="none"
                   style={{ color: colors.accent }}
@@ -174,15 +182,10 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
                 </svg>
               </a>
             </div>
-          </div>
-
-          {/* Text below centered - exact same spacing as "See Kendall in action." (bottom: 2rem) */}
-          <div 
-            className="absolute left-1/2 transform -translate-x-1/2 text-center px-4"
-            style={{ bottom: '2rem' }}
-          >
+            
+            {/* Text next to phone icon */}
             <p 
-              className="text-sm sm:text-base md:text-lg font-light tracking-wide"
+              className="text-base sm:text-base md:text-lg font-light tracking-wide whitespace-nowrap"
               style={{ color: colors.text }}
             >
               Hear{' '}
