@@ -1,7 +1,7 @@
 'use client';
 
 import VideoFrame from './VideoFrame';
-import { heroContent, colors } from '@/lib/config';
+import { heroContent, colors, kendallPhoneNumber } from '@/lib/config';
 
 export default function Hero() {
   const scrollToBooking = () => {
@@ -14,14 +14,14 @@ export default function Hero() {
   return (
     <section className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
       <div className="w-full max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-24 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-32 items-start">
           {/* Left: Video Frame */}
-          <div className="order-2 lg:order-1 w-full flex items-center lg:pr-0" style={{ maxWidth: '100%', marginRight: '0', marginLeft: '0' }}>
+          <div className="order-2 lg:order-1 w-full flex flex-col items-center lg:pr-0" style={{ maxWidth: '100%', marginRight: '0', marginLeft: '0' }}>
             <VideoFrame />
           </div>
 
           {/* Right: Headline, Bullets, CTA */}
-          <div className="order-1 lg:order-2 w-full flex flex-col justify-center lg:pl-8" style={{ paddingLeft: '0', paddingTop: '-1rem' }}>
+          <div className="order-1 lg:order-2 w-full flex flex-col justify-start lg:pl-0" style={{ paddingLeft: '0', paddingTop: '0' }}>
             {/* Headline */}
             <h1 
               className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-light leading-tight tracking-tight"
@@ -139,7 +139,7 @@ export default function Hero() {
                 }}
               >
                 <span style={{ position: 'relative', zIndex: 1, transition: 'all 0.3s ease' }}>
-                  Your move → Try{' '}
+                  Feel{' '}
                   <span style={{ 
                     fontFamily: 'var(--font-league-spartan), sans-serif',
                     fontWeight: 700,
@@ -147,7 +147,7 @@ export default function Hero() {
                   }}>
                     Kendall
                   </span>
-                  {' '}For Free.
+                  {' '}in action. → Free Trial
                 </span>
               </button>
             </div>

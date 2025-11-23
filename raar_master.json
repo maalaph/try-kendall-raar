@@ -42,6 +42,7 @@
   "product": {
     "name": "Kendall",
     "type": "24/7 AI receptionist",
+    "phone_number": "(814) 563-0232",
     "personality": {
       "tone": "calm, precise, lightly witty, aware of the customer\u2019s patterns",
       "jokes": "subtle, contextual, observational",

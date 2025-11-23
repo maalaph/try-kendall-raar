@@ -31,6 +31,7 @@ export interface RAARConfig {
   product: {
     name: string;
     type: string;
+    phone_number?: string;
     personality: {
       tone: string;
       jokes: string;
@@ -96,4 +97,5 @@ export const colors = config.brand.visual.palette;
 export const heroContent = config.landing_page.hero;
 export const bookingContent = config.landing_page.booking_section;
 export const brandVoice = config.brand.voice;
+export const kendallPhoneNumber = config.product.phone_number || '';
 

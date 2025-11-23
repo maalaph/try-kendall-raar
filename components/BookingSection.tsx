@@ -1,7 +1,7 @@
 'use client';
 
 import CalendarEmbed from './CalendarEmbed';
-import { bookingContent, colors } from '@/lib/config';
+import { bookingContent, colors, kendallPhoneNumber } from '@/lib/config';
 
 export default function BookingSection() {
   return (
@@ -71,7 +71,7 @@ export default function BookingSection() {
               />
             </svg>
             <span className="text-sm sm:text-base font-light">
-              Meeting information provided upon confirmation.
+              Meeting information provided upon booking.
             </span>
           </div>
         </div>
