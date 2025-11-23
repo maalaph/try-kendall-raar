@@ -12,9 +12,9 @@ export default function Hero() {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center px-5 sm:px-6 lg:px-8 pt-24 sm:pt-32 lg:pt-40 pb-12 sm:pb-16 lg:pb-20">
+    <section className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-20 sm:pt-32 lg:pt-40 pb-8 sm:pb-16 lg:pb-20">
       <div className="w-full max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-8 lg:gap-48 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8 lg:gap-48 items-start">
           {/* Left: Video Frame */}
           <div className="order-2 lg:order-1 w-full flex flex-col items-center lg:pr-0" style={{ maxWidth: '100%', marginRight: '0', marginLeft: '0' }}>
             <VideoFrame />
@@ -24,11 +24,11 @@ export default function Hero() {
           <div className="order-1 lg:order-2 w-full flex flex-col justify-start lg:pl-0" style={{ paddingLeft: '0', paddingTop: '0' }}>
             {/* Headline */}
             <h1 
-              className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-light leading-tight tracking-tight"
-              style={{ color: colors.text, lineHeight: '1.2' }}
+              className="text-xl sm:text-3xl md:text-4xl lg:text-6xl font-light leading-tight tracking-tight"
+              style={{ color: colors.text }}
             >
               <span style={{ display: 'block' }}>Missed Calls & No Shows Are Costly.</span>
-              <span style={{ display: 'block', marginTop: '1.25rem' }}>
+              <span style={{ display: 'block', marginTop: '1.5rem' }}>
                 Meet{' '}
                 <span 
                   className="kendall-glow"
@@ -47,12 +47,12 @@ export default function Hero() {
 
             {/* Bullets */}
             <ul 
-              className="space-y-3 sm:space-y-4"
+              className="space-y-2.5 sm:space-y-4"
               style={{ marginTop: '1.5rem' }}
             >
               <li 
-                className="flex items-start gap-2.5 sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
-                style={{ color: colors.text, opacity: 0.9, lineHeight: '1.6' }}
+                className="flex items-start gap-2 sm:gap-2.5 text-xs sm:text-base md:text-lg font-light"
+                style={{ color: colors.text, opacity: 0.9, lineHeight: '1.5' }}
               >
                 <span 
                   className="mt-1 flex-shrink-0"
@@ -63,8 +63,8 @@ export default function Hero() {
                 <span className="leading-relaxed">Answers every call instantly</span>
               </li>
               <li 
-                className="flex items-start gap-2.5 sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
-                style={{ color: colors.text, opacity: 0.9, lineHeight: '1.6' }}
+                className="flex items-start gap-2 sm:gap-2.5 text-xs sm:text-base md:text-lg font-light"
+                style={{ color: colors.text, opacity: 0.9, lineHeight: '1.5' }}
               >
                 <span 
                   className="mt-1 flex-shrink-0"
@@ -75,8 +75,8 @@ export default function Hero() {
                 <span className="leading-relaxed">Confirms, reschedules, and follows up automatically</span>
               </li>
               <li 
-                className="flex items-start gap-2.5 sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
-                style={{ color: colors.text, opacity: 0.9, lineHeight: '1.6' }}
+                className="flex items-start gap-2 sm:gap-2.5 text-xs sm:text-base md:text-lg font-light"
+                style={{ color: colors.text, opacity: 0.9, lineHeight: '1.5' }}
               >
                 <span 
                   className="mt-1 flex-shrink-0"
@@ -87,8 +87,8 @@ export default function Hero() {
                 <span className="leading-relaxed">Handles customers 24/7</span>
               </li>
               <li 
-                className="flex items-start gap-2.5 sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
-                style={{ color: colors.text, opacity: 0.9, lineHeight: '1.6' }}
+                className="flex items-start gap-2 sm:gap-2.5 text-xs sm:text-base md:text-lg font-light"
+                style={{ color: colors.text, opacity: 0.9, lineHeight: '1.5' }}
               >
                 <span 
                   className="mt-1 flex-shrink-0"
@@ -99,8 +99,8 @@ export default function Hero() {
                 <span className="leading-relaxed">Updates your calendar</span>
               </li>
               <li 
-                className="flex items-start gap-2.5 sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
-                style={{ color: colors.text, opacity: 0.9, lineHeight: '1.6' }}
+                className="flex items-start gap-2 sm:gap-2.5 text-xs sm:text-base md:text-lg font-light"
+                style={{ color: colors.text, opacity: 0.9, lineHeight: '1.5' }}
               >
                 <span 
                   className="mt-1 flex-shrink-0"
@@ -113,22 +113,22 @@ export default function Hero() {
             </ul>
 
             {/* CTA Button */}
-            <div className="flex justify-center sm:justify-start" style={{ marginTop: '2rem' }}>
+            <div className="flex justify-center" style={{ marginTop: '1.5rem' }}>
               <button
                 onClick={scrollToBooking}
-                className="group relative flex items-center justify-center overflow-hidden w-full sm:w-auto"
+                className="group relative flex items-center justify-center overflow-hidden w-full sm:w-auto touch-manipulation"
                 style={{
                   color: colors.text,
                   backgroundColor: 'transparent',
                   border: `2px solid ${colors.accent}`,
                   borderRadius: '12px',
-                  padding: '1.125rem 2rem',
-                  fontSize: '1rem',
+                  padding: '1rem 1.5rem',
+                  fontSize: '0.95rem',
                   fontWeight: 500,
                   fontFamily: 'var(--font-inter), sans-serif',
                   cursor: 'pointer',
                   minWidth: 'auto',
-                  minHeight: '52px', // iOS touch target minimum
+                  minHeight: '48px',
                   transition: 'all 0.3s ease',
                 }}
                 onMouseEnter={(e) => {

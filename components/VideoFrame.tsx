@@ -54,11 +54,10 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               <div className="relative inline-block">
                 {/* Play button circle */}
                 <div
-                  className="relative flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110"
-                  className="touch-manipulation"
+                  className="relative flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 touch-manipulation"
                   style={{
-                    width: 'clamp(70px, 12vw, 80px)',
-                    height: 'clamp(70px, 12vw, 80px)',
+                    width: '80px',
+                    height: '80px',
                     borderRadius: '50%',
                     backgroundColor: `${colors.accent}20`,
                     border: `2px solid ${colors.accent}`,
@@ -91,10 +90,10 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
             {/* Text below centered */}
             <div 
               className="absolute left-1/2 transform -translate-x-1/2 text-center px-4"
-              style={{ bottom: '1.5rem' }}
+              style={{ bottom: '2rem' }}
             >
               <p 
-                className="text-base sm:text-base md:text-lg font-light tracking-wide"
+                className="text-sm sm:text-base md:text-lg font-light tracking-wide"
                 style={{ color: colors.text }}
               >
                 See{' '}
@@ -138,11 +137,10 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               {/* Phone button circle with glow - matching play button exactly */}
               <a
                 href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
-                className="group relative flex items-center justify-center transition-all duration-300 cursor-pointer"
-                className="touch-manipulation"
+                className="group relative flex items-center justify-center transition-all duration-300 cursor-pointer touch-manipulation"
                 style={{
-                  width: 'clamp(70px, 12vw, 80px)',
-                  height: 'clamp(70px, 12vw, 80px)',
+                  width: '80px',
+                  height: '80px',
                   borderRadius: '50%',
                   backgroundColor: `${colors.accent}20`,
                   border: `2px solid ${colors.accent}`,
@@ -178,13 +176,13 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
             </div>
           </div>
 
-          {/* Text below centered - exact same spacing as "See Kendall in action." */}
+          {/* Text below centered - exact same spacing as "See Kendall in action." (bottom: 2rem) */}
           <div 
             className="absolute left-1/2 transform -translate-x-1/2 text-center px-4"
-            style={{ bottom: '1.5rem' }}
+            style={{ bottom: '2rem' }}
           >
             <p 
-              className="text-base sm:text-base md:text-lg font-light tracking-wide"
+              className="text-sm sm:text-base md:text-lg font-light tracking-wide"
               style={{ color: colors.text }}
             >
               Hear{' '}

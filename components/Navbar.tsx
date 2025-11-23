@@ -5,24 +5,23 @@ import { colors, kendallPhoneNumber } from '@/lib/config';
 export default function Navbar() {
   return (
     <nav 
-      className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center"
-      className="px-4 sm:px-6 lg:px-12"
+      className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center px-4 sm:px-6 lg:px-12"
       style={{
-        paddingTop: '1.25rem',
-        paddingBottom: '1.25rem',
+        paddingTop: '1rem',
+        paddingBottom: '1rem',
       }}
     >
       <a
         href="/"
         className="inline-block transition-all duration-300"
-        style={{
-          fontFamily: 'var(--font-league-spartan), sans-serif',
-          fontSize: 'clamp(24px, 6vw, 60px)',
-          color: colors.text,
-          textDecoration: 'none',
-          fontWeight: 700,
-          letterSpacing: '-0.02em',
-        }}
+          style={{
+            fontFamily: 'var(--font-league-spartan), sans-serif',
+            fontSize: 'clamp(24px, 6vw, 60px)',
+            color: colors.text,
+            textDecoration: 'none',
+            fontWeight: 700,
+            letterSpacing: '-0.02em',
+          }}
         onMouseEnter={(e) => {
           e.currentTarget.style.textShadow = `0 0 20px ${colors.accent}33`; // 33 hex = ~20% opacity
         }}
@@ -37,19 +36,17 @@ export default function Navbar() {
       {kendallPhoneNumber && (
         <a
           href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
-          className="group flex items-center gap-2 sm:gap-3 transition-all duration-300"
+          className="group flex items-center gap-2 sm:gap-3 lg:gap-3 transition-all duration-300 px-3 py-2 sm:px-4 sm:py-2 lg:px-7 lg:py-3.5 text-sm sm:text-base lg:text-lg"
           style={{
             color: colors.text,
             backgroundColor: `${colors.accent}15`,
             border: `2px solid ${colors.accent}`,
             borderRadius: '12px',
-            padding: '0.875rem 1.25rem',
-            fontSize: '0.95rem',
             fontWeight: 500,
             fontFamily: 'var(--font-inter), sans-serif',
             textDecoration: 'none',
             boxShadow: `0 0 15px ${colors.accent}30`,
-            minHeight: '48px', // iOS touch target minimum
+            minHeight: '44px',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
