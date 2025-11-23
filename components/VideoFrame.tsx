@@ -13,11 +13,19 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
     <div className="relative w-full">
       {/* Purple aura glow effect */}
       <div 
-        className="relative rounded-lg overflow-hidden"
+        className="relative rounded-lg overflow-hidden transition-all duration-300 cursor-pointer"
         style={{
           border: `2px solid ${colors.primary}`,
           boxShadow: `0 0 20px ${colors.accent}30, 0 0 40px ${colors.accent}20, 0 0 60px ${colors.accent}10`,
           aspectRatio: '16/9',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50, 0 0 120px ${colors.accent}30`;
+          e.currentTarget.style.transform = 'scale(1.02)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}30, 0 0 40px ${colors.accent}20, 0 0 60px ${colors.accent}10`;
+          e.currentTarget.style.transform = 'scale(1)';
         }}
       >
         {videoSrc ? (
