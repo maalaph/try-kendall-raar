@@ -5,7 +5,7 @@ import { colors, kendallPhoneNumber } from '@/lib/config';
 export default function Navbar() {
   return (
     <nav 
-      className="absolute top-0 left-0 right-0 z-50 flex justify-between items-start"
+      className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center"
       style={{
         padding: '1.5rem 3rem',
       }}
@@ -46,7 +46,6 @@ export default function Navbar() {
             fontWeight: 500,
             fontFamily: 'var(--font-inter), sans-serif',
             textDecoration: 'none',
-            marginTop: '0.5rem',
             boxShadow: `0 0 15px ${colors.accent}30`,
           }}
           onMouseEnter={(e) => {
