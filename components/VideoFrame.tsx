@@ -94,14 +94,36 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
               </div>
             </div>
             
+            {/* Text below centered - desktop version */}
+            <div 
+              className="hidden lg:block absolute left-1/2 transform -translate-x-1/2 text-center px-4"
+              style={{ bottom: '2rem' }}
+            >
+              <p 
+                className="text-sm sm:text-base md:text-lg font-light tracking-wide"
+                style={{ color: colors.text }}
+              >
+                See{' '}
+                <span
+                  style={{
+                    fontFamily: 'var(--font-league-spartan), sans-serif',
+                    fontWeight: 700,
+                    color: colors.accent,
+                  }}
+                >
+                  Kendall
+                </span>
+                {' '}in action.
+              </p>
+            </div>
           </div>
         )}
       </div>
       
-      {/* Text below video - outside overflow container */}
-      <div className="text-center px-4 mt-4">
+      {/* Text below video - mobile only version outside overflow container */}
+      <div className="lg:hidden text-center px-4 mt-4">
         <p 
-          className="text-sm sm:text-base md:text-lg font-light tracking-wide"
+          className="text-sm font-light tracking-wide"
           style={{ color: colors.text }}
         >
           See{' '}
