@@ -12,9 +12,9 @@ export default function Hero() {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-36 sm:pt-32 lg:pt-40 pb-8 sm:pb-16 lg:pb-20">
+    <section className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 pt-28 sm:pt-32 lg:pt-40 pb-8 sm:pb-16 lg:pb-20">
       <div className="w-full max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-48 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-8 lg:gap-48 items-start">
           {/* Left: Video Frame */}
           <div className="order-2 lg:order-1 w-full flex flex-col items-center lg:pr-0" style={{ maxWidth: '100%', marginRight: '0', marginLeft: '0' }}>
             <VideoFrame />
@@ -28,7 +28,7 @@ export default function Hero() {
               style={{ color: colors.text }}
             >
               <span style={{ display: 'block' }}>Missed Calls & No Shows Are Costly.</span>
-              <span style={{ display: 'block', marginTop: '1.5rem' }}>
+              <span style={{ display: 'block', marginTop: '1.25rem' }}>
                 Meet{' '}
                 <span 
                   className="kendall-glow"
@@ -47,11 +47,11 @@ export default function Hero() {
 
             {/* Bullets */}
             <ul 
-              className="space-y-2.5 sm:space-y-4"
-              style={{ marginTop: '1.5rem' }}
+              className="space-y-3 sm:space-y-4"
+              style={{ marginTop: '2rem' }}
             >
               <li 
-                className="flex items-start gap-[10px] sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
+                className="flex items-start gap-[10px] sm:gap-2.5 text-base sm:text-base md:text-lg font-light"
                 style={{ color: colors.text, opacity: 0.9, lineHeight: '1.6' }}
               >
                 <span 
@@ -63,7 +63,7 @@ export default function Hero() {
                 <span className="leading-relaxed">Answers every call instantly</span>
               </li>
               <li 
-                className="flex items-start gap-[10px] sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
+                className="flex items-start gap-[10px] sm:gap-2.5 text-base sm:text-base md:text-lg font-light"
                 style={{ color: colors.text, opacity: 0.9, lineHeight: '1.6' }}
               >
                 <span 
@@ -75,7 +75,7 @@ export default function Hero() {
                 <span className="leading-relaxed">Confirms, reschedules, and follows up automatically</span>
               </li>
               <li 
-                className="flex items-start gap-[10px] sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
+                className="flex items-start gap-[10px] sm:gap-2.5 text-base sm:text-base md:text-lg font-light"
                 style={{ color: colors.text, opacity: 0.9, lineHeight: '1.6' }}
               >
                 <span 
@@ -87,7 +87,7 @@ export default function Hero() {
                 <span className="leading-relaxed">Handles customers 24/7</span>
               </li>
               <li 
-                className="flex items-start gap-[10px] sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
+                className="flex items-start gap-[10px] sm:gap-2.5 text-base sm:text-base md:text-lg font-light"
                 style={{ color: colors.text, opacity: 0.9, lineHeight: '1.6' }}
               >
                 <span 
@@ -99,7 +99,7 @@ export default function Hero() {
                 <span className="leading-relaxed">Updates your calendar</span>
               </li>
               <li 
-                className="flex items-start gap-[10px] sm:gap-2.5 text-sm sm:text-base md:text-lg font-light"
+                className="flex items-start gap-[10px] sm:gap-2.5 text-base sm:text-base md:text-lg font-light"
                 style={{ color: colors.text, opacity: 0.9, lineHeight: '1.6' }}
               >
                 <span 
@@ -113,7 +113,7 @@ export default function Hero() {
             </ul>
 
             {/* CTA Button */}
-            <div className="flex justify-center" style={{ marginTop: '1.5rem' }}>
+            <div className="flex justify-center" style={{ marginTop: '2rem' }}>
               <button
                 onClick={scrollToBooking}
                 className="group relative flex items-center justify-center overflow-hidden w-full sm:w-auto touch-manipulation"
@@ -122,8 +122,8 @@ export default function Hero() {
                   backgroundColor: 'transparent',
                   border: `2px solid ${colors.accent}`,
                   borderRadius: '12px',
-                  padding: '1.125rem 2rem',
-                  fontSize: '1rem',
+                  padding: '1.25rem 2.25rem',
+                  fontSize: '1.125rem',
                   fontWeight: 500,
                   fontFamily: 'var(--font-inter), sans-serif',
                   cursor: 'pointer',

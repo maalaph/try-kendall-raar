@@ -7,8 +7,8 @@ export default function Navbar() {
     <nav 
       className="absolute top-0 left-0 right-0 z-50 flex justify-between items-center px-5 sm:px-6 lg:px-12"
       style={{
-        paddingTop: '1.125rem',
-        paddingBottom: '1.125rem',
+        paddingTop: '0.875rem',
+        paddingBottom: '0.875rem',
       }}
     >
       <a
@@ -36,7 +36,7 @@ export default function Navbar() {
       {kendallPhoneNumber && (
         <a
           href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
-          className="group flex items-center gap-2 sm:gap-3 lg:gap-3 transition-all duration-300 px-3 py-2.5 sm:px-4 sm:py-2 lg:px-7 lg:py-3.5 text-xs sm:text-base lg:text-lg"
+          className="group flex items-center justify-center gap-2 sm:gap-3 lg:gap-3 transition-all duration-300 px-3 py-2.5 sm:px-4 sm:py-2 lg:px-7 lg:py-3.5 text-xs sm:text-base lg:text-lg"
           style={{
             color: colors.text,
             backgroundColor: `${colors.accent}15`,
