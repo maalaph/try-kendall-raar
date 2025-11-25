@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { colors } from '@/lib/config';
 import { businessTypesData } from '@/lib/businessTypes';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info } from 'lucide-react';
 
 const BUY_PERSONAL_URL = process.env.NEXT_PUBLIC_KENDALL_PERSONAL_URL || 'https://buy.stripe.com/cNi14n8968x6gOB8LocQU00';
 
@@ -194,7 +194,7 @@ export default function PricingPage() {
                 fontWeight: 600,
                 fontFamily: 'var(--font-inter), sans-serif',
                 marginBottom: '1.25rem',
-                marginTop: '0', // Align with Business Plans header
+                marginTop: '2.5rem', // Align with Business header (accounts for Free Trial CTA above)
               }}
             >
               Personal
@@ -412,7 +412,7 @@ export default function PricingPage() {
                 marginTop: '0', // Align with Personal header
               }}
             >
-              Business Plans
+              Business
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Top Row: Starter, Growth, Professional - Three cards side by side */}
@@ -813,7 +813,7 @@ export default function PricingPage() {
                 marginBottom: '1.25rem',
               }}
             >
-              Business Plans
+              Business
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {BUSINESS_PACKAGES.map((pkg) => {
@@ -1166,39 +1166,168 @@ export default function PricingPage() {
       </div>
 
       <div className="w-full" style={{ marginTop: '3rem', textAlign: 'center' }}>
-        <p
-          style={{
-            color: colors.text,
-            opacity: 0.8,
-            fontSize: '0.875rem',
-            fontFamily: 'var(--font-inter), sans-serif',
-            marginBottom: '1rem',
-          }}
-        >
-          Extra phone lines: ${PHONE_LINE_PRICE}/mo each
-        </p>
-        <p
-          style={{
-            color: colors.text,
-            opacity: 0.7,
-            fontSize: '0.8125rem',
-            fontFamily: 'var(--font-inter), sans-serif',
-            marginBottom: '0.5rem',
-          }}
-        >
-          All plans include standard features. No credit card required for free trial.
-        </p>
-        <p
-          style={{
-            color: colors.accent,
-            opacity: 0.8,
-            fontSize: '0.875rem',
-            fontFamily: 'var(--font-inter), sans-serif',
-            fontWeight: 500,
-          }}
-        >
-          Pricing is based on total minutes per month. Use our configurator to see your recommended plan.
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+          <p
+            style={{
+              color: colors.text,
+              opacity: 0.8,
+              fontSize: '0.875rem',
+              fontFamily: 'var(--font-inter), sans-serif',
+              margin: 0,
+            }}
+          >
+            Extra phone lines: ${PHONE_LINE_PRICE}/mo each
+          </p>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <Info 
+              size={16} 
+              style={{ color: colors.accent, cursor: 'pointer', opacity: 0.8 }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '1';
+                const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                if (tooltip) tooltip.style.opacity = '1';
+                if (tooltip) tooltip.style.visibility = 'visible';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '0.8';
+                const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                if (tooltip) tooltip.style.opacity = '0';
+                if (tooltip) tooltip.style.visibility = 'hidden';
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '100%',
+                transform: 'translateY(-50%)',
+                marginLeft: '0.5rem',
+                padding: '0.75rem 1rem',
+                backgroundColor: `${colors.accent}15`,
+                border: `1px solid ${colors.accent}60`,
+                borderRadius: '8px',
+                color: colors.text,
+                fontSize: '0.8125rem',
+                fontFamily: 'var(--font-inter), sans-serif',
+                opacity: 0,
+                visibility: 'hidden',
+                transition: 'opacity 0.2s ease, visibility 0.2s ease',
+                zIndex: 1000,
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                textAlign: 'left',
+                boxShadow: `0 4px 16px ${colors.accent}30`,
+              }}
+            >
+              Extra phone lines share the same minutes pool from your plan.
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  right: '100%',
+                  transform: 'translateY(-50%)',
+                  width: 0,
+                  height: 0,
+                  borderTop: '6px solid transparent',
+                  borderBottom: '6px solid transparent',
+                  borderRight: `6px solid ${colors.accent}60`,
+                }}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-center gap-6 sm:gap-8" style={{ marginTop: '1.5rem' }}>
+          {/* Facebook Icon */}
+          <a
+            href="https://www.facebook.com/share/1bbSX7Q8Qc/?mibextid=wwXIfr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-all duration-300"
+            style={{ color: colors.accent, opacity: 0.7 }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.7';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+            </svg>
+          </a>
+
+          {/* Email Icon */}
+          <a
+            href="mailto:admin@ordco.net"
+            className="transition-all duration-300"
+            style={{ color: colors.accent, opacity: 0.7 }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.7';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+              <polyline points="22,6 12,13 2,6" />
+            </svg>
+          </a>
+
+          {/* Instagram Icon */}
+          <a
+            href="https://www.instagram.com/raar.inc?igsh=MTRhZXZicmE5dXNpZw%3D%3D&utm_source=qr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="transition-all duration-300"
+            style={{ color: colors.accent, opacity: 0.7 }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.7';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+              <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+            </svg>
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -232,16 +232,16 @@ export default function CallDurationStep({
           fontSize: '1.25rem',
           fontWeight: 500,
           fontFamily: 'var(--font-inter), sans-serif',
-          marginBottom: '0.75rem',
+          marginBottom: '1.5rem',
           marginTop: '0',
           paddingTop: '0',
           display: 'flex',
           alignItems: 'center',
-          gap: '0.75rem',
-          flexWrap: 'wrap',
+          gap: '1rem',
+          flexWrap: 'nowrap',
         }}
       >
-        <span>How long on average are your calls? (mins)</span>
+        <span style={{ minWidth: 'clamp(200px, 25vw, 280px)' }}>How long are your calls? (mins)</span>
         <input
           ref={inputRef}
           type="text"
@@ -337,6 +337,7 @@ export default function CallDurationStep({
             outline: 'none',
             transition: 'all 0.25s ease',
             cursor: 'text',
+            flexShrink: 0,
           }}
         />
       </h3>

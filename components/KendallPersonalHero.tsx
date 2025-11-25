@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { colors } from '@/lib/config';
-import { User, Phone, Sparkles, Shield, Zap } from 'lucide-react';
+import { Briefcase, Megaphone, Phone, Sparkles, Shield, Zap } from 'lucide-react';
+import SimpleDot from './SimpleDot';
 
 const BUY_PERSONAL_URL = process.env.NEXT_PUBLIC_KENDALL_PERSONAL_URL || 'https://buy.stripe.com/cNi14n8968x6gOB8LocQU00';
 
@@ -85,7 +86,7 @@ export default function KendallPersonalHero() {
 
   return (
     <section 
-      id="personal-section"
+      id="kendall-personal-hero"
       className="w-full relative overflow-hidden flex flex-col items-center"
       style={{ 
         padding: 'clamp(4rem, 8vw, 8rem) clamp(2rem, 6vw, 8rem)',
@@ -128,74 +129,97 @@ export default function KendallPersonalHero() {
         );
       })}
       <div className="w-full max-w-7xl mx-auto flex flex-col items-center px-4" style={{ position: 'relative', zIndex: 1 }}>
-        {/* Header - Kendall Personal - Centered across entire section */}
-        <h2
-          className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light leading-tight tracking-tight text-center"
-          style={{ 
-            color: colors.text,
+        {/* Header - MyKendall - Centered across entire section */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 'clamp(2rem, 4vw, 3rem)',
             width: '100%',
             marginBottom: 'clamp(4rem, 8vw, 6rem)',
+            flexWrap: 'wrap',
           }}
         >
-          <span 
-            className="kendall-glow"
-            style={{
-              color: colors.accent,
-              opacity: 0.85,
-              fontFamily: 'var(--font-league-spartan), sans-serif',
-              fontWeight: 700,
-              display: 'inline-block',
+          <h2
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light leading-tight tracking-tight text-center"
+            style={{ 
+              color: colors.text,
+              margin: 0,
             }}
           >
-            Kendall
-          </span>{' '}
-          <span style={{ color: colors.text }}>
-            Personal
-          </span>
-        </h2>
+            <span 
+              style={{
+                color: colors.text,
+                fontFamily: 'var(--font-league-spartan), sans-serif',
+                fontWeight: 700,
+                display: 'inline-block',
+              }}
+            >
+              My
+            </span>
+            <span 
+              className="kendall-glow"
+              style={{
+                color: colors.accent,
+                opacity: 0.85,
+                fontFamily: 'var(--font-league-spartan), sans-serif',
+                fontWeight: 700,
+                display: 'inline-block',
+              }}
+            >
+              Kendall
+            </span>
+          </h2>
+          {/* Simple Dot - No power-ups, just animated glow */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              minWidth: 'clamp(80px, 10vw, 120px)',
+              minHeight: 'clamp(80px, 10vw, 120px)',
+              pointerEvents: 'none',
+            }}
+          >
+            <SimpleDot />
+          </div>
+        </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-32 items-start w-full max-w-6xl mx-auto">
-          {/* Left: Cards */}
-          <div className="order-2 lg:order-1 flex flex-col gap-6 h-full">
-            {/* Top: 1 card centered */}
-            <div className="flex justify-center lg:justify-start">
-              <div
-                className="flex flex-col gap-4 p-10 lg:p-12 text-center lg:text-left w-full transition-all duration-300 cursor-pointer"
-                style={{ 
-                  color: colors.text,
-                  border: `1px solid ${colors.accent}40`,
-                  borderRadius: '12px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = colors.accent;
-                  e.currentTarget.style.boxShadow = `0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(168, 85, 247, 0.2), 0 0 60px rgba(168, 85, 247, 0.1)`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = `${colors.accent}40`;
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              >
-                <div className="flex justify-center lg:justify-start" style={{ color: colors.accent }}>
-                  <User className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-semibold tracking-tight" style={{ color: colors.text }}>
-                  Bio & CV Assistant
-                </h3>
-                <p className="text-sm text-white/70 leading-relaxed">
-                  Put <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> in your LinkedIn or Instagram bio. She introduces you, explains who you are, and forwards opportunities to you.
-                </p>
-              </div>
-            </div>
-
-            {/* Bottom: 4 cards in 2x2 grid */}
-            <div className="grid grid-cols-2 gap-4 flex-1">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-32 items-stretch w-full max-w-6xl mx-auto">
+          {/* Left: Cards - 2x3 Grid */}
+          <div className="order-2 lg:order-1 h-full">
+            <div className="grid grid-cols-2 gap-3 h-full items-stretch">
               {[
                 {
-                  icon: <Phone className="w-6 h-6" />,
+                  icon: <Briefcase className="w-6 h-6" />,
+                  title: 'Career Assistant',
+                  description: (
+                    <>
+                      Put <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> in your LinkedIn or resume. She introduces you professionally, explains who you are, and forwards real opportunities to you - 24/7.
+                    </>
+                  ),
+                },
+                {
+                  icon: <Megaphone className="w-6 h-6" />,
+                  title: 'Social Reach',
+                  description: (
+                    <>
+                      Add <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> to your Instagram or TikTok bio. She gives people a quick intro to you and keeps your audience connected without you picking up.
+                    </>
+                  ),
+                },
+                {
+                  icon: (
+                    <div className="relative" style={{ width: '24px', height: '24px' }}>
+                      <Phone className="w-6 h-6 absolute" style={{ left: '0', top: '0', opacity: 0.7 }} />
+                      <Phone className="w-6 h-6 absolute" style={{ left: '4px', top: '4px' }} />
+                    </div>
+                  ),
                   title: 'Your Second Number',
                   description: (
                     <>
-                      A clean, separate number for your socials, CV, dating apps, or website. <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> answers so you don't have to.
+                      A clean, separate number for your socials, dating apps, or website. <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> answers so you don't have to.
                     </>
                   ),
                 },
@@ -204,7 +228,7 @@ export default function KendallPersonalHero() {
                   title: 'Talks Like You',
                   description: (
                     <>
-                      <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> mirrors your tone and vibe — friendly, professional, sarcastic, or anything in between.
+                      Customize <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span>'s personality to speak in your style - or any style you want.
                     </>
                   ),
                 },
@@ -222,17 +246,17 @@ export default function KendallPersonalHero() {
                   title: 'Instant Call Forwarding',
                   description: (
                     <>
-                      <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> can forward important calls straight to your real phone — only when you want.
+                      <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> can forward important calls straight to your real phone - only when you want.
                     </>
                   ),
                 },
               ].map((card, index) => (
                 <div
-                  key={index + 1}
-                  className="flex flex-col gap-4 p-10 lg:p-12 text-center lg:text-left h-full transition-all duration-300 cursor-pointer"
+                  key={index}
+                  className="flex flex-col gap-6 py-20 lg:py-24 px-20 lg:px-28 text-center lg:text-left h-full min-h-full transition-all duration-300 cursor-pointer overflow-hidden"
                   style={{ 
                     color: colors.text,
-                    border: `1px solid ${colors.accent}40`,
+                    border: `1px solid ${colors.accent}80`,
                     borderRadius: '12px',
                   }}
                   onMouseEnter={(e) => {
@@ -240,7 +264,7 @@ export default function KendallPersonalHero() {
                     e.currentTarget.style.boxShadow = `0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(168, 85, 247, 0.2), 0 0 60px rgba(168, 85, 247, 0.1)`;
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = `${colors.accent}40`;
+                    e.currentTarget.style.borderColor = `${colors.accent}80`;
                     e.currentTarget.style.boxShadow = 'none';
                   }}
                 >
@@ -259,9 +283,9 @@ export default function KendallPersonalHero() {
           </div>
 
           {/* Right: Action Zone - Purchase Section */}
-          <div className="order-1 lg:order-2 flex flex-col items-start lg:items-start" style={{ marginLeft: '0' }}>
+          <div className="order-1 lg:order-2 flex flex-col items-start lg:items-start h-full" style={{ marginLeft: '0' }}>
             <div
-              className="w-full flex flex-col gap-12 relative overflow-hidden group transition-all duration-300"
+              className="w-full flex flex-col gap-12 relative overflow-hidden group transition-all duration-300 h-full"
               style={{
                 padding: '2.5rem',
                 border: `${isHovered ? '4px' : '2px'} solid ${colors.accent}`,
@@ -423,7 +447,6 @@ export default function KendallPersonalHero() {
           </div>
         </div>
       </div>
-
     </section>
   );
 }

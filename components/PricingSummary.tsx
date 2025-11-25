@@ -4,6 +4,18 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { colors } from '@/lib/config';
 import { getBusinessTypeData } from '@/lib/businessTypes';
+import { Info } from 'lucide-react';
+
+interface Star {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  opacity: number;
+  duration: number;
+  delay: number;
+  color: string;
+}
 
 interface PricingSummaryProps {
   businessType: string | null;
@@ -76,6 +88,7 @@ export default function PricingSummary({
   const router = useRouter();
   const [phoneLines, setPhoneLines] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
+  const [stars, setStars] = useState<Star[]>([]);
 
   // Restore phoneLines from sessionStorage if returning from pricing
   useEffect(() => {
@@ -92,6 +105,34 @@ export default function PricingSummary({
         }
       }
     }
+  }, []);
+
+  // Generate stars for the price breakdown box
+  useEffect(() => {
+    const starColors = [
+      'rgba(255, 255, 255, 1)',
+      'rgba(168, 85, 247, 1)',
+      'rgba(192, 132, 252, 1)',
+    ];
+
+    const initialStars: Star[] = Array.from({ length: 10 }, (_, i) => {
+      const intensity = Math.random();
+      const isBright = intensity > 0.6;
+      const colorIndex = Math.floor(Math.random() * starColors.length);
+      const starColor = starColors[colorIndex];
+
+      return {
+        id: i,
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        size: isBright ? Math.random() * 1.5 + 0.8 : Math.random() * 1 + 0.5,
+        opacity: isBright ? Math.random() * 0.6 + 0.3 : Math.random() * 0.4 + 0.2,
+        duration: Math.random() * 4 + 2,
+        delay: Math.random() * 3,
+        color: starColor,
+      };
+    });
+    setStars(initialStars);
   }, []);
 
   useEffect(() => {
@@ -142,9 +183,9 @@ export default function PricingSummary({
 
   return (
     <div
-      className="rounded-xl"
+      className="rounded-xl relative overflow-hidden"
       style={{
-        border: `2px solid ${colors.accent}40`,
+        border: `3px solid ${colors.accent}`,
         backgroundColor: `${colors.accent}10`,
         opacity: isVisible ? 1 : 0,
         transform: isVisible ? 'translateX(0) translateY(0)' : 'translateX(30px) translateY(-10px)',
@@ -153,19 +194,52 @@ export default function PricingSummary({
         overflow: 'visible',
         minHeight: 'fit-content',
         width: '100%',
+        position: 'relative',
       }}
     >
-      <h3
-        style={{
-          color: colors.text,
-          fontSize: '1.125rem',
-          fontWeight: 500,
-          fontFamily: 'var(--font-inter), sans-serif',
-          marginBottom: '1.25rem',
-        }}
-      >
-        Price Breakdown
-      </h3>
+      {/* Stars inside the price breakdown box */}
+      {stars.map((star) => {
+        const glowSize = star.opacity > 0.4 ? star.size * 3 : star.size * 2;
+        const glowOpacity = star.opacity > 0.4 ? 0.6 : 0.4;
+        const colorMatch = star.color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        const r = colorMatch ? colorMatch[1] : '255';
+        const g = colorMatch ? colorMatch[2] : '255';
+        const b = colorMatch ? colorMatch[3] : '255';
+        const glowColor = `rgba(${r}, ${g}, ${b}, ${glowOpacity})`;
+        const glowColorDim = `rgba(${r}, ${g}, ${b}, ${glowOpacity * 0.5})`;
+
+        return (
+          <div
+            key={star.id}
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              left: `${star.x}%`,
+              top: `${star.y}%`,
+              width: `${star.size}px`,
+              height: `${star.size}px`,
+              backgroundColor: star.color,
+              opacity: star.opacity,
+              animation: `sparkle-twinkle ${star.duration}s ease-in-out infinite`,
+              animationDelay: `${star.delay}s`,
+              boxShadow: `0 0 ${glowSize}px ${glowColor}, 0 0 ${glowSize * 1.5}px ${glowColorDim}`,
+              zIndex: 0,
+              transform: 'translate(-50%, -50%)',
+            }}
+          />
+        );
+      })}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <h3
+          style={{
+            color: colors.text,
+            fontSize: '1.125rem',
+            fontWeight: 500,
+            fontFamily: 'var(--font-inter), sans-serif',
+            marginBottom: '1.25rem',
+          }}
+        >
+          Price Breakdown
+        </h3>
 
       <div className="space-y-2.5" style={{ marginBottom: '1.5rem', minHeight: 'fit-content' }}>
         {/* Recommended Package */}
@@ -331,6 +405,63 @@ export default function PricingSummary({
                   +
                 </button>
               </div>
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <Info 
+                  size={14} 
+                  style={{ color: colors.accent, cursor: 'pointer', opacity: 0.8 }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                    const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (tooltip) tooltip.style.opacity = '1';
+                    if (tooltip) tooltip.style.visibility = 'visible';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '0.8';
+                    const tooltip = e.currentTarget.nextElementSibling as HTMLElement;
+                    if (tooltip) tooltip.style.opacity = '0';
+                    if (tooltip) tooltip.style.visibility = 'hidden';
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '100%',
+                    transform: 'translateY(-50%)',
+                    marginLeft: '0.5rem',
+                    padding: '0.75rem 1rem',
+                    backgroundColor: `${colors.accent}15`,
+                    border: `1px solid ${colors.accent}60`,
+                    borderRadius: '8px',
+                    color: colors.text,
+                    fontSize: '0.8125rem',
+                    fontFamily: 'var(--font-inter), sans-serif',
+                    opacity: 0,
+                    visibility: 'hidden',
+                    transition: 'opacity 0.2s ease, visibility 0.2s ease',
+                    zIndex: 1000,
+                    pointerEvents: 'none',
+                    whiteSpace: 'nowrap',
+                    textAlign: 'left',
+                    boxShadow: `0 4px 16px ${colors.accent}30`,
+                  }}
+                >
+                  Extra phone lines share the same minutes pool from your plan.
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      right: '100%',
+                      transform: 'translateY(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderTop: '6px solid transparent',
+                      borderBottom: '6px solid transparent',
+                      borderRight: `6px solid ${colors.accent}60`,
+                    }}
+                  />
+                </div>
+              </div>
             </div>
             {phoneLines > 0 && (
               <span
@@ -456,6 +587,7 @@ export default function PricingSummary({
             </p>
           </>
         )}
+      </div>
       </div>
     </div>
   );

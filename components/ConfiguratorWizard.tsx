@@ -327,14 +327,14 @@ export default function ConfiguratorWizard() {
     <>
       <div
         ref={bookingSectionRef}
-        className="w-full min-h-screen"
-        style={{ padding: 'clamp(2rem, 4vw, 4rem) clamp(2rem, 8vw, 10rem)' }}
+        className="w-full min-h-screen flex flex-col items-center"
+        style={{ padding: 'clamp(4rem, 8vw, 8rem) clamp(2rem, 6vw, 8rem)' }}
       >
-        <div className="w-full mx-auto" style={{ maxWidth: '1400px', width: '100%' }}>
+        <div className="w-full mx-auto flex flex-col items-center" style={{ maxWidth: '1280px', width: '100%' }}>
           {/* Mobile: Single column */}
           <Fragment>
             <div className="block lg:hidden" style={{ paddingBottom: businessType ? '200px' : '0' }}>
-              {/* Header - Left aligned, above business types */}
+              {/* Header - Always centered */}
               <div 
                 className="w-full mb-8" 
                 style={{ 
@@ -343,14 +343,15 @@ export default function ConfiguratorWizard() {
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'flex-start',
+                  justifyContent: 'center',
+                  transition: 'justify-content 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
                 }}
               >
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'flex-start',
+                    justifyContent: 'center',
                     gap: '1rem',
                     opacity: shouldAnimate ? 1 : 1,
                     transform: shouldAnimate 
@@ -371,19 +372,19 @@ export default function ConfiguratorWizard() {
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    Build Your{' '}
                     <span 
                       className="kendall-glow"
                       style={{
                         color: colors.accent,
-                        opacity: 0.75,
+                        opacity: 0.85,
                         fontFamily: 'var(--font-league-spartan), sans-serif',
                         fontWeight: 700,
                         display: 'inline-block',
                       }}
                     >
                       Kendall
-                    </span>.
+                    </span>{' '}
+                    Business
                   </h2>
                   {/* Kendall Power-ups Sphere - Always visible with header */}
                   <div
@@ -409,7 +410,7 @@ export default function ConfiguratorWizard() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(3rem, 4vw, 4rem)' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(3rem, 4vw, 4rem)', alignItems: businessType ? 'stretch' : 'center' }}>
                 {/* Business Type Selector */}
                 <BusinessTypeStep
                   selectedType={businessType}
@@ -493,82 +494,188 @@ export default function ConfiguratorWizard() {
               )}
             </Fragment>
 
-          {/* Desktop: Two-column layout */}
-          <div className="hidden lg:block">
-              {/* Two-column layout - Centered beneath header */}
-              <div className="grid grid-cols-12 items-start relative" style={{ gap: 'clamp(2rem, 4vw, 3rem)', marginTop: 'clamp(2rem, 4vw, 3rem)' }}>
-                {/* Left: Business Types, Standard Features, Also Includes, Add-Ons */}
-                <div className="col-span-7" style={{ maxWidth: '700px' }}>
-                  {/* Header positioned above business types */}
-                  <div className="mb-8" style={{ marginBottom: 'clamp(2rem, 4vw, 3rem)' }}>
+          {/* Desktop: Conditional layout - Centered when no type, two-column when type selected */}
+          <div className="hidden lg:block w-full">
+              {!businessType ? (
+                /* Centered layout when no business type selected - matches Kendall Personal */
+                <div className="w-full max-w-7xl mx-auto flex flex-col items-center justify-center px-4" style={{ position: 'relative', zIndex: 1 }}>
+                  {/* Header - Kendall Business - Centered exactly like Kendall Personal */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 'clamp(2rem, 4vw, 3rem)',
+                      width: '100%',
+                      marginBottom: 'clamp(4rem, 8vw, 6rem)',
+                      flexWrap: 'wrap',
+                      marginLeft: 'auto',
+                      marginRight: 'auto',
+                      paddingLeft: 'clamp(2rem, 4vw, 4rem)',
+                    }}
+                  >
+                    <h2
+                      className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light leading-tight tracking-tight text-center"
+                      style={{ 
+                        color: colors.text,
+                        margin: 0,
+                      }}
+                    >
+                      <span 
+                        className="kendall-glow"
+                        style={{
+                        color: colors.accent,
+                        opacity: 0.85,
+                        fontFamily: 'var(--font-league-spartan), sans-serif',
+                          fontWeight: 700,
+                          display: 'inline-block',
+                        }}
+                      >
+                        Kendall
+                      </span>{' '}
+                      <span style={{ color: colors.text }}>
+                        Business
+                      </span>
+                    </h2>
+                    {/* Kendall Power-ups Sphere */}
                     <div
                       style={{
                         display: 'flex',
+                        justifyContent: 'center',
                         alignItems: 'center',
-                        justifyContent: 'flex-start',
-                        gap: 'clamp(2rem, 4vw, 3rem)',
-                        opacity: shouldAnimate ? 1 : 1,
-                        transition: headerHasAnimated ? 'none' : 'opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        minWidth: 'clamp(80px, 10vw, 120px)',
+                        minHeight: 'clamp(80px, 10vw, 120px)',
+                        pointerEvents: 'none',
                       }}
                     >
-                      <h2
-                        style={{ 
-                          color: colors.text, 
-                          fontFamily: 'var(--font-inter), sans-serif',
-                          fontSize: 'clamp(2.5rem, 5vw, 4rem)',
-                          fontWeight: 300,
-                          letterSpacing: '-0.02em',
-                          lineHeight: '1.2',
-                          margin: 0,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        Build Your{' '}
-                        <span 
-                          className="kendall-glow"
-                          style={{
-                            color: colors.accent,
-                            opacity: 0.75,
-                            fontFamily: 'var(--font-league-spartan), sans-serif',
-                            fontWeight: 700,
-                            display: 'inline-block',
-                          }}
-                        >
-                          Kendall
-                        </span>.
-                      </h2>
-                      {/* Kendall Power-ups Sphere */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          minWidth: '120px',
-                          minHeight: '120px',
-                          pointerEvents: 'none',
-                          opacity: shouldAnimate ? 1 : 1,
-                          transition: headerHasAnimated ? 'none' : 'opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
-                        }}
-                      >
-                        <KendallPowerUps
-                          selectedAddOns={selectedAddOns}
-                          hoveredAddOnId={hoveredAddOnId}
-                          justToggledAddOnId={justToggledAddOnId}
-                          businessType={businessType}
-                          shouldAnimate={shouldAnimate}
-                        />
-                      </div>
+                      <KendallPowerUps
+                        selectedAddOns={selectedAddOns}
+                        hoveredAddOnId={hoveredAddOnId}
+                        justToggledAddOnId={justToggledAddOnId}
+                        businessType={businessType}
+                        shouldAnimate={shouldAnimate}
+                      />
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(1.5rem, 2.5vw, 2.5rem)' }}>
-                    {/* Business Type Selector - Fixed position container */}
+                  {/* Question text above business types */}
+                  <div
+                    style={{
+                      width: '100%',
+                      textAlign: 'center',
+                      marginBottom: 'clamp(2rem, 4vw, 3rem)',
+                    }}
+                  >
+                    <p
+                      style={{
+                        color: colors.text,
+                        fontSize: 'clamp(1.125rem, 2vw, 1.5rem)',
+                        fontFamily: 'var(--font-inter), sans-serif',
+                        fontWeight: 400,
+                        opacity: 0.9,
+                        margin: 0,
+                      }}
+                    >
+                      What type of business do you run?
+                    </p>
+                  </div>
+                  {/* Business Types - Centered directly beneath header */}
+                  <div 
+                    ref={businessTypesRef}
+                    style={{ 
+                      position: 'relative',
+                      minHeight: '200px',
+                      width: '100%',
+                      maxWidth: '600px',
+                      marginLeft: 'auto',
+                      marginRight: 'auto',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <BusinessTypeStep
+                      selectedType={businessType}
+                      onSelect={setBusinessType}
+                      shouldAnimate={shouldAnimate}
+                    />
+                  </div>
+                </div>
+              ) : (
+                /* Two-column layout when business type is selected - Header stays centered */
+                <div className="w-full max-w-7xl mx-auto flex flex-col items-center px-4" style={{ position: 'relative', zIndex: 1 }}>
+                  {/* Header - Kendall Business - Centered exactly like when no type selected */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 'clamp(2rem, 4vw, 3rem)',
+                      width: '100%',
+                      marginBottom: 'clamp(4rem, 8vw, 6rem)',
+                      flexWrap: 'wrap',
+                      marginLeft: 'auto',
+                      marginRight: 'auto',
+                      paddingLeft: 'clamp(2rem, 4vw, 4rem)',
+                    }}
+                  >
+                    <h2
+                      className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light leading-tight tracking-tight text-center"
+                      style={{ 
+                        color: colors.text,
+                        margin: 0,
+                      }}
+                    >
+                      <span 
+                        className="kendall-glow"
+                        style={{
+                          color: colors.accent,
+                          opacity: 0.85,
+                          fontFamily: 'var(--font-league-spartan), sans-serif',
+                          fontWeight: 700,
+                          display: 'inline-block',
+                        }}
+                      >
+                        Kendall
+                      </span>{' '}
+                      <span style={{ color: colors.text }}>
+                        Business
+                      </span>
+                    </h2>
+                    {/* Kendall Power-ups Sphere */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minWidth: 'clamp(80px, 10vw, 120px)',
+                        minHeight: 'clamp(80px, 10vw, 120px)',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      <KendallPowerUps
+                        selectedAddOns={selectedAddOns}
+                        hoveredAddOnId={hoveredAddOnId}
+                        justToggledAddOnId={justToggledAddOnId}
+                        businessType={businessType}
+                        shouldAnimate={shouldAnimate}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Business Types - Centered when no type, moves to left when type selected */}
+                  {!businessType ? (
                     <div 
                       ref={businessTypesRef}
                       style={{ 
                         position: 'relative',
-                        minHeight: businessType ? '60px' : '200px', // Reserve space to prevent shift
-                        transition: 'min-height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                        minHeight: '200px',
                         width: '100%',
+                        maxWidth: '600px',
+                        marginBottom: 'clamp(4rem, 8vw, 6rem)',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'flex-start',
+                        transition: 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
                       }}
                     >
                       <BusinessTypeStep
@@ -577,103 +684,105 @@ export default function ConfiguratorWizard() {
                         shouldAnimate={shouldAnimate}
                       />
                     </div>
+                  ) : (
+                    /* Two-column layout for content when type is selected */
+                    <div className="grid grid-cols-12 items-start relative w-full" style={{ gap: 'clamp(2rem, 4vw, 3rem)' }}>
+                      {/* Left: Business Types, Standard Features, Also Includes, Add-Ons */}
+                      <div className="col-span-7" style={{ maxWidth: '700px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(1.5rem, 2.5vw, 2.5rem)' }}>
+                          {/* Business Type Selector - Moved to left */}
+                          <div 
+                            ref={businessTypesRef}
+                            style={{ 
+                              position: 'relative',
+                              minHeight: '60px',
+                              width: '100%',
+                              display: 'flex',
+                              justifyContent: 'flex-start',
+                              alignItems: 'flex-start',
+                              transition: 'min-height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                            }}
+                          >
+                            <BusinessTypeStep
+                              selectedType={businessType}
+                              onSelect={setBusinessType}
+                              shouldAnimate={shouldAnimate}
+                            />
+                          </div>
+                          {/* Standard Features */}
+                          <StandardFeaturesStep businessType={businessType} shouldAnimate={shouldAnimateContent} />
 
-                    {/* Standard Features */}
-                    {businessType && (
-                      <StandardFeaturesStep businessType={businessType} shouldAnimate={shouldAnimateContent} />
-                    )}
+                          {/* Also Includes */}
+                          <AlsoIncludesStep businessType={businessType} shouldAnimate={shouldAnimateContent} />
 
-                    {/* Also Includes */}
-                    {businessType && (
-                      <AlsoIncludesStep businessType={businessType} shouldAnimate={shouldAnimateContent} />
-                    )}
-
-                    {/* Add-Ons */}
-                    {businessType && (
-                      <div 
-                        ref={addOnsRef}
-                        style={{ 
-                          marginTop: 'clamp(2rem, 3vw, 3rem)',
-                        }}
-                      >
-                        <AddOnsStep
-                          businessType={businessType}
-                          selectedAddOns={selectedAddOns}
-                          onToggleAddOn={handleToggleAddOn}
-                          shouldAnimate={shouldAnimateContent}
-                          onAddOnHover={setHoveredAddOnId}
-                          justToggledAddOnId={justToggledAddOnId}
-                        />
+                          {/* Add-Ons */}
+                          <div 
+                            ref={addOnsRef}
+                            style={{ 
+                              marginTop: 'clamp(2rem, 3vw, 3rem)',
+                            }}
+                          >
+                            <AddOnsStep
+                              businessType={businessType}
+                              selectedAddOns={selectedAddOns}
+                              onToggleAddOn={handleToggleAddOn}
+                              shouldAnimate={shouldAnimateContent}
+                              onAddOnHover={setHoveredAddOnId}
+                              justToggledAddOnId={justToggledAddOnId}
+                            />
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                {/* Right: Sliders and Price - Aligned with Standard Features */}
-                <div className="col-span-5">
-                  <div
-                    style={{
-                      position: 'sticky',
-                      top: 'clamp(2rem, 6vw, 8rem)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 'clamp(1.5rem, 2.5vw, 2.5rem)',
-                      height: 'fit-content',
-                    }}
-                  >
-                    {/* Spacer to align sliders with Standard Features */}
-                    {/* Account for: Header + Business Types + gap to Standard Features */}
-                    {businessType && (
-                      <div style={{ 
-                        height: 'calc(clamp(2rem, 4vw, 3rem) + 60px + clamp(1.5rem, 2.5vw, 2.5rem))',
-                        minHeight: 'calc(clamp(2rem, 4vw, 3rem) + 60px + clamp(1.5rem, 2.5vw, 2.5rem))',
-                      }} />
-                    )}
+                      {/* Right: Sliders and Price - Aligned with Standard Features */}
+                      <div className="col-span-5">
+                    <div
+                      style={{
+                        position: 'sticky',
+                        top: 'clamp(2rem, 6vw, 8rem)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 'clamp(1.5rem, 2.5vw, 2.5rem)',
+                        height: 'fit-content',
+                      }}
+                    >
+                      {/* Spacer to align price breakdown with Standard Features */}
+                      {businessType && (
+                        <div style={{ 
+                          height: 'calc(60px + clamp(1.5rem, 2.5vw, 2.5rem))',
+                          minHeight: 'calc(60px + clamp(1.5rem, 2.5vw, 2.5rem))',
+                        }} />
+                      )}
 
-                    {/* Two Sliders - Aligned with Standard Features and Also Includes */}
-                    {businessType && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(3rem, 4vw, 4.5rem)' }}>
-                        <CallVolumeStep
-                          key={`volume-${businessType}`}
-                          selectedVolume={callVolume}
-                          onSelect={setCallVolume}
-                          businessType={businessType}
-                          shouldAnimate={shouldAnimateContent}
-                        />
-                        <CallDurationStep
-                          key={`duration-${businessType}`}
-                          selectedDuration={callDuration}
-                          onSelect={setCallDuration}
-                          shouldAnimate={shouldAnimateContent}
-                        />
-                      </div>
-                    )}
-
-                    {/* Price Breakdown - Aligned with Add-Ons */}
-                    {/* Position to align with Add-Ons section with spacing from sliders */}
-                    {businessType && (
-                      <div 
-                        ref={priceBreakdownRef}
-                        style={{ 
-                          marginTop: 'clamp(3rem, 5vw, 4rem)',
-                        }}
-                      >
-                        <PricingSummary
-                          businessType={businessType}
-                          callVolume={callVolume}
-                          callDuration={callDuration}
-                          selectedAddOns={selectedAddOns}
-                          onStartTrial={() => {
-                            // Get the add-ons position on screen for expansion start
-                            if (addOnsRef.current && priceBreakdownRef.current) {
-                              const addOnsRect = addOnsRef.current?.getBoundingClientRect();
-                              const priceRect = priceBreakdownRef.current?.getBoundingClientRect();
-                              
-                              if (addOnsRect && priceRect) {
-                                const x = priceRect.left + priceRect.width / 2;
-                                const y = addOnsRect.top + addOnsRect.height / 2;
-                                setExpansionStartPos({ x, y });
-                                setIsExpanding(true);
+                      {/* Price Breakdown - Aligned with Standard Features */}
+                      {businessType && (
+                        <div 
+                          ref={priceBreakdownRef}
+                        >
+                          <PricingSummary
+                            businessType={businessType}
+                            callVolume={callVolume}
+                            callDuration={callDuration}
+                            selectedAddOns={selectedAddOns}
+                            onStartTrial={() => {
+                              // Get the add-ons position on screen for expansion start
+                              if (addOnsRef.current && priceBreakdownRef.current) {
+                                const addOnsRect = addOnsRef.current?.getBoundingClientRect();
+                                const priceRect = priceBreakdownRef.current?.getBoundingClientRect();
+                                
+                                if (addOnsRect && priceRect) {
+                                  const x = priceRect.left + priceRect.width / 2;
+                                  const y = addOnsRect.top + addOnsRect.height / 2;
+                                  setExpansionStartPos({ x, y });
+                                  setIsExpanding(true);
+                                } else {
+                                  // Fallback: center of screen
+                                  setExpansionStartPos({ 
+                                    x: window.innerWidth / 2, 
+                                    y: window.innerHeight / 2 
+                                  });
+                                  setIsExpanding(true);
+                                }
                               } else {
                                 // Fallback: center of screen
                                 setExpansionStartPos({ 
@@ -682,22 +791,41 @@ export default function ConfiguratorWizard() {
                                 });
                                 setIsExpanding(true);
                               }
-                            } else {
-                              // Fallback: center of screen
-                              setExpansionStartPos({ 
-                                x: window.innerWidth / 2, 
-                                y: window.innerHeight / 2 
-                              });
-                              setIsExpanding(true);
-                            }
-                          }}
-                          shouldAnimate={shouldAnimateContent}
-                        />
+                            }}
+                            shouldAnimate={shouldAnimateContent}
+                          />
+                        </div>
+                      )}
+
+                      {/* Two Sliders - Below Price Breakdown */}
+                      {businessType && (
+                        <div style={{ 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: 'clamp(2rem, 3vw, 3rem)',
+                          marginTop: 'clamp(2rem, 3vw, 2.5rem)',
+                        }}>
+                          <CallVolumeStep
+                            key={`volume-${businessType}`}
+                            selectedVolume={callVolume}
+                            onSelect={setCallVolume}
+                            businessType={businessType}
+                            shouldAnimate={shouldAnimateContent}
+                          />
+                          <CallDurationStep
+                            key={`duration-${businessType}`}
+                            selectedDuration={callDuration}
+                            onSelect={setCallDuration}
+                            shouldAnimate={shouldAnimateContent}
+                          />
+                        </div>
+                      )}
+                    </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
         </div>
       </div>

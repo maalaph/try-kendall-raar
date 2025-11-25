@@ -255,7 +255,7 @@ export default function CallVolumeStep({
           flexWrap: 'wrap',
         }}
       >
-        <span>How many calls do you receive per day?</span>
+        <span style={{ minWidth: 'clamp(200px, 25vw, 280px)' }}>How many calls do you receive per day?</span>
         <input
           ref={inputRef}
           type="text"

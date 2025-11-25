@@ -2,6 +2,7 @@ export interface BusinessTypeData {
   id: string;
   name: string;
   standardFeatures: string[];
+  alsoIncludes?: string[];
   addOns: {
     id: string;
     title: string;
