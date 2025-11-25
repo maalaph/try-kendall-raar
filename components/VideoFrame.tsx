@@ -451,8 +451,8 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
                   animation: 'pulse-glow 4s ease-in-out infinite',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
-                  e.currentTarget.style.transform = 'scale(1.1)';
+                  e.currentTarget.style.boxShadow = `0 0 60px ${colors.accent}90, 0 0 120px ${colors.accent}70, 0 0 180px ${colors.accent}50, 0 0 240px ${colors.accent}30`;
+                  e.currentTarget.style.transform = 'scale(1.15)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.boxShadow = `0 0 30px ${colors.accent}50, 0 0 60px ${colors.accent}30`;
@@ -479,7 +479,7 @@ export default function VideoFrame({ videoSrc, videoSrcWebm, posterSrc }: VideoF
             {/* Text next to phone icon */}
             <p 
               className="text-base sm:text-base md:text-lg font-light tracking-wide whitespace-nowrap"
-              style={{ color: colors.text }}
+              style={{ color: colors.text, marginLeft: '0.75rem' }}
             >
               <span style={{ fontStyle: 'italic' }}>Hear</span>{' '}
               <span 

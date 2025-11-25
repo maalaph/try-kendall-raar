@@ -1,6 +1,7 @@
 'use client';
 
 import { colors, kendallPhoneNumber } from '@/lib/config';
+import Link from 'next/link';
 
 export default function Navbar() {
   return (
@@ -31,38 +32,90 @@ export default function Navbar() {
         raar.
       </a>
 
+      {/* Centered links */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          gap: '2rem',
+          alignItems: 'center',
+        }}
+      >
+        <Link
+          href="/pricing"
+          className="transition-all duration-300"
+          style={{
+            color: colors.text,
+            textDecoration: 'none',
+            fontFamily: 'var(--font-inter), sans-serif',
+            fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+            fontWeight: 500,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.textShadow = `0 0 20px ${colors.accent}50`;
+            e.currentTarget.style.color = colors.accent;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.textShadow = 'none';
+            e.currentTarget.style.color = colors.text;
+          }}
+        >
+          Pricing
+        </Link>
+        <Link
+          href="/talk"
+          className="transition-all duration-300"
+          style={{
+            color: colors.text,
+            textDecoration: 'none',
+            fontFamily: 'var(--font-inter), sans-serif',
+            fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+            fontWeight: 500,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.textShadow = `0 0 20px ${colors.accent}50`;
+            e.currentTarget.style.color = colors.accent;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.textShadow = 'none';
+            e.currentTarget.style.color = colors.text;
+          }}
+        >
+          Talk to Us
+        </Link>
+      </div>
+
       {/* Phone CTA in Navbar */}
       {kendallPhoneNumber && (
         <a
           href={`tel:${kendallPhoneNumber.replace(/\D/g, '')}`}
-          className="group flex items-center gap-2 sm:gap-3 lg:gap-3 transition-all duration-300 px-5 py-2 sm:px-6 sm:py-2 lg:px-10 lg:py-3.5 text-sm sm:text-base lg:text-lg"
+          className="group flex items-center gap-2 sm:gap-3 lg:gap-3 transition-all duration-300 px-5 py-2 sm:px-6 sm:py-2 lg:px-10 lg:py-3.5 text-base sm:text-lg lg:text-xl"
           style={{
             color: colors.text,
             backgroundColor: `${colors.accent}15`,
-            border: `2.5px solid ${colors.accent}`,
+            border: 'none',
             borderRadius: '12px',
             fontWeight: 500,
             fontFamily: 'var(--font-inter), sans-serif',
             textDecoration: 'none',
-            boxShadow: `0 0 15px ${colors.accent}30`,
             minHeight: '44px',
             minWidth: '220px',
             marginLeft: 'auto',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = `0 0 40px ${colors.accent}70, 0 0 80px ${colors.accent}50`;
-            e.currentTarget.style.transform = 'scale(1.1)';
+            e.currentTarget.style.transform = 'scale(1.05)';
             e.currentTarget.style.backgroundColor = `${colors.accent}25`;
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = `0 0 15px ${colors.accent}30`;
             e.currentTarget.style.transform = 'scale(1)';
             e.currentTarget.style.backgroundColor = `${colors.accent}15`;
           }}
         >
           <svg
-            width="20"
-            height="20"
+            width="24"
+            height="24"
             viewBox="0 0 24 24"
             fill="none"
             style={{ color: colors.accent }}
@@ -78,7 +131,6 @@ export default function Navbar() {
           </svg>
           <span className="hidden sm:inline">
             <span 
-              className="kendall-glow"
               style={{
                 color: colors.accent,
                 opacity: 0.75,
@@ -89,7 +141,7 @@ export default function Navbar() {
             >
               Kendall
             </span>
-            {' '}: {kendallPhoneNumber}
+            {' '} {kendallPhoneNumber}
           </span>
           <span className="sm:hidden">Call</span>
         </a>

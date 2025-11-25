@@ -42,7 +42,7 @@ export default function CalendarEmbed({ onEventScheduled }: CalendarEmbedProps) 
     style.textContent = `
       /* Hide Calendly borders and containers - seamless dark theme */
       [data-calendar-embed] .calendly-inline-widget {
-        background: ${colors.primary} !important;
+        background: transparent !important;
         border: none !important;
         box-shadow: none !important;
         border-radius: 0 !important;
@@ -55,38 +55,29 @@ export default function CalendarEmbed({ onEventScheduled }: CalendarEmbedProps) 
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
+        outline: none !important;
       }
       
       /* Make Calendly iframe blend in */
       .calendly-inline-widget iframe {
-        background: ${colors.primary} !important;
+        background: transparent !important;
         border: none !important;
-      }
-      
-      /* Remove scrollbars - make it flow naturally with full height */
-      .calendly-inline-widget {
-        overflow: hidden !important;
-        height: 1200px !important;
-        min-height: 1200px !important;
-      }
-      
-      /* Ensure iframe takes full height without internal scroll */
-      .calendly-inline-widget iframe {
-        height: 1200px !important;
-        min-height: 1200px !important;
-        overflow: hidden !important;
+        outline: none !important;
       }
       
       /* Specific override for Calendly's wrapper divs */
       [data-calendar-embed] > div {
-        background: ${colors.primary} !important;
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
       }
       
       /* Ensure no borders or shadows on wrapper */
       [data-calendar-embed] > div > div {
-        background: ${colors.primary} !important;
+        background: transparent !important;
         border: none !important;
         box-shadow: none !important;
+        outline: none !important;
       }
     `;
     document.head.appendChild(style);
@@ -103,17 +94,27 @@ export default function CalendarEmbed({ onEventScheduled }: CalendarEmbedProps) 
       data-calendar-embed
       className="w-full flex items-center justify-center"
       style={{
-        backgroundColor: colors.primary, // Pure black to match page
+        backgroundColor: 'transparent',
         padding: 0,
-        marginTop: '3rem',
+        marginTop: 0,
+        position: 'relative',
       }}
     >
-      <div className="w-full max-w-5xl">
+      <div 
+        className="w-full"
+        style={{
+          maxWidth: '900px',
+          margin: '0 auto',
+          position: 'relative',
+          borderRadius: '12px',
+          overflow: 'visible',
+        }}
+      >
         <InlineWidget
           url={calendlyUrl}
           styles={{
-            height: '1200px', // Full height to show entire calendar without internal scrolling
-            minHeight: '1200px',
+            height: '700px',
+            minHeight: '700px',
             width: '100%',
             display: 'block',
           }}

@@ -1,5 +1,6 @@
 import Hero from '@/components/Hero';
 import BookingSection from '@/components/BookingSection';
+import KendallPersonalHero from '@/components/KendallPersonalHero';
 import FooterQuote from '@/components/FooterQuote';
 
 export default function Home() {
@@ -8,6 +9,7 @@ export default function Home() {
     <main className="min-h-screen relative" style={{ zIndex: 1 }}>
       <Hero />
       <BookingSection />
+      <KendallPersonalHero />
       <FooterQuote />
     </main>
   );
