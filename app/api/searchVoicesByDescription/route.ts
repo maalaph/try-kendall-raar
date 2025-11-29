@@ -141,8 +141,12 @@ export async function POST(request: NextRequest) {
               const generatedVoiceId = preview.generated_voice_id || `generated-${index}`;
               
               // CRITICAL: Ensure audioBase64 is always present for generated voices
-              if (!audioBase64) {
-                console.warn(`[SEARCH] Generated voice ${index} missing audioBase64, skipping`);
+              if (!audioBase64 || audioBase64.length === 0) {
+                console.error(`[SEARCH] Generated voice ${index} missing audioBase64 - this should not happen:`, {
+                  hasAudioBase64: !!preview.audio_base_64,
+                  hasAudioBase64Alt: !!preview.audioBase64,
+                  previewKeys: Object.keys(preview),
+                });
                 return null;
               }
               

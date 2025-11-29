@@ -209,18 +209,13 @@ export default function VoiceSelectionStep({
     try {
       // CRITICAL: Generated voices MUST use base64 audio directly
       // They cannot use the preview API because their IDs are temporary
-      // Check if it's a generated voice by checking for generatedVoiceId, audioBase64, or _internal.source
-      const isGeneratedVoice = voice.source === 'generated' || voice.generatedVoiceId || voice._internal?.source === 'generated' || voice._internal?.generatedVoiceId || (voice.audioBase64 && !voice._internal?.elevenLabsVoiceId && !voice._internal?.vapiVoiceId);
+      // Check if it's a generated voice by checking for _internal.source === 'generated' OR has audioBase64 with no internal IDs
+      const isGeneratedVoice = voice._internal?.source === 'generated' || 
+                               (voice.source === 'generated' && voice.audioBase64) ||
+                               (voice.audioBase64 && !voice._internal?.elevenLabsVoiceId && !voice._internal?.vapiVoiceId && voice.generatedVoiceId);
       
-      if (isGeneratedVoice) {
-        if (!voice.audioBase64) {
-          console.error('[VOICE PREVIEW] Generated voice missing audioBase64:', voice);
-          setIsLoading(false);
-          setIsPlaying(false);
-          setPreviewingVoiceId(null);
-          alert('Voice preview is not available for this generated voice. The audio data is missing. Please try generating the voice again.');
-          return;
-        }
+      if (isGeneratedVoice && voice.audioBase64) {
+        // Generated voice with audioBase64 - use it directly
         try {
           // Decode base64 audio and play it
           const audioData = atob(voice.audioBase64);
@@ -282,11 +277,14 @@ export default function VoiceSelectionStep({
           alert('Failed to decode audio data. Please try generating the voice again.');
           return;
         }
+      } else if (isGeneratedVoice && !voice.audioBase64) {
+        // Generated voice but missing audioBase64 - fall back to preview API
+        console.warn('[VOICE PREVIEW] Generated voice missing audioBase64, falling back to preview API:', voice);
+        // Fall through to regular voice preview handling below
       }
 
-      // For regular voices, call our API endpoint to generate preview
+      // For regular voices (or generated voices without audioBase64), call our API endpoint to generate preview
       // Use the voice ID directly and preview text in selected language
-      // Generated voices should have been handled above and returned early
       
       // Extract the correct voice ID - prioritize internal IDs for API calls
       const voiceIdForApi = voice._internal?.elevenLabsVoiceId || voice._internal?.vapiVoiceId || voice._internal?.generatedVoiceId || voice.voiceId || voice.id;
@@ -800,8 +798,19 @@ export default function VoiceSelectionStep({
       if (data.voices && Array.isArray(data.voices) && data.voices.length > 0) {
         // Transform generated voices to match VoiceOption interface - Brand as RAAR
         // Filter out voices without audio data
+        // Note: Generated voices from /api/generateVoice should always have audioBase64
+        // If they don't, it's an API error and we should log it
         const transformedVoices: VoiceOption[] = data.voices
-          .filter((voice: any) => voice.audioBase64) // Only include voices with audio
+          .filter((voice: any) => {
+            if (!voice.audioBase64) {
+              console.error('[VOICE GENERATION] Voice from API missing audioBase64:', {
+                id: voice.id,
+                name: voice.name,
+                generatedVoiceId: voice.generatedVoiceId,
+              });
+            }
+            return !!voice.audioBase64 && voice.audioBase64.length > 0;
+          }) // Only include voices with valid audio data
           .map((voice: any, index: number) => ({
             id: voice.generatedVoiceId || voice.id || `generated-${index}`,
             name: voice.name || `RAAR Voice ${index + 1}`,
@@ -1606,7 +1615,8 @@ export default function VoiceSelectionStep({
           flexShrink: 0,
           paddingTop: '0.5rem',
           position: 'relative',
-          zIndex: 400,
+          zIndex: 1000,
+          overflow: 'visible',
         }}
       >
         {/* Filters row - horizontal pills, scrollable on smaller screens */}
@@ -1616,13 +1626,14 @@ export default function VoiceSelectionStep({
             scrollbarWidth: 'thin',
             scrollbarColor: `${colors.accent}40 transparent`,
             overflowY: 'visible',
+            overflow: 'visible',
             paddingBottom: '0.25rem',
             position: 'relative',
-            zIndex: 400,
+            zIndex: 1000,
           }}
         >
         {/* Language Dropdown - Concise Premium */}
-        <div className="relative" style={{ position: 'relative', zIndex: 400 }}>
+        <div className="relative" style={{ position: 'relative', zIndex: 1000, overflow: 'visible' }}>
           <button
             onClick={() => {
               closeAllDropdowns();
@@ -1691,7 +1702,7 @@ export default function VoiceSelectionStep({
                   minWidth: '150px',
                   maxHeight: '320px',
                   overflowY: 'auto',
-                  zIndex: 500,
+                  zIndex: 1000,
                   animation: 'fade-in-scale 0.2s ease-out',
                 }}
                 onWheel={(e) => {
@@ -1761,14 +1772,14 @@ export default function VoiceSelectionStep({
               <div
                 className="fixed inset-0"
                 onClick={closeAllDropdowns}
-                style={{ cursor: 'pointer', zIndex: 399, pointerEvents: 'auto' }}
+                style={{ cursor: 'pointer', zIndex: 9999, pointerEvents: 'auto' }}
               />
             </>
           )}
         </div>
 
         {/* Gender Dropdown - Concise Premium */}
-        <div className="relative" style={{ position: 'relative', zIndex: 400 }}>
+        <div className="relative" style={{ position: 'relative', zIndex: 1000, overflow: 'visible' }}>
           <button
             onClick={() => {
               closeAllDropdowns();
@@ -1836,7 +1847,7 @@ export default function VoiceSelectionStep({
                   minWidth: '150px',
                   maxHeight: '320px',
                   overflowY: 'auto',
-                  zIndex: 500,
+                  zIndex: 10000,
                   animation: 'fade-in-scale 0.2s ease-out',
                 }}
                 onWheel={(e) => {
@@ -1884,7 +1895,7 @@ export default function VoiceSelectionStep({
               <div
                 className="fixed inset-0"
                 onClick={closeAllDropdowns}
-                style={{ cursor: 'pointer', zIndex: 399, pointerEvents: 'auto' }}
+                style={{ cursor: 'pointer', zIndex: 9999, pointerEvents: 'auto' }}
               />
             </>
           )}
@@ -1892,7 +1903,7 @@ export default function VoiceSelectionStep({
 
         {/* Accent Dropdown - Concise Premium */}
         {filterOptions.accents.length > 0 && (
-          <div className="relative" style={{ position: 'relative', zIndex: 400 }}>
+          <div className="relative" style={{ position: 'relative', zIndex: 1000, overflow: 'visible' }}>
             <button
               onClick={() => {
                 closeAllDropdowns();
@@ -1960,7 +1971,7 @@ export default function VoiceSelectionStep({
                     minWidth: '150px',
                     maxHeight: '320px',
                     overflowY: 'auto',
-                    zIndex: 500,
+                    zIndex: 10000,
                     animation: 'fade-in-scale 0.2s ease-out',
                   }}
                   onWheel={(e) => {
@@ -2068,7 +2079,7 @@ export default function VoiceSelectionStep({
 
         {/* Style/Tone Dropdown - Concise Premium */}
         {filterOptions.styles.length > 0 && (
-          <div className="relative" style={{ position: 'relative', zIndex: 400 }}>
+          <div className="relative" style={{ position: 'relative', zIndex: 1000, overflow: 'visible' }}>
             <button
               onClick={() => {
                 closeAllDropdowns();
@@ -2136,7 +2147,7 @@ export default function VoiceSelectionStep({
                     minWidth: '150px',
                     maxHeight: '320px',
                     overflowY: 'auto',
-                    zIndex: 500,
+                    zIndex: 10000,
                     animation: 'fade-in-scale 0.2s ease-out',
                   }}
                   onClick={(e) => {
@@ -2223,7 +2234,7 @@ export default function VoiceSelectionStep({
         )}
 
         {/* Age Group Dropdown - Concise Premium */}
-          <div className="relative" style={{ position: 'relative', zIndex: 400 }}>
+        <div className="relative" style={{ position: 'relative', zIndex: 1000, overflow: 'visible' }}>
           <button
             onClick={() => {
               closeAllDropdowns();
@@ -2291,7 +2302,7 @@ export default function VoiceSelectionStep({
                   minWidth: '150px',
                   maxHeight: '320px',
                   overflowY: 'auto',
-                  zIndex: 500,
+                  zIndex: 10000,
                   animation: 'fade-in-scale 0.2s ease-out',
                 }}
                 onWheel={(e) => {
@@ -2339,7 +2350,7 @@ export default function VoiceSelectionStep({
               <div
                 className="fixed inset-0"
                 onClick={closeAllDropdowns}
-                style={{ cursor: 'pointer', zIndex: 399, pointerEvents: 'auto' }}
+                style={{ cursor: 'pointer', zIndex: 9999, pointerEvents: 'auto' }}
               />
             </>
           )}
@@ -2347,7 +2358,7 @@ export default function VoiceSelectionStep({
 
         {/* Voice Characteristic Dropdown - Concise Premium */}
         {filterOptions.characteristics.length > 0 && (
-          <div className="relative" style={{ position: 'relative', zIndex: 400 }}>
+          <div className="relative" style={{ position: 'relative', zIndex: 1000, overflow: 'visible' }}>
             <button
               onClick={() => {
                 closeAllDropdowns();
@@ -2415,7 +2426,7 @@ export default function VoiceSelectionStep({
                   minWidth: '150px',
                     maxHeight: '320px',
                     overflowY: 'auto',
-                    zIndex: 500,
+                    zIndex: 10000,
                     animation: 'fade-in-scale 0.2s ease-out',
                   }}
                   onWheel={(e) => {
