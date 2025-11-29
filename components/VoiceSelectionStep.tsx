@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { colors } from '@/lib/config';
-import { Volume2, Play, Loader2, CheckCircle2, Circle, FileText, Lightbulb, Globe, ChevronDown, Users, MapPin, Palette, Calendar, Tag } from 'lucide-react';
+import { Volume2, Play, Loader2, CheckCircle2, Circle, FileText, Lightbulb, Globe, ChevronDown, Users, MapPin, Palette, Calendar, Tag, Search } from 'lucide-react';
 import { parseVoiceDescription } from '@/lib/parseVoiceDescription';
 import { getLanguagePreview, getAvailableLanguages, getLanguageName } from '@/lib/languagePreviews';
 import { analyzeDescription, getQuickSuggestions } from '@/lib/descriptionSuggestions';
@@ -57,14 +57,12 @@ export default function VoiceSelectionStep({
   const [activeAccent, setActiveAccent] = useState<string>('all');
   const [activeStyle, setActiveStyle] = useState<string>('all');
   const [activeAgeGroup, setActiveAgeGroup] = useState<string>('all');
-  const [activeCharacteristic, setActiveCharacteristic] = useState<string>('all');
   
   // Dropdown states for all filters
   const [isGenderDropdownOpen, setIsGenderDropdownOpen] = useState(false);
   const [isAccentDropdownOpen, setIsAccentDropdownOpen] = useState(false);
   const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false);
   const [isAgeGroupDropdownOpen, setIsAgeGroupDropdownOpen] = useState(false);
-  const [isCharacteristicDropdownOpen, setIsCharacteristicDropdownOpen] = useState(false);
   const [voiceDescription, setVoiceDescription] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewingDescription, setIsPreviewingDescription] = useState(false);
@@ -84,8 +82,7 @@ export default function VoiceSelectionStep({
     isGenderDropdownOpen ||
     isAccentDropdownOpen ||
     isStyleDropdownOpen ||
-    isAgeGroupDropdownOpen ||
-    isCharacteristicDropdownOpen;
+    isAgeGroupDropdownOpen;
 
   // Helper function to close all dropdowns
   const closeAllDropdowns = () => {
@@ -94,7 +91,6 @@ export default function VoiceSelectionStep({
     setIsAccentDropdownOpen(false);
     setIsStyleDropdownOpen(false);
     setIsAgeGroupDropdownOpen(false);
-    setIsCharacteristicDropdownOpen(false);
   };
 
   // Get preview text based on selected language
@@ -723,254 +719,21 @@ export default function VoiceSelectionStep({
         return; // Stop here, we found good matches
       }
 
-      // STEP 2: If no good matches found, generate new voice (requires 20+ chars)
-      if (trimmedDescription.length < 20) {
-        console.log('[VOICE GENERATION] Description too short for generation, but no good matches found');
-        alert(`No close matches found. To generate a custom voice, please use at least 20 characters.\n\nCurrent: ${trimmedDescription.length} characters\nRequired: 20-1000 characters\n\nTip: Add more details like accent, gender, tone, or style for better results.`);
-        setIsGenerating(false);
-        setIsPreviewingDescription(false);
-        return;
-      }
+      // STEP 2: No good matches found - show empty state (no voice generation)
+      console.log('[VOICE SEARCH] No good matches found in library');
+      setGeneratedVoices([]);
+      setVoices([]);
+      setDescriptionHash(currentHash);
+      setIsGenerating(false);
+      setIsPreviewingDescription(false);
       
-      console.log('[VOICE GENERATION] No good matches found, generating new voice from description...');
-      console.log('[VOICE GENERATION] Making API call to /api/generateVoice');
-      
-      const response = await fetch('/api/generateVoice', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          description: trimmedDescription,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to generate voices:', errorData);
-        
-        let errorMessage = errorData.error || 'Unknown error';
-        
-        if (errorData.message) {
-          errorMessage += `\n\n${errorData.message}`;
+      // Show user-friendly message if search returned a message
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json().catch(() => ({}));
+        if (searchData.message) {
+          // Message already shown in UI via empty state
+          console.log('[VOICE SEARCH] Search returned message:', searchData.message);
         }
-        
-        if (errorData.requirements) {
-          if (errorData.requirements.minLength) {
-            errorMessage += `\n\nMinimum: ${errorData.requirements.minLength} characters`;
-          }
-          if (errorData.requirements.maxLength) {
-            errorMessage += `\nMaximum: ${errorData.requirements.maxLength} characters`;
-          }
-          if (errorData.requirements.restrictions) {
-            errorMessage += `\nRestrictions: ${errorData.requirements.restrictions}`;
-          }
-          if (errorData.requirements.message) {
-            errorMessage += `\n\n${errorData.requirements.message}`;
-          }
-        }
-        
-        if (errorData.suggestion) {
-          errorMessage += `\n\nSuggestion: ${errorData.suggestion}`;
-        }
-        
-        alert(errorMessage);
-        setIsGenerating(false);
-        setIsPreviewingDescription(false);
-        return;
-      }
-
-      const data = await response.json();
-      
-      // Check if response indicates success
-      if (!data.success) {
-        console.error('[VOICE GENERATION] API returned unsuccessful response:', data);
-        let errorMessage = data.error || 'Failed to generate voices';
-        if (data.message) {
-          errorMessage += `\n\n${data.message}`;
-        }
-        alert(errorMessage);
-        setIsGenerating(false);
-        setIsPreviewingDescription(false);
-        return;
-      }
-      
-      if (data.voices && Array.isArray(data.voices) && data.voices.length > 0) {
-        // Transform generated voices to match VoiceOption interface - Brand as RAAR
-        // Filter out voices without audio data
-        // Note: Generated voices from /api/generateVoice should always have audioBase64
-        // If they don't, it's an API error and we should log it
-        const transformedVoices: VoiceOption[] = data.voices
-          .filter((voice: any) => {
-            if (!voice.audioBase64) {
-              console.error('[VOICE GENERATION] Voice from API missing audioBase64:', {
-                id: voice.id,
-                name: voice.name,
-                generatedVoiceId: voice.generatedVoiceId,
-              });
-            }
-            return !!voice.audioBase64 && voice.audioBase64.length > 0;
-          }) // Only include voices with valid audio data
-          .map((voice: any, index: number) => ({
-            id: voice.generatedVoiceId || voice.id || `generated-${index}`,
-            name: voice.name || `RAAR Voice ${index + 1}`,
-            gender: 'neutral' as const,
-            description: voice.description || voice.originalDescription || trimmedDescription,
-            voiceId: voice.voiceId || voice.generatedVoiceId || voice.id || `generated-${index}`,
-            source: 'generated' as const, // Mark as generated for proper handling
-            generatedVoiceId: voice.generatedVoiceId || voice.id || `generated-${index}`,
-            audioBase64: voice.audioBase64,
-            qualityScore: voice.qualityScore, // Phase 5.4: Include quality score if available
-            _internal: voice._internal || {
-              source: 'generated',
-              generatedVoiceId: voice.generatedVoiceId || voice.id || `generated-${index}`,
-            },
-          }));
-        
-        if (transformedVoices.length === 0) {
-          console.error('[VOICE GENERATION] No voices with valid audio data:', data.voices);
-          alert('Voices were generated but audio data is missing. Please try again with a different description.');
-          setGeneratedVoices([]);
-          setIsGenerating(false);
-          setIsPreviewingDescription(false);
-          return;
-        }
-        
-        setGeneratedVoices(transformedVoices);
-        setDescriptionHash(currentHash);
-        
-        // Auto-select the first generated voice
-        if (transformedVoices[0]?.id) {
-          setMatchedVoiceId(transformedVoices[0].id);
-          onSelectionChange(transformedVoices[0].id);
-        }
-
-        // Generate a preview in the user's selected language and play it
-        // RAAR voices are multilingual, so we can preview in any language
-        const firstVoice = transformedVoices[0];
-        if (firstVoice?.voiceId || firstVoice?.generatedVoiceId || firstVoice?.id) {
-          const voiceIdToPreview = firstVoice.voiceId || firstVoice._internal?.generatedVoiceId || firstVoice.generatedVoiceId || firstVoice.id;
-          const previewText = getPreviewText(); // Use selected language (EN/ES/AR)
-          
-          console.log('[VOICE GENERATION] Generating preview in selected language:', activeLanguage);
-          console.log('[VOICE GENERATION] Current activeLanguage state:', activeLanguage);
-          console.log('[VOICE GENERATION] Preview text being sent:', previewText);
-          console.log('[VOICE GENERATION] Preview text length:', previewText.length);
-          console.log('[VOICE GENERATION] Preview text first 50 chars:', previewText.substring(0, 50));
-          
-          try {
-            const previewResponse = await fetch('/api/generateVoicePreview', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                voiceId: voiceIdToPreview,
-                text: previewText,
-              }),
-            });
-
-            if (previewResponse.ok) {
-              const audioBlob = await previewResponse.blob();
-              
-              if (!audioBlob || audioBlob.size === 0) {
-                console.warn('[VOICE GENERATION] Preview generation returned empty audio blob, using base64 audio');
-                // Fallback to base64 audio if preview fails
-                if (firstVoice.audioBase64) {
-                  await playGeneratedAudio(firstVoice);
-                } else {
-                  setIsGenerating(false);
-                  setIsPreviewingDescription(false);
-                  alert('Voice was generated but audio preview is not available. Please try selecting the voice to preview it.');
-                }
-                return;
-              }
-              
-              const audioUrl = URL.createObjectURL(audioBlob);
-              const audio = new Audio(audioUrl);
-              descriptionAudioRef.current = audio;
-
-              audio.onplay = () => {
-                setIsGenerating(false);
-                setIsPlaying(true);
-              };
-
-              audio.onended = () => {
-                setIsPlaying(false);
-                setIsPreviewingDescription(false);
-                URL.revokeObjectURL(audioUrl);
-                descriptionAudioRef.current = null;
-              };
-
-              audio.onerror = (error) => {
-                console.error('[VOICE GENERATION] Audio playback error:', error);
-                setIsGenerating(false);
-                setIsPlaying(false);
-                setIsPreviewingDescription(false);
-                URL.revokeObjectURL(audioUrl);
-                descriptionAudioRef.current = null;
-                alert('Failed to play voice preview. Please try again.');
-              };
-
-              try {
-                await audio.play();
-              } catch (playError: any) {
-                console.error('[VOICE GENERATION] Failed to start playback:', playError);
-                setIsGenerating(false);
-                setIsPlaying(false);
-                setIsPreviewingDescription(false);
-                URL.revokeObjectURL(audioUrl);
-                descriptionAudioRef.current = null;
-                
-                if (playError.name === 'NotAllowedError') {
-                  alert('Audio playback was blocked by your browser. Please interact with the page first, then try again.');
-                } else {
-                  alert('Failed to play voice preview. Please try again.');
-                }
-              }
-            } else {
-              // Fallback to base64 audio if preview generation fails
-              console.warn('[VOICE GENERATION] Preview generation failed, using base64 audio');
-              if (firstVoice.audioBase64) {
-                await playGeneratedAudio(firstVoice);
-              } else {
-                const errorData = await previewResponse.json().catch(() => ({}));
-                console.error('[VOICE GENERATION] Preview failed:', errorData);
-                setIsGenerating(false);
-                setIsPreviewingDescription(false);
-                alert('Voice was generated but preview is not available. Please try selecting the voice to preview it.');
-              }
-            }
-          } catch (previewError) {
-            console.error('[VOICE GENERATION] Error generating preview:', previewError);
-            // Fallback to base64 audio
-            if (firstVoice.audioBase64) {
-              await playGeneratedAudio(firstVoice);
-            } else {
-              setIsGenerating(false);
-              setIsPreviewingDescription(false);
-              alert('Voice was generated but preview is not available. Please try again.');
-            }
-          }
-        } else {
-          console.warn('[VOICE GENERATION] Generated voice has no ID');
-          setIsGenerating(false);
-          setIsPreviewingDescription(false);
-          alert('Voice was generated but is missing required data. Please try again.');
-        }
-      } else {
-        console.error('[VOICE GENERATION] No voices in response:', data);
-        let errorMessage = 'No voices were generated.';
-        if (data.message) {
-          errorMessage += `\n\n${data.message}`;
-        }
-        if (data.error) {
-          errorMessage += `\n\nError: ${data.error}`;
-        }
-        alert(errorMessage);
-        setGeneratedVoices([]);
-        setIsGenerating(false);
-        setIsPreviewingDescription(false);
       }
     } catch (error) {
       console.error('[VOICE GENERATION] Error in voice search/generation:', error);
@@ -1086,28 +849,17 @@ export default function VoiceSelectionStep({
     const allVoices = [...generatedVoices, ...voices];
     const accents = new Set<string>();
     const styles = new Set<string>();
-    const characteristics = new Set<string>();
     
     allVoices.forEach(voice => {
       if (voice.accent) accents.add(voice.accent);
       if (voice.tone && Array.isArray(voice.tone)) {
         voice.tone.forEach(t => styles.add(t));
       }
-      if (voice.tags && Array.isArray(voice.tags)) {
-        voice.tags.forEach(tag => {
-          // Only include voice characteristics, not character types
-          const voiceChars = ['deep', 'raspy', 'smooth', 'bright', 'warm', 'calm', 'energetic', 'soft', 'powerful'];
-          if (voiceChars.includes(tag.toLowerCase())) {
-            characteristics.add(tag);
-          }
-        });
-      }
     });
     
     return {
       accents: Array.from(accents).sort(),
       styles: Array.from(styles).sort(),
-      characteristics: Array.from(characteristics).sort(),
     };
   }, [generatedVoices, voices]);
 
@@ -1166,16 +918,8 @@ export default function VoiceSelectionStep({
       result = result.filter(voice => voice.ageGroup === activeAgeGroup);
     }
     
-    // Apply characteristic filter
-    if (activeCharacteristic !== 'all') {
-      result = result.filter(voice => 
-        voice.tags && Array.isArray(voice.tags) && 
-        voice.tags.some(tag => tag.toLowerCase() === activeCharacteristic.toLowerCase())
-      );
-    }
-    
     return result;
-  }, [generatedVoices, voices, activeFilter, activeLanguage, activeAccent, activeStyle, activeAgeGroup, activeCharacteristic]);
+  }, [generatedVoices, voices, activeFilter, activeLanguage, activeAccent, activeStyle, activeAgeGroup]);
 
   // Use the SAME parsing logic as backend for 100% accuracy
   // This ensures what user types = what gets checked
@@ -1297,6 +1041,35 @@ export default function VoiceSelectionStep({
                   : '0 10px 28px rgba(0,0,0,0.6)',
               }}
             >
+              {/* Try example button - moved to left side */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setVoiceDescription('Young British male with confident tone');
+                }}
+                className="hidden sm:inline-flex items-center text-xs font-medium transition-all duration-200 flex-shrink-0"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: colors.accent,
+                  border: 'none',
+                  fontFamily: 'var(--font-inter), sans-serif',
+                  whiteSpace: 'nowrap',
+                  marginRight: '0.5rem',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = colors.accent;
+                  e.currentTarget.style.opacity = '0.8';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = colors.accent;
+                  e.currentTarget.style.opacity = '1';
+                }}
+              >
+                Try example
+              </button>
+
               <input
                 type="text"
                 value={voiceDescription}
@@ -1310,6 +1083,12 @@ export default function VoiceSelectionStep({
                     // Reserved for future search
                   }, 300);
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isGenerating && voiceDescription.trim()) {
+                    e.preventDefault();
+                    handleGenerateAndPlay();
+                  }
+                }}
                 placeholder="Describe the voice you want (e.g. calm Australian female, warm and confident)"
                 className="flex-1 bg-transparent text-sm sm:text-base outline-none border-none"
                 style={{
@@ -1317,32 +1096,6 @@ export default function VoiceSelectionStep({
                   fontFamily: 'var(--font-inter), sans-serif',
                 }}
               />
-
-              {/* Try example text */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setVoiceDescription('Young British male with confident tone');
-                }}
-                className="hidden sm:inline-flex items-center text-xs font-medium transition-all duration-200"
-                style={{
-                  backgroundColor: 'transparent',
-                  color: colors.text,
-                  border: 'none',
-                  fontFamily: 'var(--font-inter), sans-serif',
-                  whiteSpace: 'nowrap',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = colors.accent;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = colors.text;
-                }}
-              >
-                Try example
-              </button>
 
               {/* Play Button – inline at the right end of the input */}
               <button
@@ -1389,12 +1142,11 @@ export default function VoiceSelectionStep({
                     }} 
                   />
                 ) : (
-                  <Play 
+                  <Search 
                     size={20} 
-                    fill="#000" 
-                    stroke={colors.accent}
                     strokeWidth={2}
                     style={{ 
+                      color: colors.accent,
                       marginLeft: '2px',
                       filter: `drop-shadow(0 0 8px ${colors.accent}) drop-shadow(0 0 16px ${colors.accent}80)`,
                     }} 
@@ -1461,124 +1213,6 @@ export default function VoiceSelectionStep({
         </div>
       </div>
 
-      {/* Active filter chips – combined filter summary */}
-      <div
-        className="hidden sm:flex flex-wrap justify-end gap-1.5 mb-4"
-        style={{ maxWidth: '100%', justifyContent: 'flex-end' }}
-      >
-        {/* Language chip */}
-        {activeLanguage !== 'all' && (
-          <button
-            type="button"
-            onClick={() => setActiveLanguage('all')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
-            style={{
-              backgroundColor: `${colors.accent}20`,
-              border: `1px solid ${colors.accent}`,
-              color: colors.text,
-              fontFamily: 'var(--font-inter), sans-serif',
-            }}
-          >
-            <Globe size={12} />
-            <span>{getLanguageName(activeLanguage).slice(0, 10)}</span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>✕</span>
-          </button>
-        )}
-        {/* Gender chip */}
-        {activeFilter !== 'all' && (
-          <button
-            type="button"
-            onClick={() => setActiveFilter('all')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
-            style={{
-              backgroundColor: `${colors.accent}20`,
-              border: `1px solid ${colors.accent}`,
-              color: colors.text,
-              fontFamily: 'var(--font-inter), sans-serif',
-            }}
-          >
-            <Users size={12} />
-            <span>
-              {activeFilter === 'male' ? 'Male' : 'Female'}
-            </span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>✕</span>
-          </button>
-        )}
-        {/* Accent chip */}
-        {activeAccent !== 'all' && (
-          <button
-            type="button"
-            onClick={() => setActiveAccent('all')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
-            style={{
-              backgroundColor: `${colors.accent}20`,
-              border: `1px solid ${colors.accent}`,
-              color: colors.text,
-              fontFamily: 'var(--font-inter), sans-serif',
-            }}
-          >
-            <MapPin size={12} />
-            <span>{activeAccent.length > 10 ? `${activeAccent.slice(0, 10)}…` : activeAccent}</span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>✕</span>
-          </button>
-        )}
-        {/* Style chip */}
-        {activeStyle !== 'all' && (
-          <button
-            type="button"
-            onClick={() => setActiveStyle('all')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
-            style={{
-              backgroundColor: `${colors.accent}20`,
-              border: `1px solid ${colors.accent}`,
-              color: colors.text,
-              fontFamily: 'var(--font-inter), sans-serif',
-            }}
-          >
-            <Palette size={12} />
-            <span>{activeStyle.length > 10 ? `${activeStyle.slice(0, 10)}…` : activeStyle}</span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>✕</span>
-          </button>
-        )}
-        {/* Age chip */}
-        {activeAgeGroup !== 'all' && (
-          <button
-            type="button"
-            onClick={() => setActiveAgeGroup('all')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
-            style={{
-              backgroundColor: `${colors.accent}20`,
-              border: `1px solid ${colors.accent}`,
-              color: colors.text,
-              fontFamily: 'var(--font-inter), sans-serif',
-            }}
-          >
-            <Calendar size={12} />
-            <span>
-              {activeAgeGroup === 'middle-aged' ? 'Middle-aged' : activeAgeGroup}
-            </span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>✕</span>
-          </button>
-        )}
-        {/* Trait chip */}
-        {activeCharacteristic !== 'all' && (
-          <button
-            type="button"
-            onClick={() => setActiveCharacteristic('all')}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs"
-            style={{
-              backgroundColor: `${colors.accent}20`,
-              border: `1px solid ${colors.accent}`,
-              color: colors.text,
-              fontFamily: 'var(--font-inter), sans-serif',
-            }}
-          >
-            <Tag size={12} />
-            <span>{activeCharacteristic.length > 10 ? `${activeCharacteristic.slice(0, 10)}…` : activeCharacteristic}</span>
-            <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>✕</span>
-          </button>
-        )}
-      </div>
 
       {/* Voice Library Section Header - Premium Spacing */}
       <div style={{ marginBottom: '1.25rem', width: '100%', flexShrink: 0 }}>
@@ -1615,7 +1249,7 @@ export default function VoiceSelectionStep({
           flexShrink: 0,
           paddingTop: '0.5rem',
           position: 'relative',
-          zIndex: 1000,
+          zIndex: 10000, // Higher z-index to ensure dropdowns appear above everything
           overflow: 'visible',
         }}
       >
@@ -1630,12 +1264,16 @@ export default function VoiceSelectionStep({
             paddingBottom: '0.25rem',
             position: 'relative',
             zIndex: 1000,
+            flex: 1,
+            minWidth: 0, // Allow flex shrinking
           }}
         >
         {/* Language Dropdown - Concise Premium */}
-        <div className="relative" style={{ position: 'relative', zIndex: 1000, overflow: 'visible' }}>
+        <div className="relative" style={{ position: 'relative', zIndex: 10001, overflow: 'visible' }}>
           <button
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
               closeAllDropdowns();
               setIsLanguageDropdownOpen(!isLanguageDropdownOpen);
             }}
@@ -1655,6 +1293,10 @@ export default function VoiceSelectionStep({
                 : '0 2px 8px rgba(0, 0, 0, 0.2)',
               transform: 'scale(1)',
               animation: 'fade-in-scale 0.4s ease-out 0.1s both',
+              pointerEvents: 'auto',
+              cursor: 'pointer',
+              position: 'relative',
+              zIndex: 10002,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.05)';
@@ -1702,8 +1344,9 @@ export default function VoiceSelectionStep({
                   minWidth: '150px',
                   maxHeight: '320px',
                   overflowY: 'auto',
-                  zIndex: 1000,
+                  zIndex: 10003, // Higher than backdrop (9998) to ensure clicks work
                   animation: 'fade-in-scale 0.2s ease-out',
+                  pointerEvents: 'auto', // Ensure clicks work
                 }}
                 onWheel={(e) => {
                   // Scroll only inside this panel, not the wizard/cards
@@ -1750,8 +1393,10 @@ export default function VoiceSelectionStep({
                       color: activeLanguage === lang ? colors.accent : colors.text,
                       fontFamily: 'var(--font-inter), sans-serif',
                       fontWeight: activeLanguage === lang ? 500 : 400,
-                      zIndex: 501,
+                      zIndex: 10004, // Higher than dropdown container to ensure clicks work
                       position: 'relative',
+                      pointerEvents: 'auto', // Ensure clicks work
+                      cursor: 'pointer', // Show pointer cursor
                     }}
                     onMouseEnter={(e) => {
                       if (activeLanguage !== lang) {
@@ -1771,8 +1416,20 @@ export default function VoiceSelectionStep({
               {/* Backdrop to close dropdown */}
               <div
                 className="fixed inset-0"
-                onClick={closeAllDropdowns}
-                style={{ cursor: 'pointer', zIndex: 9999, pointerEvents: 'auto' }}
+                onClick={(e) => {
+                  // Only close if clicking directly on backdrop, not on dropdown
+                  if (e.target === e.currentTarget) {
+                    closeAllDropdowns();
+                  }
+                }}
+                onMouseDown={(e) => {
+                  // Prevent backdrop from blocking dropdown clicks
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.rounded-xl')) {
+                    e.preventDefault();
+                  }
+                }}
+                style={{ cursor: 'pointer', zIndex: 9998, pointerEvents: 'auto' }}
               />
             </>
           )}
@@ -1895,7 +1552,7 @@ export default function VoiceSelectionStep({
               <div
                 className="fixed inset-0"
                 onClick={closeAllDropdowns}
-                style={{ cursor: 'pointer', zIndex: 9999, pointerEvents: 'auto' }}
+                style={{ cursor: 'pointer', zIndex: 9998, pointerEvents: 'auto' }}
               />
             </>
           )}
@@ -2350,208 +2007,259 @@ export default function VoiceSelectionStep({
               <div
                 className="fixed inset-0"
                 onClick={closeAllDropdowns}
-                style={{ cursor: 'pointer', zIndex: 9999, pointerEvents: 'auto' }}
+                style={{ cursor: 'pointer', zIndex: 9998, pointerEvents: 'auto' }}
               />
             </>
           )}
         </div>
 
-        {/* Voice Characteristic Dropdown - Concise Premium */}
-        {filterOptions.characteristics.length > 0 && (
-          <div className="relative" style={{ position: 'relative', zIndex: 1000, overflow: 'visible' }}>
-            <button
-              onClick={() => {
-                closeAllDropdowns();
-                setIsCharacteristicDropdownOpen(!isCharacteristicDropdownOpen);
-              }}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium transition-all duration-300 rounded-full relative overflow-hidden flex-shrink-0"
-              style={{
-                backgroundColor: activeCharacteristic !== 'all' 
-                  ? `${colors.accent}25` 
-                  : 'rgba(255, 255, 255, 0.08)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                color: activeCharacteristic !== 'all' ? colors.accent : colors.text,
-                border: `1.5px solid ${activeCharacteristic !== 'all' ? colors.accent : 'rgba(255, 255, 255, 0.15)'}`,
-                fontFamily: 'var(--font-inter), sans-serif',
-                fontWeight: 500,
-                boxShadow: activeCharacteristic !== 'all'
-                  ? `0 4px 12px ${colors.accent}40, 0 0 20px ${colors.accent}25, inset 0 0 10px ${colors.accent}10`
-                  : '0 2px 8px rgba(0, 0, 0, 0.2)',
-                transform: 'scale(1)',
-                animation: 'fade-in-scale 0.4s ease-out 0.35s both',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.05)';
-                e.currentTarget.style.backgroundColor = activeCharacteristic !== 'all' 
-                  ? `${colors.accent}35` 
-                  : 'rgba(255, 255, 255, 0.12)';
-                e.currentTarget.style.boxShadow = activeCharacteristic !== 'all'
-                  ? `0 6px 16px ${colors.accent}50, 0 0 30px ${colors.accent}35, inset 0 0 15px ${colors.accent}15`
-                  : `0 4px 12px rgba(255, 255, 255, 0.1)`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.backgroundColor = activeCharacteristic !== 'all' 
-                  ? `${colors.accent}25` 
-                  : 'rgba(255, 255, 255, 0.08)';
-                e.currentTarget.style.boxShadow = activeCharacteristic !== 'all'
-                  ? `0 4px 12px ${colors.accent}40, 0 0 20px ${colors.accent}25, inset 0 0 10px ${colors.accent}10`
-                  : '0 2px 8px rgba(0, 0, 0, 0.2)';
-              }}
-            >
-              <Tag size={13} style={{ flexShrink: 0 }} />
-              <span style={{ whiteSpace: 'nowrap' }}>{activeCharacteristic === 'all' ? 'Trait' : activeCharacteristic.length > 10 ? activeCharacteristic.slice(0, 10) + '...' : activeCharacteristic}</span>
-              <ChevronDown size={11} style={{ 
-                transform: isCharacteristicDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                flexShrink: 0,
-              }} />
-            </button>
-            
-            {isCharacteristicDropdownOpen && (
-              <>
-                <div
-                  className="rounded-xl overflow-hidden"
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    marginTop: '0.5rem',
-                    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-                    backdropFilter: 'blur(24px)',
-                    WebkitBackdropFilter: 'blur(24px)',
-                  border: `1.5px solid ${colors.accent}40`,
-                  boxShadow: `0 12px 40px rgba(0, 0, 0, 0.6), 0 0 24px ${colors.accent}30, inset 0 0 20px ${colors.accent}10`,
-                  minWidth: '150px',
-                    maxHeight: '320px',
-                    overflowY: 'auto',
-                    zIndex: 10000,
-                    animation: 'fade-in-scale 0.2s ease-out',
-                  }}
-                  onWheel={(e) => {
-                    e.stopPropagation();
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveCharacteristic('all');
-                      setIsCharacteristicDropdownOpen(false);
-                      stopPreview();
-                    }}
-                    className="w-full text-left px-4 py-2.5 text-sm transition-all duration-200"
-                    style={{
-                      backgroundColor: activeCharacteristic === 'all' 
-                        ? 'rgba(168, 85, 247, 0.2)' 
-                        : 'transparent',
-                      color: activeCharacteristic === 'all' ? colors.accent : colors.text,
-                      fontFamily: 'var(--font-inter), sans-serif',
-                      fontWeight: activeCharacteristic === 'all' ? 500 : 400,
-                      zIndex: 501,
-                      position: 'relative',
-                    }}
-                    onMouseEnter={(e) => {
-                      if (activeCharacteristic !== 'all') {
-                        e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (activeCharacteristic !== 'all') {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                      }
-                    }}
-                  >
-                    All Characteristics
-                  </button>
-                  {filterOptions.characteristics.map((char) => (
-              <button
-                key={char}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveCharacteristic(char);
-                  setIsCharacteristicDropdownOpen(false);
-                  stopPreview();
-                }}
-                      className="w-full text-left px-4 py-2.5 text-sm transition-all duration-200 capitalize"
-                style={{
-                  backgroundColor: activeCharacteristic === char 
-                    ? 'rgba(168, 85, 247, 0.2)' 
-                          : 'transparent',
-                  color: activeCharacteristic === char ? colors.accent : colors.text,
-                  fontFamily: 'var(--font-inter), sans-serif',
-                  fontWeight: activeCharacteristic === char ? 500 : 400,
-                  zIndex: 501,
-                  position: 'relative',
-                }}
-                      onMouseEnter={(e) => {
-                        if (activeCharacteristic !== char) {
-                          e.currentTarget.style.backgroundColor = 'rgba(168, 85, 247, 0.1)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (activeCharacteristic !== char) {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }
-                }}
-              >
-                {char}
-              </button>
-            ))}
-                </div>
-                <div
-                  className="fixed inset-0"
-                  onClick={closeAllDropdowns}
-                  style={{ cursor: 'pointer', zIndex: 350, pointerEvents: 'auto' }}
-                />
-              </>
-            )}
-          </div>
-        )}
 
         {/* Clear All Button - Premium */}
         {(activeFilter !== 'all' || activeLanguage !== 'all' || activeAccent !== 'all' || 
-          activeStyle !== 'all' || activeAgeGroup !== 'all' || activeCharacteristic !== 'all') && (
-          <button
-            onClick={() => {
+          activeStyle !== 'all' || activeAgeGroup !== 'all') && (
+            <button
+              onClick={() => {
               setActiveFilter('all');
               setActiveLanguage('all');
               setActiveAccent('all');
               setActiveStyle('all');
               setActiveAgeGroup('all');
-              setActiveCharacteristic('all');
               stopPreview();
             }}
             className="px-3 py-2 text-xs font-medium transition-all duration-300 rounded-full flex-shrink-0"
-            style={{
+              style={{
               backgroundColor: 'rgba(255, 255, 255, 0.08)',
-              backdropFilter: 'blur(12px)',
+                backdropFilter: 'blur(12px)',
               color: colors.text,
               border: '1.5px solid rgba(255, 255, 255, 0.15)',
-              fontFamily: 'var(--font-inter), sans-serif',
+                fontFamily: 'var(--font-inter), sans-serif',
               opacity: 0.8,
-              transform: 'scale(1)',
+                transform: 'scale(1)',
               animation: 'fade-in-scale 0.4s ease-out 0.4s both',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.05)';
               e.currentTarget.style.opacity = '1';
               e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
               e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 255, 255, 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)';
               e.currentTarget.style.opacity = '0.8';
               e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)';
               e.currentTarget.style.boxShadow = 'none';
             }}
           >
             Clear
+            </button>
+        )}
+            
+        {/* Active Filter Tags - Premium Design, Right of Filters */}
+                <div
+          className="flex flex-nowrap items-center gap-2 ml-auto"
+                  style={{
+            flexShrink: 0,
+            overflow: 'hidden',
+            maxWidth: '100%',
+            marginLeft: 'auto',
+          }}
+        >
+          {/* Language tag */}
+          {activeLanguage !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setActiveLanguage('all')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 flex-shrink-0"
+              style={{
+                backgroundColor: `${colors.accent}30`,
+                border: `1.5px solid ${colors.accent}`,
+                color: colors.accent,
+                fontFamily: 'var(--font-inter), sans-serif',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                borderRadius: '8px',
+                boxShadow: `0 2px 8px ${colors.accent}40, inset 0 0 8px ${colors.accent}15`,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '120px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = `${colors.accent}40`;
+                e.currentTarget.style.boxShadow = `0 4px 12px ${colors.accent}50, inset 0 0 12px ${colors.accent}20`;
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = `${colors.accent}30`;
+                e.currentTarget.style.boxShadow = `0 2px 8px ${colors.accent}40, inset 0 0 8px ${colors.accent}15`;
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <Globe size={11} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {getLanguageName(activeLanguage)}
+              </span>
+              <span style={{ fontSize: '0.65rem', opacity: 0.9, marginLeft: '2px', flexShrink: 0 }}>×</span>
+            </button>
+          )}
+          {/* Gender tag */}
+          {activeFilter !== 'all' && (
+                  <button
+              type="button"
+              onClick={() => setActiveFilter('all')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 flex-shrink-0"
+                    style={{
+                backgroundColor: `${colors.accent}30`,
+                border: `1.5px solid ${colors.accent}`,
+                color: colors.accent,
+                      fontFamily: 'var(--font-inter), sans-serif',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                borderRadius: '8px',
+                boxShadow: `0 2px 8px ${colors.accent}40, inset 0 0 8px ${colors.accent}15`,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100px',
+                transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = `${colors.accent}40`;
+                e.currentTarget.style.boxShadow = `0 4px 12px ${colors.accent}50, inset 0 0 12px ${colors.accent}20`;
+                e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = `${colors.accent}30`;
+                e.currentTarget.style.boxShadow = `0 2px 8px ${colors.accent}40, inset 0 0 8px ${colors.accent}15`;
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <Users size={11} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {activeFilter === 'male' ? 'Male' : 'Female'}
+              </span>
+              <span style={{ fontSize: '0.65rem', opacity: 0.9, marginLeft: '2px', flexShrink: 0 }}>×</span>
+                  </button>
+          )}
+          {/* Accent tag */}
+          {activeAccent !== 'all' && (
+              <button
+              type="button"
+              onClick={() => setActiveAccent('all')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 flex-shrink-0"
+                style={{
+                backgroundColor: `${colors.accent}30`,
+                border: `1.5px solid ${colors.accent}`,
+                color: colors.accent,
+                  fontFamily: 'var(--font-inter), sans-serif',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                borderRadius: '8px',
+                boxShadow: `0 2px 8px ${colors.accent}40, inset 0 0 8px ${colors.accent}15`,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '140px',
+                transition: 'all 0.2s ease',
+                }}
+                      onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = `${colors.accent}40`;
+                e.currentTarget.style.boxShadow = `0 4px 12px ${colors.accent}50, inset 0 0 12px ${colors.accent}20`;
+                e.currentTarget.style.transform = 'scale(1.05)';
+                      }}
+                      onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = `${colors.accent}30`;
+                e.currentTarget.style.boxShadow = `0 2px 8px ${colors.accent}40, inset 0 0 8px ${colors.accent}15`;
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <MapPin size={11} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {activeAccent}
+              </span>
+              <span style={{ fontSize: '0.65rem', opacity: 0.9, marginLeft: '2px', flexShrink: 0 }}>×</span>
+              </button>
+          )}
+          {/* Style tag */}
+          {activeStyle !== 'all' && (
+          <button
+              type="button"
+              onClick={() => setActiveStyle('all')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 flex-shrink-0"
+              style={{
+                backgroundColor: `${colors.accent}30`,
+                border: `1.5px solid ${colors.accent}`,
+                color: colors.accent,
+                fontFamily: 'var(--font-inter), sans-serif',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                borderRadius: '8px',
+                boxShadow: `0 2px 8px ${colors.accent}40, inset 0 0 8px ${colors.accent}15`,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '140px',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = `${colors.accent}40`;
+                e.currentTarget.style.boxShadow = `0 4px 12px ${colors.accent}50, inset 0 0 12px ${colors.accent}20`;
+                e.currentTarget.style.transform = 'scale(1.05)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = `${colors.accent}30`;
+                e.currentTarget.style.boxShadow = `0 2px 8px ${colors.accent}40, inset 0 0 8px ${colors.accent}15`;
+                e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <Palette size={11} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {activeStyle}
+              </span>
+              <span style={{ fontSize: '0.65rem', opacity: 0.9, marginLeft: '2px', flexShrink: 0 }}>×</span>
+            </button>
+          )}
+          {/* Age tag */}
+          {activeAgeGroup !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setActiveAgeGroup('all')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 flex-shrink-0"
+            style={{
+                backgroundColor: `${colors.accent}30`,
+                border: `1.5px solid ${colors.accent}`,
+                color: colors.accent,
+              fontFamily: 'var(--font-inter), sans-serif',
+                fontWeight: 600,
+                fontSize: '0.75rem',
+                borderRadius: '8px',
+                boxShadow: `0 2px 8px ${colors.accent}40, inset 0 0 8px ${colors.accent}15`,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '120px',
+                transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = `${colors.accent}40`;
+                e.currentTarget.style.boxShadow = `0 4px 12px ${colors.accent}50, inset 0 0 12px ${colors.accent}20`;
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = `${colors.accent}30`;
+                e.currentTarget.style.boxShadow = `0 2px 8px ${colors.accent}40, inset 0 0 8px ${colors.accent}15`;
+              e.currentTarget.style.transform = 'scale(1)';
+              }}
+            >
+              <Calendar size={11} style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {activeAgeGroup === 'middle-aged' ? 'Middle-aged' : activeAgeGroup}
+              </span>
+              <span style={{ fontSize: '0.65rem', opacity: 0.9, marginLeft: '2px', flexShrink: 0 }}>×</span>
           </button>
         )}
+        </div>
         </div>
       </div>
 
@@ -2561,8 +2269,8 @@ export default function VoiceSelectionStep({
         style={{
           width: '100%',
           position: 'relative',
-          // When any dropdown is open, give a bit of extra space between filters and cards
-          marginTop: isAnyFilterDropdownOpen ? '1.5rem' : '0.5rem',
+          // When any dropdown is open, push cards down significantly to make room for dropdown
+          marginTop: isAnyFilterDropdownOpen ? '22rem' : '0.5rem', // Large margin when dropdown open to push cards below
           paddingRight: '0.5rem',
           paddingBottom: '2.5rem',
           flex: 1,
@@ -2571,6 +2279,7 @@ export default function VoiceSelectionStep({
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
           scrollBehavior: 'smooth',
+          zIndex: 1, // Lower z-index so dropdowns (z-index 10000) appear above cards
         }}
         className="scrollbar-thin"
       >
@@ -2679,7 +2388,6 @@ export default function VoiceSelectionStep({
                 setActiveAccent('all');
                 setActiveStyle('all');
                 setActiveAgeGroup('all');
-                setActiveCharacteristic('all');
               }}
               className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300"
               style={{

@@ -14,15 +14,26 @@ export async function POST(request: NextRequest) {
   try {
     const { voiceId, text, traits } = await request.json();
 
+    // Detect environment (localhost vs production)
+    const isLocalhost = process.env.NODE_ENV === 'development' || 
+                       request.headers.get('host')?.includes('localhost') ||
+                       request.headers.get('host')?.includes('127.0.0.1');
+
     // Log the text being received to verify language
     console.log('[VOICE PREVIEW API] Received request:', {
       voiceId: voiceId?.substring(0, 20) + '...',
       textLength: text?.length,
       textPreview: text?.substring(0, 100),
       textLanguage: text?.substring(0, 50), // First 50 chars to see language
+      isLocalhost,
+      environment: process.env.NODE_ENV,
     });
 
     if (!voiceId || !text) {
+      console.error('[VOICE PREVIEW API] Missing required parameters:', {
+        hasVoiceId: !!voiceId,
+        hasText: !!text,
+      });
       return NextResponse.json(
         { error: 'voiceId and text are required' },
         { status: 400 }
@@ -32,11 +43,28 @@ export async function POST(request: NextRequest) {
     const apiKey = process.env.ELEVENLABS_API_KEY;
 
     if (!apiKey) {
+      console.error('[VOICE PREVIEW API] ELEVENLABS_API_KEY not found:', {
+        hasApiKey: !!apiKey,
+        isLocalhost,
+        nodeEnv: process.env.NODE_ENV,
+        envKeys: Object.keys(process.env).filter(k => k.includes('ELEVEN')).join(', '),
+      });
       return NextResponse.json(
-        { error: 'ELEVENLABS_API_KEY not found in environment variables' },
+        { 
+          error: 'ELEVENLABS_API_KEY not found in environment variables',
+          hint: isLocalhost 
+            ? 'Make sure your .env.local file contains ELEVENLABS_API_KEY and restart the dev server'
+            : 'Check your environment variable configuration',
+        },
         { status: 500 }
       );
     }
+
+    console.log('[VOICE PREVIEW API] API key found:', {
+      keyLength: apiKey.length,
+      keyPrefix: apiKey.substring(0, 10) + '...',
+      isLocalhost,
+    });
 
     // Check if voiceId is already an ElevenLabs voice ID (typically 20+ character alphanumeric string)
     // ElevenLabs voice IDs are usually long alphanumeric strings
@@ -133,26 +161,77 @@ export async function POST(request: NextRequest) {
       textPreview: text.substring(0, 100),
       model: 'eleven_multilingual_v2',
       voiceSettings,
+      isLocalhost,
     });
     
-    const elevenLabsResponse = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${elevenLabsVoiceId}`,
-      {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: 'eleven_multilingual_v2', // Multilingual model - supports 70+ languages including Spanish and Arabic
-          voice_settings: voiceSettings, // Use personality-based settings
-        }),
-      }
-    );
+    // Add retry logic for network issues (especially on localhost)
+    let elevenLabsResponse: Response | null = null;
+    let lastError: Error | null = null;
+    const maxRetries = isLocalhost ? 3 : 1; // More retries on localhost due to potential network issues
     
-    console.log('[VOICE PREVIEW API] ElevenLabs response status:', elevenLabsResponse.status, elevenLabsResponse.statusText);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        elevenLabsResponse = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${elevenLabsVoiceId}`,
+          {
+            method: 'POST',
+            headers: {
+              'Accept': 'audio/mpeg',
+              'Content-Type': 'application/json',
+              'xi-api-key': apiKey,
+            },
+            body: JSON.stringify({
+              text: text,
+              model_id: 'eleven_multilingual_v2', // Multilingual model - supports 70+ languages including Spanish and Arabic
+              voice_settings: voiceSettings, // Use personality-based settings
+            }),
+          }
+        );
+        
+        console.log(`[VOICE PREVIEW API] ElevenLabs response (attempt ${attempt}/${maxRetries}):`, {
+          status: elevenLabsResponse.status,
+          statusText: elevenLabsResponse.statusText,
+          isLocalhost,
+        });
+        
+        // If successful, break out of retry loop
+        if (elevenLabsResponse.ok) {
+          break;
+        }
+        
+        // If it's a client error (4xx), don't retry
+        if (elevenLabsResponse.status >= 400 && elevenLabsResponse.status < 500) {
+          break;
+        }
+        
+        // If it's a server error (5xx) or network error, retry
+        if (attempt < maxRetries) {
+          const waitTime = attempt * 1000; // Exponential backoff: 1s, 2s, 3s
+          console.log(`[VOICE PREVIEW API] Retrying in ${waitTime}ms... (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[VOICE PREVIEW API] Network error on attempt ${attempt}/${maxRetries}:`, {
+          error: lastError.message,
+          isLocalhost,
+        });
+        
+        // If it's the last attempt, throw the error
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        
+        // Otherwise, wait and retry
+        const waitTime = attempt * 1000;
+        console.log(`[VOICE PREVIEW API] Retrying after network error in ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+    
+    if (!elevenLabsResponse) {
+      throw new Error(lastError?.message || 'Failed to get response from ElevenLabs API');
+    }
 
     if (!elevenLabsResponse.ok) {
       const errorData = await elevenLabsResponse.json().catch(() => ({}));
@@ -190,9 +269,38 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Provide more specific error messages based on status code
+      let errorMessage = 'Failed to generate voice preview';
+      let errorHint = '';
+      
+      if (elevenLabsResponse.status === 401) {
+        errorMessage = 'Authentication failed with ElevenLabs API';
+        errorHint = isLocalhost 
+          ? 'Check that ELEVENLABS_API_KEY in .env.local is valid and restart the dev server'
+          : 'Check that ELEVENLABS_API_KEY environment variable is valid';
+      } else if (elevenLabsResponse.status === 429) {
+        errorMessage = 'Rate limit exceeded for ElevenLabs API';
+        errorHint = 'Too many requests. Please wait a moment and try again.';
+      } else if (elevenLabsResponse.status >= 500) {
+        errorMessage = 'ElevenLabs API server error';
+        errorHint = 'The ElevenLabs service is temporarily unavailable. Please try again later.';
+      } else if (elevenLabsResponse.status === 400) {
+        errorMessage = 'Invalid request to ElevenLabs API';
+        errorHint = errorData?.detail?.message || 'The voice ID or text may be invalid.';
+      }
+      
+      console.error('[VOICE PREVIEW API] ElevenLabs API error:', {
+        status: elevenLabsResponse.status,
+        statusText: elevenLabsResponse.statusText,
+        errorData,
+        voiceId: elevenLabsVoiceId?.substring(0, 20) + '...',
+        isLocalhost,
+      });
+      
       return NextResponse.json(
         { 
-          error: 'Failed to generate voice preview',
+          error: errorMessage,
+          hint: errorHint,
           details: errorData,
           status: elevenLabsResponse.status,
         },
@@ -213,10 +321,34 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('[ERROR] generateVoicePreview failed:', error);
+    const isLocalhost = process.env.NODE_ENV === 'development';
+    const errorMessage = error instanceof Error ? error.message : 'Failed to generate voice preview';
+    
+    console.error('[ERROR] generateVoicePreview failed:', {
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+      isLocalhost,
+      nodeEnv: process.env.NODE_ENV,
+    });
+    
+    // Provide helpful error messages based on error type
+    let hint = '';
+    if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED')) {
+      hint = isLocalhost
+        ? 'Network error. Check your internet connection and ensure ElevenLabs API is accessible from localhost.'
+        : 'Network error connecting to ElevenLabs API.';
+    } else if (errorMessage.includes('timeout')) {
+      hint = 'Request timed out. The ElevenLabs API may be slow or unavailable.';
+    } else if (errorMessage.includes('API key') || errorMessage.includes('ELEVENLABS')) {
+      hint = isLocalhost
+        ? 'Check that ELEVENLABS_API_KEY is set in .env.local and restart the dev server.'
+        : 'Check that ELEVENLABS_API_KEY environment variable is configured.';
+    }
+    
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Failed to generate voice preview',
+        error: errorMessage,
+        hint: hint || 'An unexpected error occurred while generating the voice preview.',
       },
       { status: 500 }
     );

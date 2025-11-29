@@ -19,15 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Parse the description using the same function as frontend
-    const attributes = parseVoiceDescription(description.trim());
-    
-    // Debug logging
-    console.log('[SEARCH DEBUG] Parsed attributes:', JSON.stringify(attributes, null, 2));
-    console.log('[SEARCH DEBUG] Description:', description.trim());
-    console.log('[SEARCH DEBUG] Extracted - accent:', attributes.accent, 'gender:', attributes.gender);
-
-    // Initialize curated voice library if needed - ENHANCED: Ensure library is always loaded
+    // Initialize curated voice library FIRST - needed for dynamic attribute extraction
     let curatedVoices = getAllCuratedVoices();
     if (curatedVoices.length === 0) {
       console.log('[SEARCH DEBUG] Voice library empty, initializing...');
@@ -41,10 +33,18 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
+    // Parse the description using dynamic matching against voice library
+    const attributes = parseVoiceDescription(description.trim(), curatedVoices);
+    
+    // Debug logging
+    console.log('[SEARCH DEBUG] Parsed attributes:', JSON.stringify(attributes, null, 2));
+    console.log('[SEARCH DEBUG] Description:', description.trim());
+    console.log('[SEARCH DEBUG] Extracted - accent:', attributes.accent, 'gender:', attributes.gender);
     
     console.log(`[SEARCH DEBUG] Searching ${curatedVoices.length} curated voices (${curatedVoices.filter(v => v.source === 'elevenlabs').length} ElevenLabs, ${curatedVoices.filter(v => v.source === 'vapi').length} VAPI)`);
 
-    // Use curated library matching - ENHANCED: Return more matches (10 instead of 5)
+    // Use curated library matching - Return top matches (fewer for character queries)
     const matches = matchDescriptionToVoice(description.trim(), curatedVoices, 10);
     
     console.log(`[SEARCH DEBUG] Found ${matches.length} matching curated voices`);
@@ -96,117 +96,63 @@ export async function POST(request: NextRequest) {
     // Get best match for preview
     const bestMatch = allMatches[0] || null;
     
-    // Enhanced: Fallback to Voice Design API if no good match
-    // The matcher now returns empty array if confidence is too low (score < 50)
-    // This ensures we only return high-quality matches or generate a custom voice
-    let fallbackGenerated = false;
+    // CRITICAL: Disable Voice Design API fallback entirely
+    // If description doesn't match anything in library, return empty results - no suggestions, no generated voices
+    // Users prefer empty results over generated voices that don't match their request
     
-    if (matches.length === 0 || !bestMatch) {
-      console.log(`[SEARCH] No good matches found (matches: ${matches.length}), falling back to Voice Design API for custom generation`);
-      
-      try {
-        // Normalize description for Voice Design API
-        const normalizedParams = normalizeVoiceDescription(attributes, description.trim());
-        const normalizedDescription = formatForElevenLabsAPI(normalizedParams, attributes.character);
-        
-        // Generate sample text using enhanceVoiceDescription
-        const { enhanceVoiceDescription, generateStyleAppropriateText } = await import('@/lib/enhanceVoiceDescription');
-        const { enhanced, extractedElements } = enhanceVoiceDescription(normalizedDescription);
-        const sampleText = generateStyleAppropriateText(enhanced, extractedElements);
-        
-        // Call ElevenLabs Voice Design API
-        const apiKey = process.env.ELEVENLABS_API_KEY;
-        if (apiKey) {
-          const response = await fetch('https://api.elevenlabs.io/v1/text-to-voice/design', {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-              'xi-api-key': apiKey,
-            },
-            body: JSON.stringify({
-              model_id: 'eleven_multilingual_ttv_v2',
-              voice_description: normalizedDescription,
-              text: sampleText,
-            }),
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            const previews = data.previews || [];
-            
-            // Add generated voices to matches
-            const generatedMatches = previews.map((preview: any, index: number) => {
-              const audioBase64 = preview.audio_base_64 || preview.audioBase64;
-              const generatedVoiceId = preview.generated_voice_id || `generated-${index}`;
-              
-              // CRITICAL: Ensure audioBase64 is always present for generated voices
-              if (!audioBase64 || audioBase64.length === 0) {
-                console.error(`[SEARCH] Generated voice ${index} missing audioBase64 - this should not happen:`, {
-                  hasAudioBase64: !!preview.audio_base_64,
-                  hasAudioBase64Alt: !!preview.audioBase64,
-                  previewKeys: Object.keys(preview),
-                });
-                return null;
-              }
-              
-              return {
-                id: generatedVoiceId,
-                name: attributes.character 
-                  ? `${attributes.character.charAt(0).toUpperCase() + attributes.character.slice(1)} ${index + 1}`
-                  : `Voice ${index + 1}`,
-                gender: attributes.gender || 'neutral',
-                accent: attributes.accent || 'American',
-                ageGroup: attributes.ageGroup || 'middle-aged',
-                description: normalizedDescription,
-                score: 50, // Generated voices get a base score
-                source: 'raar', // Brand as RAAR (hide 'generated')
-                voiceId: generatedVoiceId, // Generic voiceId (hide 'elevenLabsVoiceId')
-                audioBase64: audioBase64, // CRITICAL: Always include base64 audio for direct preview
-                tags: (attributes.tags || (attributes.character ? [attributes.character] : [])).filter(tag => {
-                  // Filter out tags that don't match the description
-                  const descriptionLower = description.trim().toLowerCase();
-                  const tagLower = tag.toLowerCase();
-                  // Only include tags that are in the description or are valid characteristics
-                  return descriptionLower.includes(tagLower) || 
-                         ['male', 'female', 'neutral', 'young', 'middle-aged', 'older'].includes(tagLower) ||
-                         descriptionLower.includes(tagLower.split(' ')[0]); // Check first word of compound tags
-                }),
-                tone: [],
-                matchDetails: {
-                  accentMatch: !!attributes.accent,
-                  genderMatch: !!attributes.gender,
-                  ageMatch: !!attributes.ageGroup,
-                  tagMatches: attributes.tags || (attributes.character ? [attributes.character] : []),
-                  toneMatches: [],
-                  keywordMatches: attributes.character ? [attributes.character] : [],
-                },
-                // Keep internal IDs for backend use only
-                _internal: {
-                  source: 'generated',
-                  generatedVoiceId: generatedVoiceId,
-                  elevenLabsVoiceId: generatedVoiceId,
-                },
-              };
-            }).filter((match): match is NonNullable<typeof match> => match !== null); // Filter out null entries
-            
-            allMatches.push(...generatedMatches);
-            fallbackGenerated = true;
-            console.log(`[SEARCH] Generated ${generatedMatches.length} fallback voices`);
-          } else {
-            console.warn('[SEARCH] Voice Design API fallback failed:', response.status);
-          }
+    // Check if user specified an accent that doesn't exist in library
+    // This validation should already happen in voiceMatcher.ts, but double-check here
+    if (attributes.accent && matches.length === 0) {
+      // Verify accent doesn't exist - if it was parsed but no matches, it likely doesn't exist
+      const availableAccents = new Set(
+        curatedVoices
+          .map(v => v.accent?.toLowerCase().trim())
+          .filter((accent): accent is string => !!accent)
+      );
+      const parsedAccentLower = attributes.accent.toLowerCase().trim();
+      const accentExists = Array.from(availableAccents).some(acc => {
+        if (acc === parsedAccentLower) return true;
+        // For single-word accents, require exact match
+        const parsedWords = parsedAccentLower.split(/[- ]+/);
+        const availableWords = acc.split(/[- ]+/);
+        if (parsedWords.length === 1 && availableWords.length === 1) {
+          return availableWords[0] === parsedWords[0];
         }
-      } catch (error) {
-        console.error('[SEARCH] Error in Voice Design API fallback:', error);
+        // For compound accents, check word-by-word match
+        return parsedWords.length === availableWords.length &&
+               parsedWords.every((pw, idx) => availableWords[idx] === pw);
+      });
+      
+      if (!accentExists) {
+        console.log(`[SEARCH] Accent "${attributes.accent}" specified but doesn't exist in library. Returning empty results (no fallback, no suggestions).`);
+        return NextResponse.json({
+          matches: [],
+          bestMatch: null,
+          parsedAttributes: attributes,
+          fallbackGenerated: false,
+          message: 'Sorry, none of our voices match your description.',
+        });
       }
+    }
+    
+    // CRITICAL: If no matches found, return empty results with user-friendly message
+    // DO NOT generate voices, DO NOT show suggestions, DO NOT assume different attributes
+    if (matches.length === 0 || !bestMatch) {
+      console.log(`[SEARCH] No matches found in library. Returning empty results (no generated voices, no suggestions).`);
+      return NextResponse.json({
+        matches: [],
+        bestMatch: null,
+        parsedAttributes: attributes,
+        fallbackGenerated: false,
+        message: 'Sorry, none of our voices match your description.',
+      });
     }
     
     return NextResponse.json({
       matches: allMatches,
       bestMatch: allMatches[0] || null,
       parsedAttributes: attributes,
-      fallbackGenerated,
+      fallbackGenerated: false, // Always false - we don't generate voices anymore
     });
   } catch (error) {
     console.error('[ERROR] searchVoicesByDescription failed:', error);
