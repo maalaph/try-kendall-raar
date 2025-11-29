@@ -308,7 +308,11 @@ export async function POST(request: NextRequest) {
         const audioBase64 = preview.audio_base_64 || preview.audioBase64;
         
         if (!audioBase64) {
-          console.warn(`[VOICE GENERATION] Preview ${index} missing audio data:`, preview);
+          console.error(`[VOICE GENERATION] Preview ${index} missing audio data - this should not happen:`, {
+            hasAudioBase64: !!preview.audio_base_64,
+            hasAudioBase64Alt: !!preview.audioBase64,
+            previewKeys: Object.keys(preview),
+          });
         }
         
         if (!preview.generated_voice_id) {
@@ -340,7 +344,18 @@ export async function POST(request: NextRequest) {
             generatedVoiceId: preview.generated_voice_id || `generated-${index}`,
           },
         };
-      }).filter((voice: any) => voice.audioBase64); // Only include voices with audio data
+      }).filter((voice: any) => {
+        // CRITICAL: Only include voices with valid audioBase64
+        // Log any that are filtered out for debugging
+        if (!voice.audioBase64) {
+          console.error('[VOICE GENERATION] Filtering out voice without audioBase64:', {
+            id: voice.id,
+            name: voice.name,
+            generatedVoiceId: voice.generatedVoiceId,
+          });
+        }
+        return !!voice.audioBase64 && voice.audioBase64.length > 0;
+      });
 
       // Phase 5.4: Rank voices by quality and return top voices first
       const rankedVoices = rankVoicesByQuality(generatedVoices, enhanced, extractedElements);
