@@ -25,10 +25,10 @@ export default function CallVolumeStep({
     if (businessType) {
       if (shouldAnimate) {
         setIsVisible(false);
-        // Calculate delay based on previous sections
+        // Animate first after add-ons (2500ms delay)
         const timer = setTimeout(() => {
           setIsVisible(true);
-        }, 3000);
+        }, 2500);
         return () => clearTimeout(timer);
       } else {
         // Keep hidden until animation starts

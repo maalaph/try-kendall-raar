@@ -182,7 +182,11 @@ export default function Navbar() {
               fontWeight: 700,
               color: colors.text,
             }}>
-              <span style={{ color: colors.text }}>My</span><span style={{ color: colors.accent }}>Kendall</span> is for <em>you</em>.
+              <span style={{ color: colors.text }}>My</span><span style={{ 
+                color: colors.accent,
+                fontFamily: 'var(--font-league-spartan), sans-serif',
+                fontWeight: 700,
+              }}>Kendall</span> is for <em>you</em>.
             </span>
           </span>
         </button>
@@ -255,7 +259,6 @@ export default function Navbar() {
               <span 
                 style={{
                   color: colors.accent,
-                  opacity: 0.75,
                   fontFamily: 'var(--font-league-spartan), sans-serif',
                   fontWeight: 700,
                   display: 'inline-block',

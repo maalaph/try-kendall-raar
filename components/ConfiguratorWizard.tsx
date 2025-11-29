@@ -14,6 +14,7 @@ import KendallPowerUps from './KendallPowerUps';
 import KendallExpansion from './KendallExpansion';
 import { colors } from '@/lib/config';
 import { getBusinessTypeData } from '@/lib/businessTypes';
+import { calculateTotalMinutes, getRecommendedPackage } from '@/lib/pricing';
 
 export default function ConfiguratorWizard() {
   const pathname = usePathname();
@@ -267,6 +268,38 @@ export default function ConfiguratorWizard() {
     }
   };
 
+  // Get configurator data to pass to TrialFormDrawer
+  const getConfiguratorData = () => {
+    // Read phoneLines from sessionStorage
+    let phoneLines = 0;
+    if (typeof window !== 'undefined') {
+      const savedState = sessionStorage.getItem('wizardState');
+      if (savedState) {
+        try {
+          const state = JSON.parse(savedState);
+          if (state.phoneLines !== undefined) {
+            phoneLines = state.phoneLines;
+          }
+        } catch (e) {
+          console.error('Failed to read phoneLines from sessionStorage:', e);
+        }
+      }
+    }
+
+    // Calculate recommended package
+    const totalMinutes = calculateTotalMinutes(callVolume, callDuration);
+    const recommendedPackage = getRecommendedPackage(totalMinutes);
+
+    return {
+      businessType,
+      callVolume: callVolume ? parseFloat(callVolume) : 0,
+      callDuration: callDuration ? parseFloat(callDuration) : 0,
+      selectedAddOns,
+      phoneLines,
+      recommendedPlan: recommendedPackage.name,
+    };
+  };
+
   const handleFormSubmit = (data: {
     fullName: string;
     businessName: string;
@@ -275,53 +308,16 @@ export default function ConfiguratorWizard() {
     website?: string;
     bookingSystem?: string;
   }) => {
-    // Here you would typically send the data to your API
-    console.log('Form submitted:', data);
+    // Form submission is now handled by TrialFormDrawer component
+    // This callback is called after successful API submission
+    console.log('Business trial signup successful:', data);
     
-    setIsDrawerOpen(false);
+    // Don't close drawer - let it stay open to show success message and confetti
     setIsSubmitted(true);
   };
 
-  // Show confirmation message after submission
-  if (isSubmitted) {
-    return (
-      <div
-        className="w-full min-h-screen flex items-center justify-center"
-        style={{ padding: 'clamp(2rem, 6vw, 8rem) clamp(2rem, 8vw, 10rem)' }}
-      >
-        <div
-          className="p-8 rounded-xl text-center"
-          style={{
-            border: `2px solid ${colors.accent}40`,
-            backgroundColor: `${colors.accent}10`,
-            maxWidth: '600px',
-          }}
-        >
-          <h2
-            style={{
-              color: colors.text,
-              fontSize: '1.5rem',
-              fontWeight: 500,
-              fontFamily: 'var(--font-inter), sans-serif',
-              marginBottom: '1rem',
-            }}
-          >
-            Your free trial is being activated.
-          </h2>
-          <p
-            style={{
-              color: colors.text,
-              opacity: 0.9,
-              fontSize: '1rem',
-              fontFamily: 'var(--font-inter), sans-serif',
-            }}
-          >
-            Check your email for next steps.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Don't show confirmation screen - let the drawer handle it with confetti
+  // The drawer will close automatically after showing success message
 
   return (
     <>
@@ -418,25 +414,6 @@ export default function ConfiguratorWizard() {
                   shouldAnimate={shouldAnimate}
                 />
 
-                {/* Two Sliders */}
-                {businessType && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(3rem, 4vw, 4.5rem)' }}>
-                    <CallVolumeStep
-                      key={`volume-mobile-${businessType}`}
-                      selectedVolume={callVolume}
-                      onSelect={setCallVolume}
-                      businessType={businessType}
-                      shouldAnimate={shouldAnimateContent}
-                    />
-                    <CallDurationStep
-                      key={`duration-mobile-${businessType}`}
-                      selectedDuration={callDuration}
-                      onSelect={setCallDuration}
-                      shouldAnimate={shouldAnimateContent}
-                    />
-                  </div>
-                )}
-
                 {/* Standard Features */}
                 {businessType && (
                   <StandardFeaturesStep businessType={businessType} shouldAnimate={shouldAnimateContent} />
@@ -457,6 +434,25 @@ export default function ConfiguratorWizard() {
                       shouldAnimate={shouldAnimateContent}
                       onAddOnHover={setHoveredAddOnId}
                       justToggledAddOnId={justToggledAddOnId}
+                    />
+                  </div>
+                )}
+
+                {/* Two Sliders - After Add-ons */}
+                {businessType && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(3rem, 4vw, 4.5rem)', marginTop: 'clamp(2rem, 3vw, 3rem)' }}>
+                    <CallDurationStep
+                      key={`duration-mobile-${businessType}`}
+                      selectedDuration={callDuration}
+                      onSelect={setCallDuration}
+                      shouldAnimate={shouldAnimateContent}
+                    />
+                    <CallVolumeStep
+                      key={`volume-mobile-${businessType}`}
+                      selectedVolume={callVolume}
+                      onSelect={setCallVolume}
+                      businessType={businessType}
+                      shouldAnimate={shouldAnimateContent}
                     />
                   </div>
                 )}
@@ -519,6 +515,7 @@ export default function ConfiguratorWizard() {
                       style={{ 
                         color: colors.text,
                         margin: 0,
+                        paddingLeft: 'clamp(1.5rem, 3vw, 2.5rem)',
                       }}
                     >
                       <span 
@@ -623,6 +620,7 @@ export default function ConfiguratorWizard() {
                       style={{ 
                         color: colors.text,
                         margin: 0,
+                        paddingLeft: 'clamp(1.5rem, 3vw, 2.5rem)',
                       }}
                     >
                       <span 
@@ -754,7 +752,7 @@ export default function ConfiguratorWizard() {
                         }} />
                       )}
 
-                      {/* Price Breakdown - Aligned with Standard Features */}
+                      {/* Price Breakdown - Top (visual position) */}
                       {businessType && (
                         <div 
                           ref={priceBreakdownRef}
@@ -797,25 +795,26 @@ export default function ConfiguratorWizard() {
                         </div>
                       )}
 
-                      {/* Two Sliders - Below Price Breakdown */}
+                      {/* Call Duration - Middle (animates second, but visually above Call Volume) */}
                       {businessType && (
-                        <div style={{ 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          gap: 'clamp(2rem, 3vw, 3rem)',
-                          marginTop: 'clamp(2rem, 3vw, 2.5rem)',
-                        }}>
+                        <div style={{ marginTop: 'clamp(2rem, 3vw, 3rem)' }}>
+                          <CallDurationStep
+                            key={`duration-${businessType}`}
+                            selectedDuration={callDuration}
+                            onSelect={setCallDuration}
+                            shouldAnimate={shouldAnimateContent}
+                          />
+                        </div>
+                      )}
+
+                      {/* Call Volume - Bottom (animates first after add-ons) */}
+                      {businessType && (
+                        <div style={{ marginTop: 'clamp(2rem, 3vw, 3rem)' }}>
                           <CallVolumeStep
                             key={`volume-${businessType}`}
                             selectedVolume={callVolume}
                             onSelect={setCallVolume}
                             businessType={businessType}
-                            shouldAnimate={shouldAnimateContent}
-                          />
-                          <CallDurationStep
-                            key={`duration-${businessType}`}
-                            selectedDuration={callDuration}
-                            onSelect={setCallDuration}
                             shouldAnimate={shouldAnimateContent}
                           />
                         </div>
@@ -845,6 +844,7 @@ export default function ConfiguratorWizard() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         onSubmit={handleFormSubmit}
+        configuratorData={isDrawerOpen ? getConfiguratorData() : null}
       />
     </>
   );

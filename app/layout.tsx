@@ -56,7 +56,9 @@ export default function RootLayout({
         style={{ backgroundColor: config.brand.visual.palette.primary, color: config.brand.visual.palette.text }}
       >
         <AnimatedBackground />
-        <Navbar />
+        <div id="main-navbar">
+          <Navbar />
+        </div>
         {children}
       </body>
     </html>

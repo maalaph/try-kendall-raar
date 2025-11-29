@@ -71,8 +71,8 @@ export default function PricingPage() {
   const PERSONAL_PLAN = {
     id: 'personal',
     name: 'Personal',
-    pricePerMinute: 0.35,
-    description: 'Perfect for personal use',
+    pricePerMinute: 0.25,
+    description: 'Most Popular for Individuals',
     features: [
       '24/7 AI receptionist',
       'Unlimited calls',
@@ -182,9 +182,10 @@ export default function PricingPage() {
               width: '25%', 
               minWidth: '280px', 
               maxWidth: '340px',
-              marginLeft: '0',       // forces it to hug the left under the logo
+              marginLeft: '2rem',       // Move to the right
               display: 'flex',
               flexDirection: 'column',
+              height: '100%',
             }}
           >
             <h3
@@ -194,16 +195,16 @@ export default function PricingPage() {
                 fontWeight: 600,
                 fontFamily: 'var(--font-inter), sans-serif',
                 marginBottom: '1.25rem',
-                marginTop: '2.5rem', // Align with Business header (accounts for Free Trial CTA above)
+                marginTop: '2.5rem',
               }}
             >
-              Personal
+              <span style={{ color: colors.text }}>My</span><span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span>
             </h3>
             <div
-              className="flex flex-col"
+              className="flex flex-col relative"
               style={{
                 borderRadius: '16px',
-                border: `2px solid ${colors.accent}40`,
+                border: `3px solid ${colors.accent}80`,
                 backgroundColor: `${colors.accent}10`,
                 padding: '2rem',
                 transition: 'all 0.3s ease',
@@ -211,18 +212,21 @@ export default function PricingPage() {
                 flexDirection: 'column',
                 width: '100%',
                 flex: 1,
+                minHeight: 0,
+                position: 'relative',
+                boxShadow: `0 0 20px rgba(168, 85, 247, 0.2),
+                            0 0 40px rgba(168, 85, 247, 0.15),
+                            0 8px 24px rgba(168, 85, 247, 0.1)`,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = colors.accent;
                 e.currentTarget.style.backgroundColor = `${colors.accent}20`;
                 e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = `0 8px 32px ${colors.accent}30`;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = `${colors.accent}40`;
+                e.currentTarget.style.borderColor = `${colors.accent}80`;
                 e.currentTarget.style.backgroundColor = `${colors.accent}10`;
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
               }}
             >
               <h4
@@ -233,9 +237,10 @@ export default function PricingPage() {
                   fontFamily: 'var(--font-inter), sans-serif',
                   marginBottom: '0.5rem',
                   lineHeight: '1.2',
+                  marginTop: '0.5rem',
                 }}
               >
-                {PERSONAL_PLAN.name}
+                "Not A Plan"
               </h4>
               <p
                 style={{
@@ -251,74 +256,74 @@ export default function PricingPage() {
               </p>
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  gap: '0.5rem',
                   marginBottom: '1.5rem',
                 }}
               >
                 <span
                   style={{
-                    color: colors.accent,
-                    fontSize: '3.5rem',
+                    fontSize: '2rem',
                     fontWeight: 700,
                     fontFamily: 'var(--font-inter), sans-serif',
-                    lineHeight: '1',
+                    lineHeight: '1.3',
+                    display: 'block',
                   }}
                 >
-                  ${PERSONAL_PLAN.pricePerMinute.toFixed(2)}
-                </span>
-                <span
-                  style={{
-                    fontSize: '1.5rem',
-                    fontWeight: 300,
-                    color: colors.text,
-                    opacity: 0.8,
-                    fontFamily: 'var(--font-inter), sans-serif',
-                  }}
-                >
-                  /min
+                  <span style={{ color: colors.text }}>Activate Your Line - </span><span style={{ color: colors.accent }}>$7.99</span>
                 </span>
               </div>
               {/* BUY NOW Button */}
-              <button
-                onClick={handlePersonalBuyClick}
-                className="group relative flex items-center justify-center overflow-visible w-full touch-manipulation transition-all duration-300"
-                style={{
-                  color: colors.text,
-                  backgroundColor: colors.accent,
-                  border: `2px solid ${colors.accent}`,
-                  borderRadius: '12px',
-                  padding: '1.5rem 2rem',
-                  fontSize: '1.25rem',
-                  fontWeight: 700,
-                  fontFamily: 'var(--font-league-spartan), sans-serif',
-                  cursor: 'pointer',
-                  minWidth: 'auto',
-                  minHeight: '64px',
-                  boxShadow: `0 0 30px rgba(168, 85, 247, 0.7), 0 0 60px rgba(168, 85, 247, 0.5)`,
-                  outline: 'none',
-                  textShadow: 'none',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '1.5rem',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = `0 0 50px rgba(168, 85, 247, 0.9), 0 0 100px rgba(168, 85, 247, 0.7), 0 0 150px rgba(168, 85, 247, 0.5)`;
-                  e.currentTarget.style.transform = 'scale(1.02)';
-                  e.currentTarget.style.backgroundColor = colors.accent;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = `0 0 30px rgba(168, 85, 247, 0.7), 0 0 60px rgba(168, 85, 247, 0.5)`;
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = colors.accent;
-                }}
-              >
-                <span style={{ position: 'relative', zIndex: 2, fontWeight: 700 }}>
-                  BUY NOW
-                </span>
-              </button>
-              <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: `1px solid ${colors.accent}30` }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <button
+                  onClick={handlePersonalBuyClick}
+                  className="group relative flex items-center justify-center overflow-visible w-full touch-manipulation transition-all duration-300"
+                  style={{
+                    color: colors.text,
+                    backgroundColor: colors.accent,
+                    border: `3px solid ${colors.accent}`,
+                    borderRadius: '12px',
+                    padding: '2rem 2.5rem',
+                    fontSize: '1.5rem',
+                    fontWeight: 700,
+                    fontFamily: 'var(--font-league-spartan), sans-serif',
+                    cursor: 'pointer',
+                    minWidth: 'auto',
+                    minHeight: '80px',
+                    boxShadow: `0 0 10px rgba(168, 85, 247, 0.3)`,
+                    outline: 'none',
+                    textShadow: 'none',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = `0 0 15px rgba(168, 85, 247, 0.4)`;
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                    e.currentTarget.style.backgroundColor = colors.accent;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = `0 0 10px rgba(168, 85, 247, 0.3)`;
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.backgroundColor = colors.accent;
+                  }}
+                >
+                  <span style={{ position: 'relative', zIndex: 2, fontWeight: 700 }}>
+                    BUY NOW
+                  </span>
+                </button>
+                <p
+                  style={{
+                    color: colors.text,
+                    opacity: 0.8,
+                    fontSize: '0.8125rem',
+                    fontFamily: 'var(--font-inter), sans-serif',
+                    textAlign: 'center',
+                    marginTop: '0.75rem',
+                    lineHeight: '1.4',
+                  }}
+                >
+                  First 30 min free, then $0.25/min
+                </p>
+              </div>
+              <div style={{ marginTop: 'auto', paddingTop: '1.25rem', borderTop: `1px solid ${colors.accent}30` }}>
                 <p
                   style={{
                     color: colors.text,
@@ -329,101 +334,149 @@ export default function PricingPage() {
                     opacity: 0.9,
                   }}
                 >
-                  Features:
+                  Key Features:
                 </p>
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {PERSONAL_PLAN.features.map((feature, idx) => (
-                    <li
-                      key={idx}
+                  <li
+                    style={{
+                      color: colors.text,
+                      opacity: 0.85,
+                      fontSize: '0.875rem',
+                      fontFamily: 'var(--font-inter), sans-serif',
+                      marginBottom: '0.75rem',
+                      paddingLeft: '1rem',
+                      position: 'relative',
+                      lineHeight: '1.5',
+                    }}
+                  >
+                    <span
                       style={{
-                        color: colors.text,
-                        opacity: 0.85,
-                        fontSize: '0.875rem',
-                        fontFamily: 'var(--font-inter), sans-serif',
-                        marginBottom: '0.5rem',
-                        paddingLeft: '1rem',
-                        position: 'relative',
-                        lineHeight: '1.5',
+                        position: 'absolute',
+                        left: 0,
+                        color: colors.accent,
+                        opacity: 0.8,
+                        fontSize: '1rem',
+                        top: '0.125rem',
                       }}
                     >
-                      <span
-                        style={{
-                          position: 'absolute',
-                          left: 0,
-                          color: colors.accent,
-                          opacity: 0.8,
-                          fontSize: '1rem',
-                          top: '0.125rem',
-                        }}
-                      >
-                        •
-                      </span>
-                      {feature}
-                    </li>
-                  ))}
+                      •
+                    </span>
+                    Personalized Voice & Personality
+                  </li>
+                  <li
+                    style={{
+                      color: colors.text,
+                      opacity: 0.85,
+                      fontSize: '0.875rem',
+                      fontFamily: 'var(--font-inter), sans-serif',
+                      marginBottom: '0.75rem',
+                      paddingLeft: '1rem',
+                      position: 'relative',
+                      lineHeight: '1.5',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        color: colors.accent,
+                        opacity: 0.8,
+                        fontSize: '1rem',
+                        top: '0.125rem',
+                      }}
+                    >
+                      •
+                    </span>
+                    24/7 Call Handling
+                  </li>
+                  <li
+                    style={{
+                      color: colors.text,
+                      opacity: 0.85,
+                      fontSize: '0.875rem',
+                      fontFamily: 'var(--font-inter), sans-serif',
+                      marginBottom: '0.75rem',
+                      paddingLeft: '1rem',
+                      position: 'relative',
+                      lineHeight: '1.5',
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        color: colors.accent,
+                        opacity: 0.8,
+                        fontSize: '1rem',
+                        top: '0.125rem',
+                      }}
+                    >
+                      •
+                    </span>
+                    Forward Calls To Your Number
+                  </li>
                 </ul>
               </div>
             </div>
           </div>
 
           {/* Right Column: Business Plans */}
-          <div style={{ width: '75%', maxWidth: '960px', marginLeft: 'auto', display: 'flex', flexDirection: 'column' }}>
-            {/* Free Trial CTA */}
-            <p style={{
-              color: colors.text,
-              fontSize: '0.875rem',
-              fontFamily: 'var(--font-inter), sans-serif',
-              opacity: 0.9,
-              lineHeight: '1.6',
-              marginBottom: '1.5rem',
-              textAlign: 'center'
-            }}>
-              <span>Free Trial. No Credit Card Required. </span>
-              <Link 
-                href="/book"
+          <div style={{ width: '75%', maxWidth: '960px', marginLeft: 'auto', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {/* Header Row with Free Trial CTA and Kendall Business */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', marginTop: '2.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+              <h3
                 style={{
-                  color: colors.accent,
-                  textDecoration: 'none',
+                  color: colors.text,
+                  fontSize: '1.75rem',
                   fontWeight: 600,
-                  borderBottom: `1px solid ${colors.accent}60`,
-                  transition: 'all 0.2s ease',
-                  cursor: 'pointer'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderBottomColor = colors.accent;
-                  e.currentTarget.style.opacity = '0.8';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderBottomColor = `${colors.accent}60`;
-                  e.currentTarget.style.opacity = '1';
+                  fontFamily: 'var(--font-inter), sans-serif',
+                  margin: 0,
                 }}
               >
-                Your Recommended Plan
-              </Link>
-            </p>
-
-            <h3
-              style={{
+                <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall </span><span style={{ color: colors.text, fontWeight: 700 }}>Business</span>
+              </h3>
+              <p style={{
                 color: colors.text,
-                fontSize: '1.75rem',
-                fontWeight: 600,
+                fontSize: '0.875rem',
                 fontFamily: 'var(--font-inter), sans-serif',
-                marginBottom: '1.25rem',
-                marginTop: '0', // Align with Personal header
-              }}
-            >
-              Business
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                opacity: 0.9,
+                lineHeight: '1.6',
+                margin: 0,
+              }}>
+                <span>Free Trial. No Credit Card Required. </span>
+                <Link 
+                  href="/book"
+                  style={{
+                    color: colors.accent,
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                    borderBottom: `1px solid ${colors.accent}60`,
+                    transition: 'all 0.2s ease',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderBottomColor = colors.accent;
+                    e.currentTarget.style.opacity = '0.8';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderBottomColor = `${colors.accent}60`;
+                    e.currentTarget.style.opacity = '1';
+                  }}
+                >
+                  Set Up Your Recommended Plan
+                </Link>
+              </p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', flex: 1, minHeight: 0 }}>
               {/* Top Row: Starter, Growth, Professional - Three cards side by side */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', width: '100%', gridAutoRows: '1fr' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.5rem', width: '100%', gridAutoRows: '1fr', flex: 1, minHeight: 0 }}>
                 {BUSINESS_PACKAGES.map((pkg) => {
                   const isHighlighted = highlightedPlan === pkg.id;
                   return (
                     <div
                       key={pkg.id}
                       id={`plan-${pkg.id}`}
-                      className="flex flex-col"
+                      className="flex flex-col cursor-pointer"
                       style={{
                         borderRadius: '16px',
                         border: isHighlighted ? `3px solid ${colors.accent}` : `2px solid ${colors.accent}40`,
@@ -435,6 +488,22 @@ export default function PricingPage() {
                         width: '100%',
                         height: '100%',
                         boxShadow: isHighlighted ? `0 0 40px ${colors.accent}50, 0 8px 32px ${colors.accent}40` : 'none',
+                      }}
+                      onClick={() => {
+                        // Navigate to booking section to select business type (same as recommended plan)
+                        const bookingSection = document.getElementById('booking-section');
+                        if (bookingSection) {
+                          window.location.hash = 'booking-section';
+                          bookingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          // Trigger animation after scroll
+                          setTimeout(() => {
+                            const event = new CustomEvent('triggerConfiguratorAnimation');
+                            window.dispatchEvent(event);
+                          }, 500);
+                        } else {
+                          // Navigate to home page with booking section hash
+                          window.location.href = '/#booking-section';
+                        }
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.borderColor = colors.accent;
@@ -649,44 +718,34 @@ export default function PricingPage() {
                 marginBottom: '1.25rem',
               }}
             >
-              Personal
+              <span style={{ color: colors.text }}>My</span><span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span>
             </h3>
             <div
-              className="flex flex-col"
+              className="flex flex-col relative"
               style={{
                 borderRadius: '16px',
-                border: `2px solid ${colors.accent}40`,
+                border: `3px solid ${colors.accent}80`,
                 backgroundColor: `${colors.accent}10`,
                 padding: '2rem',
                 transition: 'all 0.3s ease',
                 display: 'flex',
                 flexDirection: 'column',
+                position: 'relative',
+                boxShadow: `0 0 20px rgba(168, 85, 247, 0.2),
+                            0 0 40px rgba(168, 85, 247, 0.15),
+                            0 8px 24px rgba(168, 85, 247, 0.1)`,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = colors.accent;
                 e.currentTarget.style.backgroundColor = `${colors.accent}20`;
                 e.currentTarget.style.transform = 'translateY(-4px)';
-                e.currentTarget.style.boxShadow = `0 8px 32px ${colors.accent}30`;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = `${colors.accent}40`;
+                e.currentTarget.style.borderColor = `${colors.accent}80`;
                 e.currentTarget.style.backgroundColor = `${colors.accent}10`;
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              <h4
-                style={{
-                  color: colors.text,
-                  fontSize: '1.5rem',
-                  fontWeight: 700,
-                  fontFamily: 'var(--font-inter), sans-serif',
-                  marginBottom: '0.5rem',
-                  lineHeight: '1.2',
-                }}
-              >
-                {PERSONAL_PLAN.name}
-              </h4>
               <p
                 style={{
                   color: colors.text,
@@ -695,79 +754,80 @@ export default function PricingPage() {
                   fontFamily: 'var(--font-inter), sans-serif',
                   marginBottom: '1.5rem',
                   lineHeight: '1.4',
+                  marginTop: '0.5rem',
                 }}
               >
                 {PERSONAL_PLAN.description}
               </p>
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  gap: '0.5rem',
                   marginBottom: '1.5rem',
                 }}
               >
                 <span
                   style={{
-                    color: colors.accent,
-                    fontSize: '3.5rem',
+                    fontSize: '2rem',
                     fontWeight: 700,
                     fontFamily: 'var(--font-inter), sans-serif',
-                    lineHeight: '1',
+                    lineHeight: '1.3',
+                    display: 'block',
                   }}
                 >
-                  ${PERSONAL_PLAN.pricePerMinute.toFixed(2)}
-                </span>
-                <span
-                  style={{
-                    fontSize: '1.5rem',
-                    fontWeight: 300,
-                    color: colors.text,
-                    opacity: 0.8,
-                    fontFamily: 'var(--font-inter), sans-serif',
-                  }}
-                >
-                  /min
+                  <span style={{ color: colors.text }}>Activate Your Line - </span><span style={{ color: colors.accent }}>$7.99</span>
                 </span>
               </div>
               {/* BUY NOW Button */}
-              <button
-                onClick={handlePersonalBuyClick}
-                className="group relative flex items-center justify-center overflow-visible w-full touch-manipulation transition-all duration-300"
-                style={{
-                  color: colors.text,
-                  backgroundColor: colors.accent,
-                  border: `2px solid ${colors.accent}`,
-                  borderRadius: '12px',
-                  padding: '1.5rem 2rem',
-                  fontSize: '1.25rem',
-                  fontWeight: 700,
-                  fontFamily: 'var(--font-league-spartan), sans-serif',
-                  cursor: 'pointer',
-                  minWidth: 'auto',
-                  minHeight: '64px',
-                  boxShadow: `0 0 30px rgba(168, 85, 247, 0.7), 0 0 60px rgba(168, 85, 247, 0.5)`,
-                  outline: 'none',
-                  textShadow: 'none',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '1.5rem',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = `0 0 50px rgba(168, 85, 247, 0.9), 0 0 100px rgba(168, 85, 247, 0.7), 0 0 150px rgba(168, 85, 247, 0.5)`;
-                  e.currentTarget.style.transform = 'scale(1.02)';
-                  e.currentTarget.style.backgroundColor = colors.accent;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = `0 0 30px rgba(168, 85, 247, 0.7), 0 0 60px rgba(168, 85, 247, 0.5)`;
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = colors.accent;
-                }}
-              >
-                <span style={{ position: 'relative', zIndex: 2, fontWeight: 700 }}>
-                  BUY NOW
-                </span>
-              </button>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <button
+                  onClick={handlePersonalBuyClick}
+                  className="group relative flex items-center justify-center overflow-visible w-full touch-manipulation transition-all duration-300"
+                  style={{
+                    color: colors.text,
+                    backgroundColor: colors.accent,
+                    border: `3px solid ${colors.accent}`,
+                    borderRadius: '12px',
+                    padding: '2rem 2.5rem',
+                    fontSize: '1.5rem',
+                    fontWeight: 700,
+                    fontFamily: 'var(--font-league-spartan), sans-serif',
+                    cursor: 'pointer',
+                    minWidth: 'auto',
+                    minHeight: '80px',
+                    boxShadow: `0 0 10px rgba(168, 85, 247, 0.3)`,
+                    outline: 'none',
+                    textShadow: 'none',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = `0 0 15px rgba(168, 85, 247, 0.4)`;
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                    e.currentTarget.style.backgroundColor = colors.accent;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = `0 0 10px rgba(168, 85, 247, 0.3)`;
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.backgroundColor = colors.accent;
+                  }}
+                >
+                  <span style={{ position: 'relative', zIndex: 2, fontWeight: 700 }}>
+                    BUY NOW
+                  </span>
+                </button>
+                <p
+                  style={{
+                    color: colors.text,
+                    opacity: 0.8,
+                    fontSize: '0.8125rem',
+                    fontFamily: 'var(--font-inter), sans-serif',
+                    textAlign: 'center',
+                    marginTop: '0.75rem',
+                    lineHeight: '1.4',
+                  }}
+                >
+                  First 30 min free, then $0.25/min
+                </p>
+              </div>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                 {PERSONAL_PLAN.features.map((feature, idx) => (
                   <li
@@ -813,7 +873,7 @@ export default function PricingPage() {
                 marginBottom: '1.25rem',
               }}
             >
-              Business
+              <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall </span><span style={{ color: colors.text, fontWeight: 700 }}>Business</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {BUSINESS_PACKAGES.map((pkg) => {
@@ -822,7 +882,7 @@ export default function PricingPage() {
                   <div
                     key={pkg.id}
                     id={`plan-${pkg.id}`}
-                    className="flex flex-col"
+                    className="flex flex-col cursor-pointer"
                     style={{
                       borderRadius: '16px',
                       border: isHighlighted ? `3px solid ${colors.accent}` : `2px solid ${colors.accent}40`,
@@ -833,6 +893,22 @@ export default function PricingPage() {
                       flexDirection: 'column',
                       width: '100%',
                       boxShadow: isHighlighted ? `0 0 40px ${colors.accent}50, 0 8px 32px ${colors.accent}40` : 'none',
+                    }}
+                    onClick={() => {
+                      // Navigate to booking section and trigger animation
+                      const bookingSection = document.getElementById('booking-section');
+                      if (bookingSection) {
+                        window.location.hash = 'booking-section';
+                        bookingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        // Trigger animation after scroll
+                        setTimeout(() => {
+                          const event = new CustomEvent('triggerConfiguratorAnimation');
+                          window.dispatchEvent(event);
+                        }, 500);
+                      } else {
+                        // If on pricing page, navigate to home page first
+                        window.location.href = '/#booking-section';
+                      }
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.borderColor = colors.accent;
@@ -1036,6 +1112,27 @@ export default function PricingPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Separator line between business plans and add-ons */}
+      <div 
+        className="w-full" 
+        style={{ 
+          paddingLeft: 'clamp(2rem, 8vw, 10rem)', 
+          paddingRight: 'clamp(2rem, 8vw, 10rem)',
+          marginTop: '3rem',
+          marginBottom: '2rem',
+        }}
+      >
+        <div 
+          style={{
+            width: '100%',
+            height: '1px',
+            background: `linear-gradient(to right, transparent, ${colors.accent}30, transparent)`,
+            maxWidth: '1200px',
+            margin: '0 auto',
+          }}
+        />
       </div>
 
       <div className="w-full" style={{ marginTop: '2rem', paddingLeft: 'clamp(2rem, 8vw, 10rem)', paddingRight: 'clamp(2rem, 8vw, 10rem)' }}>

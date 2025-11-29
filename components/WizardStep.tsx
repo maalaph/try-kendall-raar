@@ -9,12 +9,21 @@ interface WizardStepProps {
 
 export default function WizardStep({ isActive, children }: WizardStepProps) {
   const [isVisible, setIsVisible] = useState(isActive);
+  const [isExiting, setIsExiting] = useState(false);
 
   useEffect(() => {
     if (isActive) {
+      // When becoming active, ensure visibility and reset exit state
+      setIsExiting(false);
       setIsVisible(true);
     } else {
-      const timer = setTimeout(() => setIsVisible(false), 250);
+      // When becoming inactive, start exit animation
+      setIsExiting(true);
+      // Hide after exit animation completes
+      const timer = setTimeout(() => {
+        setIsVisible(false);
+        setIsExiting(false);
+      }, 400);
       return () => clearTimeout(timer);
     }
   }, [isActive]);
@@ -26,15 +35,23 @@ export default function WizardStep({ isActive, children }: WizardStepProps) {
       className="wizard-step"
       style={{
         opacity: isActive ? 1 : 0,
-        transition: 'opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        transform: isActive 
+          ? 'translateX(0) scale(1)' 
+          : isExiting
+          ? 'translateX(100%) scale(0.95)'
+          : 'translateX(100%) scale(0.95)',
+        transition: 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
         width: '100%',
         position: 'absolute',
         top: 0,
         left: 0,
+        zIndex: isActive ? 10 : isExiting ? 5 : 1,
+        pointerEvents: isActive ? 'auto' : 'none',
       }}
     >
       {children}
     </div>
   );
 }
+
 

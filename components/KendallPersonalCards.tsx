@@ -10,7 +10,7 @@ export default function KendallPersonalCards() {
       title: 'Bio & CV Assistant',
       description: (
         <>
-          Put <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> in your LinkedIn or Instagram bio. She introduces you, explains who you are, and forwards opportunities to you.
+          Put <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span> in your LinkedIn or Instagram bio. She introduces you, explains who you are, and forwards opportunities to you.
         </>
       ),
     },
@@ -19,7 +19,7 @@ export default function KendallPersonalCards() {
       title: 'Your Second Number',
       description: (
         <>
-          A clean, separate number for your socials, CV, dating apps, or website. <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> answers so you don't have to.
+          A clean, separate number for your socials, CV, dating apps, or website. <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span> answers so you don't have to.
         </>
       ),
     },
@@ -28,7 +28,7 @@ export default function KendallPersonalCards() {
       title: 'Talks Like You',
       description: (
         <>
-          <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> mirrors your tone and vibe — friendly, professional, sarcastic, or anything in between.
+          <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span> mirrors your tone and vibe — friendly, professional, sarcastic, or anything in between.
         </>
       ),
     },
@@ -37,7 +37,7 @@ export default function KendallPersonalCards() {
       title: 'Handle Awkward Calls',
       description: (
         <>
-          Let <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> pick up when you'd rather not. She filters, softens the interaction, and keeps you unbothered.
+          Let <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span> pick up when you'd rather not. She filters, softens the interaction, and keeps you unbothered.
         </>
       ),
     },
@@ -46,7 +46,7 @@ export default function KendallPersonalCards() {
       title: 'Instant Call Forwarding',
       description: (
         <>
-          <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> can forward important calls straight to your real phone — only when you want.
+          <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span> can forward important calls straight to your real phone — only when you want.
         </>
       ),
     },
@@ -76,7 +76,7 @@ export default function KendallPersonalCards() {
               marginBottom: '1rem',
             }}
           >
-            <span style={{ color: colors.text }}>My</span><span style={{ color: colors.accent }}>Kendall</span>
+            <span style={{ color: colors.text }}>My</span><span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span>
           </h2>
           <p
             style={{
@@ -97,8 +97,8 @@ export default function KendallPersonalCards() {
           {cards.slice(0, 3).map((card, index) => (
             <div
               key={index}
-              className="bg-white/5 border border-purple-500/20 rounded-xl p-16 shadow-lg shadow-purple-500/10 flex flex-col gap-4 text-center lg:text-left"
-              style={{ color: colors.text, minWidth: '450px' }}
+              className="bg-white/5 border border-purple-500/20 rounded-xl p-6 sm:p-8 lg:p-12 shadow-lg shadow-purple-500/10 flex flex-col gap-4 text-center lg:text-left"
+              style={{ color: colors.text }}
             >
               <div className="flex justify-center lg:justify-start" style={{ color: colors.accent }}>
                 {card.icon}
@@ -118,8 +118,8 @@ export default function KendallPersonalCards() {
           {cards.slice(3, 5).map((card, index) => (
             <div
               key={index + 3}
-              className="bg-white/5 border border-purple-500/20 rounded-xl p-16 shadow-lg shadow-purple-500/10 flex flex-col gap-4 text-center lg:text-left w-full lg:w-auto"
-              style={{ color: colors.text, minWidth: '600px', maxWidth: '750px' }}
+              className="bg-white/5 border border-purple-500/20 rounded-xl p-6 sm:p-8 lg:p-12 shadow-lg shadow-purple-500/10 flex flex-col gap-4 text-center lg:text-left w-full lg:w-auto"
+              style={{ color: colors.text, maxWidth: '750px' }}
             >
               <div className="flex justify-center lg:justify-start" style={{ color: colors.accent }}>
                 {card.icon}

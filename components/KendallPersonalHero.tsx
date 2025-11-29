@@ -162,7 +162,6 @@ export default function KendallPersonalHero() {
               className="kendall-glow"
               style={{
                 color: colors.accent,
-                opacity: 0.85,
                 fontFamily: 'var(--font-league-spartan), sans-serif',
                 fontWeight: 700,
                 display: 'inline-block',
@@ -189,14 +188,14 @@ export default function KendallPersonalHero() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-32 items-stretch w-full max-w-6xl mx-auto">
           {/* Left: Cards - 2x3 Grid */}
           <div className="order-2 lg:order-1 h-full">
-            <div className="grid grid-cols-2 gap-3 h-full items-stretch">
+            <div className="grid grid-cols-2 gap-x-20 gap-y-6 h-full items-stretch">
               {[
                 {
                   icon: <Briefcase className="w-6 h-6" />,
                   title: 'Career Assistant',
                   description: (
                     <>
-                      Put <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> in your LinkedIn or resume. She introduces you professionally, explains who you are, and forwards real opportunities to you - 24/7.
+                      Put <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span> in your LinkedIn or resume. She introduces you professionally, explains who you are, and forwards real opportunities to you - 24/7.
                     </>
                   ),
                 },
@@ -205,7 +204,7 @@ export default function KendallPersonalHero() {
                   title: 'Social Reach',
                   description: (
                     <>
-                      Add <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> to your Instagram or TikTok bio. She gives people a quick intro to you and keeps your audience connected without you picking up.
+                      Add <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span> to your Instagram or TikTok bio. She gives people a quick intro to you and keeps your audience connected without you picking up.
                     </>
                   ),
                 },
@@ -219,7 +218,7 @@ export default function KendallPersonalHero() {
                   title: 'Your Second Number',
                   description: (
                     <>
-                      A clean, separate number for your socials, dating apps, or website. <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> answers so you don't have to.
+                      A clean, separate number for your socials, dating apps, or website. <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span> answers so you don't have to.
                     </>
                   ),
                 },
@@ -228,7 +227,7 @@ export default function KendallPersonalHero() {
                   title: 'Talks Like You',
                   description: (
                     <>
-                      Customize <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span>'s personality to speak in your style - or any style you want.
+                      Customize <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span>'s personality to speak in your style - or any style you want.
                     </>
                   ),
                 },
@@ -237,7 +236,7 @@ export default function KendallPersonalHero() {
                   title: 'Handle Awkward Calls',
                   description: (
                     <>
-                      Let <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> pick up when you'd rather not. She filters, softens the interaction, and keeps you unbothered.
+                      Let <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span> pick up when you'd rather not. She filters, softens the interaction, and keeps you unbothered.
                     </>
                   ),
                 },
@@ -246,14 +245,14 @@ export default function KendallPersonalHero() {
                   title: 'Instant Call Forwarding',
                   description: (
                     <>
-                      <span style={{ color: colors.accent, fontWeight: 700 }}>Kendall</span> can forward important calls straight to your real phone - only when you want.
+                      <span style={{ color: colors.accent, fontFamily: 'var(--font-league-spartan), sans-serif', fontWeight: 700 }}>Kendall</span> can forward important calls straight to your real phone - only when you want.
                     </>
                   ),
                 },
               ].map((card, index) => (
                 <div
                   key={index}
-                  className="flex flex-col gap-6 py-20 lg:py-24 px-20 lg:px-28 text-center lg:text-left h-full min-h-full transition-all duration-300 cursor-pointer overflow-hidden"
+                  className="flex flex-col gap-6 py-8 sm:py-10 lg:py-12 px-10 sm:px-12 lg:px-16 text-center lg:text-left h-full min-h-full transition-all duration-300 cursor-pointer overflow-hidden"
                   style={{ 
                     color: colors.text,
                     border: `1px solid ${colors.accent}80`,
@@ -262,10 +261,12 @@ export default function KendallPersonalHero() {
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = colors.accent;
                     e.currentTarget.style.boxShadow = `0 0 20px rgba(168, 85, 247, 0.4), 0 0 40px rgba(168, 85, 247, 0.2), 0 0 60px rgba(168, 85, 247, 0.1)`;
+                    e.currentTarget.style.transform = 'scale(1.05)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = `${colors.accent}80`;
                     e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
                   <div className="flex justify-center lg:justify-start" style={{ color: colors.accent }}>
@@ -347,7 +348,7 @@ export default function KendallPersonalHero() {
                   cursor: 'pointer',
                   minWidth: 'auto',
                   minHeight: '72px',
-                  boxShadow: `0 0 30px rgba(168, 85, 247, 0.7), 0 0 60px rgba(168, 85, 247, 0.5)`,
+                  boxShadow: `0 0 10px rgba(168, 85, 247, 0.3)`,
                   outline: 'none',
                   textShadow: 'none',
                   textTransform: 'uppercase',
@@ -355,12 +356,12 @@ export default function KendallPersonalHero() {
                   zIndex: 1,
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = `0 0 50px rgba(168, 85, 247, 0.9), 0 0 100px rgba(168, 85, 247, 0.7), 0 0 150px rgba(168, 85, 247, 0.5)`;
+                  e.currentTarget.style.boxShadow = `0 0 15px rgba(168, 85, 247, 0.4)`;
                   e.currentTarget.style.transform = 'scale(1.02)';
                   e.currentTarget.style.backgroundColor = colors.accent;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = `0 0 30px rgba(168, 85, 247, 0.7), 0 0 60px rgba(168, 85, 247, 0.5)`;
+                  e.currentTarget.style.boxShadow = `0 0 10px rgba(168, 85, 247, 0.3)`;
                   e.currentTarget.style.transform = 'scale(1)';
                   e.currentTarget.style.backgroundColor = colors.accent;
                 }}
@@ -372,37 +373,22 @@ export default function KendallPersonalHero() {
 
               {/* Pricing Display - Prominent */}
               <div className="flex flex-col gap-4" style={{ position: 'relative', zIndex: 1 }}>
-                <div 
-                  className="flex items-baseline gap-2"
+                <span
+                  style={{
+                    fontSize: '2rem',
+                    fontWeight: 700,
+                    fontFamily: 'var(--font-inter), sans-serif',
+                    lineHeight: '1.3',
+                    display: 'block',
+                  }}
                 >
-                  <span
-                    style={{
-                      fontSize: '3.5rem',
-                      fontWeight: 700,
-                      color: colors.accent,
-                      fontFamily: 'var(--font-inter), sans-serif',
-                      lineHeight: '1',
-                    }}
-                  >
-                    $0.35
-                  </span>
-                  <span
-                    style={{
-                      fontSize: '1.5rem',
-                      fontWeight: 300,
-                      color: colors.text,
-                      opacity: 0.8,
-                      fontFamily: 'var(--font-inter), sans-serif',
-                    }}
-                  >
-                    /min
-                  </span>
-                </div>
+                  <span style={{ color: colors.text }}>Activate Your Line - </span><span style={{ color: colors.accent }}>$7.99</span>
+                </span>
                 <p
                   className="text-base sm:text-lg font-light"
                   style={{ color: colors.text, opacity: 0.9 }}
                 >
-                  Pay any amount from $0.99
+                  First 30 min free, then $0.25/min
                 </p>
               </div>
 

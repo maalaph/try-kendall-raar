@@ -1,0 +1,1709 @@
+/**
+ * VAPI helper functions for My Kendall agent creation and phone number management
+ */
+
+import { buildSystemPrompt } from './promptBlocks';
+import { getElevenLabsMapping } from './voiceMapping';
+
+const VAPI_API_URL = 'https://api.vapi.ai';
+
+/**
+ * VAPI function definition for capturing notes/messages from callers
+ */
+const CAPTURE_NOTE_FUNCTION = {
+  name: 'capture_note',
+  description: 'Call this function when the caller wants to leave a message or asks you to pass something along to the person whose number this is.',
+  parameters: {
+    type: 'object',
+    properties: {
+      note_content: {
+        type: 'string',
+        description: 'The message or note that the caller wants to leave',
+      },
+      caller_phone: {
+        type: 'string',
+        description: 'The caller\'s phone number',
+      },
+    },
+    required: ['note_content', 'caller_phone'],
+  },
+};
+
+const getHeaders = () => {
+  const apiKey = process.env.VAPI_PRIVATE_KEY;
+  
+  if (!apiKey) {
+    console.error('[VAPI ERROR] VAPI_PRIVATE_KEY is not set in environment variables');
+    throw new Error('VAPI_PRIVATE_KEY environment variable is not configured');
+  }
+  
+  return {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
+};
+
+/**
+ * Build personality description using hybrid logic:
+ * - Prioritizes custom text if provided
+ * - Falls back to choice-based defaults
+ * - Enhances with customization options
+ */
+function buildPersonality({ 
+  choices, 
+  customText, 
+  options 
+}: { 
+  choices?: string[]; 
+  customText?: string; 
+  options?: string[] 
+}): string {
+  let personality = '';
+  
+  // Primary personality source: custom text takes precedence
+  if (customText && customText.trim().length > 0) {
+    personality = customText.trim();
+  } else if (choices && choices.length > 0) {
+    // Combine multiple personality choices
+    const choiceDescriptions: Record<string, string> = {
+      'Friendly & Casual': 'Friendly and approachable. Use casual, warm language. Match the caller\'s energy. It\'s okay to be conversational.',
+      'Professional & Polished': 'Professional and polished. Use formal, courteous language. Maintain professional tone throughout.',
+      'Warm & Personal': 'Warm and personable. Show genuine interest in helping. Use empathetic language.',
+      'Direct & Brief': 'Direct and efficient. Get to the point quickly. Be clear and concise.',
+      'Rude & Blunt': 'Rude and blunt. Be straightforward and unapologetically direct. Don\'t sugarcoat things. Be brutally honest.',
+      'Sarcastic & Mean': 'Sarcastic and mean-spirited. Use sarcasm, wit, and sharp humor. Be snarky and dismissive when appropriate.',
+    };
+    
+    // Combine descriptions for selected choices
+    const descriptions = choices
+      .map(choice => choiceDescriptions[choice])
+      .filter(desc => desc !== undefined);
+    
+    if (descriptions.length > 0) {
+      // Combine multiple personality traits intelligently
+      if (descriptions.length === 1) {
+        personality = descriptions[0];
+      } else {
+        // For multiple selections, combine them naturally
+        personality = descriptions.join(' Also, ').replace(/\. Also, /g, '. Additionally, ');
+        // Add context about combining traits
+        personality += ` Balance these ${descriptions.length} personality aspects naturally in conversation.`;
+      }
+    } else {
+      personality = 'Warm, professional, and helpful';
+    }
+  } else {
+    personality = 'Warm, professional, and helpful';
+  }
+  
+  // Enhance with customization options
+  if (options && options.length > 0) {
+    const enhancements: string[] = [];
+    
+    if (options.includes('Keep conversations brief (under 2 minutes)')) {
+      enhancements.push('Keep responses brief and focused. Minimize small talk.');
+    }
+    if (options.includes('Allow longer conversations (5+ minutes if needed)')) {
+      enhancements.push('Allow for detailed conversations when needed. Take time to fully understand the caller\'s needs.');
+    }
+    if (options.includes('Match caller\'s energy level')) {
+      enhancements.push('Match the caller\'s energy and communication style.');
+    }
+    if (options.includes('Use more formal language')) {
+      enhancements.push('Use formal language and professional tone.');
+    }
+    if (options.includes('Use casual, friendly language')) {
+      enhancements.push('Use casual, friendly language. It\'s okay to be relaxed and conversational.');
+    }
+    if (options.includes('Ask clarifying questions when uncertain')) {
+      enhancements.push('If uncertain about anything, ask clarifying questions rather than making assumptions.');
+    }
+    if (options.includes('Be more direct and to-the-point')) {
+      enhancements.push('Be direct and to-the-point. Get to the core of what the caller needs quickly.');
+    }
+    
+    if (enhancements.length > 0) {
+      personality += '\n\nAdditional Behaviors:\n' + enhancements.join('\n');
+    }
+  }
+  
+  return personality;
+}
+
+export async function createAgent({
+  fullName,
+  forwardCalls,
+  mobileNumber,
+  personalityChoices,
+  personalityText,
+  customizationOptions,
+  userContext,
+  additionalInstructions,
+  voiceChoice,
+  analyzedFileContent,
+  kendallName,
+}: {
+  fullName: string;
+  forwardCalls?: boolean;
+  mobileNumber?: string;
+  personalityChoices?: string[];
+  personalityText?: string;
+  customizationOptions?: string[];
+  userContext: string;
+  additionalInstructions?: string;
+  voiceChoice?: string;
+  analyzedFileContent?: string;
+  kendallName?: string;
+}) {
+  try {
+    // Build personality using hybrid logic
+    const personality = buildPersonality({
+      choices: personalityChoices,
+      customText: personalityText,
+      options: customizationOptions,
+    });
+
+    // Build call forwarding rules based on user preference
+    const callForwardingRules = forwardCalls
+      ? `When callers request to speak directly with ${fullName}, forward the call to ${fullName}'s mobile number.`
+      : `Do not forward calls. Handle all inquiries yourself as ${fullName}'s personal assistant.`;
+
+    // Format phone number to E.164 format (e.g., +1XXXXXXXXXX)
+    // E.164 format requires: +[country code][number] with no spaces or special characters
+    const formatPhoneNumberToE164 = (phone: string): string | null => {
+      if (!phone || typeof phone !== 'string') {
+        return null;
+      }
+      
+      const trimmed = phone.trim();
+      if (!trimmed) {
+        return null;
+      }
+      
+      // Remove all non-digit characters except +
+      let cleaned = trimmed;
+      
+      // If it already starts with +, validate it's properly formatted
+      if (cleaned.startsWith('+')) {
+        // Extract all digits (including the country code)
+        const digits = cleaned.replace(/\D/g, '');
+        // E.164 requires at least 10 digits total (country code + number)
+        // Minimum: 1 digit country code + 9 digit number = 10 digits
+        // Typical US: 1 (country) + 10 (area code + number) = 11 digits
+        if (digits.length >= 10) {
+          // Return with + prefix and all digits
+          return `+${digits}`;
+        }
+        return null;
+      }
+      
+      // If no + prefix, extract only digits
+      const digits = cleaned.replace(/\D/g, '');
+      
+      // Must have at least 10 digits
+      if (digits.length < 10) {
+        return null;
+      }
+      
+      // If it's exactly 10 digits, assume US number and add +1
+      if (digits.length === 10) {
+        return `+1${digits}`;
+      }
+      
+      // If it's 11 digits and starts with 1, assume US number
+      if (digits.length === 11 && digits.startsWith('1')) {
+        return `+${digits}`;
+      }
+      
+      // For other lengths, assume first 1-3 digits are country code
+      // For safety, if we can't determine, default to US (+1) for 10-digit numbers
+      // For longer numbers, prepend +
+      if (digits.length > 11) {
+        // Already has country code included
+        return `+${digits}`;
+      }
+      
+      // Default: assume US number if ambiguous
+      return `+1${digits}`;
+    };
+
+    // Use provided kendallName or default to 'Kendall'
+    const assistantName = (kendallName && kendallName.trim()) || 'Kendall';
+
+    // Build purpose description
+    const purposeDescription = `You are ${assistantName}, the personal AI assistant for ${fullName}. Your purpose is to represent ${fullName} professionally and handle calls on their behalf. Use the context about ${fullName} to answer questions accurately and naturally. Be helpful, professional, and make every caller feel valued.`;
+
+    // Build file content section if available with explicit instructions
+    const fileContentSection = analyzedFileContent && analyzedFileContent.trim()
+      ? `=== DETAILED INFORMATION ABOUT ${fullName} ===
+The following information comes from ${fullName}'s professional documents (resume, CV, portfolio). This is your PRIMARY source of specific information about ${fullName}.
+
+${analyzedFileContent}
+
+⚠️ MANDATORY INSTRUCTIONS FOR USING THIS INFORMATION:
+
+1. When asked ANY question about ${fullName}'s experience, background, achievements, or skills, you MUST reference the specific information from the sections above.
+
+2. CRITICAL: Use ALL information from the sections, not just a subset:
+   - From "WORK EXPERIENCE": Mention ALL companies and roles listed (e.g., if there are 3 companies, mention all 3)
+   - From "KEY ACHIEVEMENTS": Reference multiple achievements, not just one
+   - From "EDUCATION": Use exact institution, degree, and graduation year
+   - From "LEADERSHIP & ACTIVITIES": Mention all leadership roles and activities listed
+
+3. Use EXACT details from the sections:
+   - Use exact company names, job titles, dates, and achievements with numbers
+   - Cite specific achievements with exact numbers/percentages
+   - Reference specific roles and achievements
+
+4. SPEAK NATURALLY using the information:
+   - GOOD FORMAT: "At [Company Name] as [Job Title], ${fullName} [specific achievement with numbers]. At [Another Company], they [another achievement]."
+   - BAD: "They have consulting experience" or mentioning only one company
+   - CRITICAL: Only use company names, institutions, and organizations that are explicitly listed in the sections above
+
+5. When asked general questions like "What does ${fullName} do?" or "Tell me about ${fullName}":
+   - Start with information from "WHO THEY ARE"
+   - Then share ALL work experiences from "WORK EXPERIENCE" section - list each company, role, and key achievements
+   - Include multiple specific achievements with numbers from "KEY ACHIEVEMENTS"
+   - Mention leadership roles and activities from "LEADERSHIP & ACTIVITIES"
+   - CRITICAL: Do not mention only one experience - you MUST share ALL experiences, companies, and achievements listed
+
+6. NEVER say "I don't have that information" - the sections above contain your information source.
+
+7. ALWAYS cite specific company names, job titles, dates, and numbers when available.
+
+🚫 ABSOLUTELY FORBIDDEN - DO NOT:
+- Make up, invent, or guess information that is NOT explicitly stated in the sections above
+- Use generic information like "graduated from a university" - use the EXACT institution and year from "EDUCATION" section
+- Say information that contradicts what's in the sections above (e.g., if EDUCATION says "Penn State, 2026", DO NOT say "UCLA, 2020" or "Lebanese American University")
+- Use placeholder or generic information - ONLY use what is explicitly written in the sections above
+- Mention universities, schools, organizations, or activities that are NOT explicitly listed in the "EDUCATION" or "LEADERSHIP & ACTIVITIES" sections
+- For EDUCATION: ONLY mention the exact institution, degree, and year from the "EDUCATION" section - do NOT mention any other schools or universities, even if they seem related
+- For LEADERSHIP & ACTIVITIES: ONLY mention roles and activities explicitly listed in the "LEADERSHIP & ACTIVITIES" section - do NOT invent organizations like "Lebanese Scout" or roles like "choir president" if they are not in the sections
+- If asked about something NOT in the sections above, deflect naturally and professionally (e.g., "I'm not sure about that specific detail" or "Let me help you with something else I can tell you about" or redirect to relevant information you DO know) - DO NOT mention "files" or "documents" and maintain your role as their assistant
+
+`
+      : '';
+
+    // Build system prompt in required format
+    const systemPrompt = `Identity & Context:
+You are ${assistantName}, the personal AI assistant for ${fullName}.
+
+About ${fullName}:
+${userContext}${fileContentSection}
+
+⚠️ CRITICAL: The "DETAILED INFORMATION ABOUT ${fullName}" section above contains your PRIMARY source of specific information. When answering ANY question about ${fullName}'s experience, background, achievements, or skills, you MUST reference the exact details from that section. Use specific company names, job titles, dates, numbers, and percentages. Never be vague or generic.
+
+🚫 CRITICAL RULE: NEVER make up, invent, or guess information. ONLY use information that is explicitly stated in the "DETAILED INFORMATION ABOUT ${fullName}" section above. If asked about something not in that section, deflect naturally and professionally (e.g., "I'm not sure about that specific detail" or redirect to relevant information you DO know) - DO NOT mention "files" or "documents" and maintain your role as their assistant.
+
+Speech Style:
+Direct, clear, and human.
+One question at a time.
+Never ramble.
+
+Personality & Communication Style:
+${personality}
+
+${additionalInstructions ? `Additional Instructions:\n${additionalInstructions}\n\n` : ''}Your Purpose:
+${purposeDescription}
+
+Call Forwarding Rules:
+${callForwardingRules}
+
+You must never give:
+Medical, legal, or financial advice
+Emotional counseling
+Technical explanations of internal models
+Claims about having feelings or intentions.
+
+End of System Prompt`;
+
+    // Build voice configuration - handle both ElevenLabs and VAPI voices
+    const trimmedVoiceChoice = voiceChoice && typeof voiceChoice === 'string' ? voiceChoice.trim() : '';
+    
+    let voiceConfig: { provider: '11labs' | 'vapi'; voiceId: string } | undefined;
+    
+    if (trimmedVoiceChoice) {
+      // Try to get voice config using helper (handles curated library IDs)
+      const { getVoiceConfigForVAPI } = await import('./voiceConfigHelper');
+      voiceConfig = await getVoiceConfigForVAPI(trimmedVoiceChoice);
+      
+      // Fallback: Check legacy mapping system
+      if (!voiceConfig) {
+        const voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
+        if (voiceMapping?.elevenLabsVoiceId) {
+          voiceConfig = {
+            provider: '11labs',
+            voiceId: voiceMapping.elevenLabsVoiceId,
+          };
+        } else {
+          // Assume VAPI voice name
+          voiceConfig = {
+            provider: 'vapi',
+            voiceId: trimmedVoiceChoice,
+          };
+        }
+      }
+    }
+
+    // Log voice configuration for debugging
+    console.log('[VAPI DEBUG] createAgent voice configuration:', {
+      voiceChoice: voiceChoice,
+      trimmedVoiceChoice: trimmedVoiceChoice,
+      voiceMapping: voiceMapping,
+      voiceConfig: voiceConfig,
+      hasVoiceConfig: !!voiceConfig,
+      provider: voiceConfig?.provider,
+    });
+
+    // Create the assistant with proper API structure
+    const requestBody: any = {
+      name: `My ${assistantName} - ${fullName}`,
+      model: {
+        provider: 'openai',
+        model: process.env.VAPI_DEFAULT_MODEL || 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+        ],
+      },
+      firstMessage: 'Hello!',
+      // Explicitly set background sound to Off by default
+      backgroundSound: 'off',
+    };
+
+    // CRITICAL: Always add voice config if provided - this ensures voice is set correctly
+    if (voiceConfig) {
+      requestBody.voice = voiceConfig;
+      console.log('[VAPI DEBUG] Voice config added to request body:', voiceConfig);
+    } else {
+      console.warn('[VAPI WARNING] No voice config - voiceChoice was:', voiceChoice);
+    }
+
+    // Add forwarding phone number if call forwarding is enabled and valid
+    // Vapi requires forwardingPhoneNumber to be a string in E.164 format (e.g., "+14155552671")
+    // OR an object of shape { phone: string, country?: string }
+    // IMPORTANT: Only add this field if we have a valid value - never add undefined/null/empty
+    if (forwardCalls && mobileNumber) {
+      const trimmedMobile = typeof mobileNumber === 'string' ? mobileNumber.trim() : String(mobileNumber).trim();
+      
+      if (trimmedMobile.length === 0) {
+        console.warn('[VAPI WARNING] Call forwarding enabled but mobile number is empty');
+        // Don't add forwardingPhoneNumber - Vapi will handle calls without forwarding
+      } else {
+        const formattedNumber = formatPhoneNumberToE164(trimmedMobile);
+        
+        // Only set forwardingPhoneNumber if we have a valid, non-empty string that starts with +
+        if (formattedNumber && 
+            typeof formattedNumber === 'string' && 
+            formattedNumber.trim().length >= 11 && 
+            formattedNumber.trim().startsWith('+')) {
+          const cleanNumber = formattedNumber.trim();
+          requestBody.forwardingPhoneNumber = cleanNumber;
+          console.log('[VAPI INFO] Setting forwardingPhoneNumber to:', cleanNumber);
+        } else {
+          console.warn('[VAPI WARNING] Invalid formatted number - not adding forwardingPhoneNumber:', {
+            original: trimmedMobile,
+            formatted: formattedNumber,
+            type: typeof formattedNumber
+          });
+          // Explicitly do NOT add forwardingPhoneNumber - leave it undefined
+        }
+      }
+    }
+    // If forwardCalls is false or mobileNumber is missing, forwardingPhoneNumber is not added to requestBody
+
+    // Log the request body for debugging (remove sensitive data in production)
+    console.log('[VAPI DEBUG] Assistant creation request body:', {
+      name: requestBody.name,
+      voice: requestBody.voice,
+      backgroundSound: requestBody.backgroundSound,
+      hasSystemPrompt: !!requestBody.model?.messages?.[0]?.content,
+      systemPromptLength: requestBody.model?.messages?.[0]?.content?.length || 0,
+      forwardingPhoneNumber: requestBody.forwardingPhoneNumber,
+    });
+
+    const response = await fetch(`${VAPI_API_URL}/assistant`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || errorData.error || `VAPI API error: ${response.status} ${response.statusText}`;
+      console.error('[VAPI ERROR] createAgent failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        fullName,
+        voiceConfig: requestBody.voice,
+      });
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    
+    // Log the response to verify voice was set correctly
+    console.log('[VAPI DEBUG] createAgent response:', {
+      agentId: result.id || result.agentId,
+      voice: result.voice,
+      voiceId: result.voice?.voiceId,
+      voiceProvider: result.voice?.provider,
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('[VAPI ERROR] createAgent failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create agent using the new template-based system
+ */
+export async function createAgentFromTemplate({
+  fullName,
+  nickname,
+  kendallName,
+  mobileNumber,
+  selectedTraits,
+  useCaseChoice,
+  boundaryChoices,
+  userContextAndRules,
+  forwardCalls = false,
+  voiceChoice,
+  analyzedFileContent,
+  fileUsageInstructions,
+}: {
+  fullName: string;
+  nickname?: string;
+  kendallName: string;
+  mobileNumber: string;
+  selectedTraits: string[];
+  useCaseChoice: string;
+  boundaryChoices: string[];
+  userContextAndRules: string;
+  forwardCalls?: boolean;
+  voiceChoice?: string;
+  analyzedFileContent?: string;
+  fileUsageInstructions?: string;
+}) {
+  try {
+    // Use provided kendallName or default to 'Kendall'
+    const assistantName = (kendallName && kendallName.trim()) || 'Kendall';
+    
+    // Build system prompt using template
+    const systemPrompt = buildSystemPrompt({
+      kendallName: assistantName,
+      fullName,
+      nickname,
+      selectedTraits,
+      useCaseChoice,
+      boundaryChoices,
+      userContextAndRules,
+      analyzedFileContent,
+    });
+
+    // Format phone number to E.164 format
+    const formatPhoneNumberToE164 = (phone: string): string | null => {
+      if (!phone || typeof phone !== 'string') {
+        return null;
+      }
+      
+      const trimmed = phone.trim();
+      if (!trimmed) {
+        return null;
+      }
+      
+      let cleaned = trimmed;
+      
+      if (cleaned.startsWith('+')) {
+        const digits = cleaned.replace(/\D/g, '');
+        if (digits.length >= 10) {
+          return `+${digits}`;
+        }
+        return null;
+      }
+      
+      const digits = cleaned.replace(/\D/g, '');
+      
+      if (digits.length < 10) {
+        return null;
+      }
+      
+      if (digits.length === 10) {
+        return `+1${digits}`;
+      }
+      
+      if (digits.length === 11 && digits.startsWith('1')) {
+        return `+${digits}`;
+      }
+      
+      if (digits.length > 11) {
+        return `+${digits}`;
+      }
+      
+      return `+1${digits}`;
+    };
+
+    // Build voice configuration - handle both ElevenLabs and VAPI voices
+    const trimmedVoiceChoice = voiceChoice && typeof voiceChoice === 'string' ? voiceChoice.trim() : '';
+    
+    let voiceConfig: { provider: '11labs' | 'vapi'; voiceId: string } | undefined;
+    
+    if (trimmedVoiceChoice) {
+      // Try to get voice config using helper (handles curated library IDs)
+      const { getVoiceConfigForVAPI } = await import('./voiceConfigHelper');
+      voiceConfig = await getVoiceConfigForVAPI(trimmedVoiceChoice);
+      
+      // Fallback: Check legacy mapping system
+      if (!voiceConfig) {
+        const voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
+        if (voiceMapping?.elevenLabsVoiceId) {
+          voiceConfig = {
+            provider: '11labs',
+            voiceId: voiceMapping.elevenLabsVoiceId,
+          };
+        } else {
+          // Assume VAPI voice name
+          voiceConfig = {
+            provider: 'vapi',
+            voiceId: trimmedVoiceChoice,
+          };
+        }
+      }
+    }
+
+    // Log voice configuration for debugging
+    console.log('[VAPI DEBUG] createAgentFromTemplate voice configuration:', {
+      voiceChoice: voiceChoice,
+      trimmedVoiceChoice: trimmedVoiceChoice,
+      voiceMapping: voiceMapping,
+      voiceConfig: voiceConfig,
+      hasVoiceConfig: !!voiceConfig,
+      provider: voiceConfig?.provider,
+      fullName: fullName,
+    });
+
+    // Create the assistant with proper API structure
+    const requestBody: any = {
+      name: `My ${assistantName} - ${fullName}`,
+      model: {
+        provider: 'openai',
+        model: process.env.VAPI_DEFAULT_MODEL || 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+        ],
+        functions: [CAPTURE_NOTE_FUNCTION],
+      },
+      firstMessage: 'Hello!',
+      backgroundSound: 'off',
+    };
+
+    // CRITICAL: Always add voice config if provided - this ensures voice is set correctly
+    if (voiceConfig) {
+      requestBody.voice = voiceConfig;
+      console.log('[VAPI DEBUG] Voice config added to request body:', voiceConfig);
+    } else {
+      console.warn('[VAPI WARNING] No voice config in createAgentFromTemplate - voiceChoice was:', voiceChoice);
+    }
+
+    // Add server URL for webhook (note-taking feature)
+    const webhookUrl = process.env.VAPI_WEBHOOK_URL || process.env.NEXT_PUBLIC_WEBHOOK_URL;
+    if (webhookUrl) {
+      requestBody.serverUrl = webhookUrl;
+      console.log('[VAPI INFO] Setting serverUrl to:', webhookUrl);
+    }
+
+    // Add forwarding phone number if call forwarding is enabled
+    if (forwardCalls && mobileNumber) {
+      const trimmedMobile = typeof mobileNumber === 'string' ? mobileNumber.trim() : String(mobileNumber).trim();
+      
+      if (trimmedMobile.length > 0) {
+        const formattedNumber = formatPhoneNumberToE164(trimmedMobile);
+        
+        if (formattedNumber && 
+            typeof formattedNumber === 'string' && 
+            formattedNumber.trim().length >= 11 && 
+            formattedNumber.trim().startsWith('+')) {
+          requestBody.forwardingPhoneNumber = formattedNumber.trim();
+        }
+      }
+    }
+
+    // Log the full request body (redact system prompt for brevity)
+    console.log('[VAPI DEBUG] createAgentFromTemplate request body:', {
+      name: requestBody.name,
+      voice: requestBody.voice,
+      backgroundSound: requestBody.backgroundSound,
+      hasSystemPrompt: !!requestBody.model?.messages?.[0]?.content,
+      systemPromptLength: requestBody.model?.messages?.[0]?.content?.length || 0,
+    });
+
+    const response = await fetch(`${VAPI_API_URL}/assistant`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || errorData.error || `VAPI API error: ${response.status} ${response.statusText}`;
+      console.error('[VAPI ERROR] createAgentFromTemplate failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        fullName,
+        voiceConfig: requestBody.voice,
+      });
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    
+    // Log the response to verify voice was set correctly
+    console.log('[VAPI DEBUG] createAgentFromTemplate response:', {
+      agentId: result.id || result.agentId,
+      voice: result.voice,
+      voiceId: result.voice?.voiceId,
+      voiceProvider: result.voice?.provider,
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('[VAPI ERROR] createAgentFromTemplate failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing VAPI assistant agent using template system (new format)
+ */
+export async function updateAgentFromTemplate({
+  agentId,
+  fullName,
+  nickname,
+  kendallName,
+  mobileNumber,
+  selectedTraits,
+  useCaseChoice,
+  boundaryChoices,
+  userContextAndRules,
+  forwardCalls = false,
+  voiceChoice,
+  analyzedFileContent,
+  fileUsageInstructions,
+}: {
+  agentId: string;
+  fullName: string;
+  nickname?: string;
+  kendallName: string;
+  mobileNumber: string;
+  selectedTraits: string[];
+  useCaseChoice: string;
+  boundaryChoices: string[];
+  userContextAndRules: string;
+  forwardCalls?: boolean;
+  voiceChoice?: string;
+  analyzedFileContent?: string;
+  fileUsageInstructions?: string;
+}) {
+  try {
+    // Use provided kendallName or default to 'Kendall'
+    const assistantName = (kendallName && kendallName.trim()) || 'Kendall';
+    
+    console.log('[VAPI DEBUG] updateAgentFromTemplate called with:');
+    console.log('[VAPI DEBUG] - agentId:', agentId);
+    console.log('[VAPI DEBUG] - fullName:', fullName);
+    console.log('[VAPI DEBUG] - analyzedFileContent length:', analyzedFileContent?.length || 0);
+    console.log('[VAPI DEBUG] - analyzedFileContent preview:', analyzedFileContent?.substring(0, 200) || 'EMPTY');
+    console.log('[VAPI DEBUG] - analyzedFileContent includes WHO THEY ARE:', analyzedFileContent?.includes('WHO THEY ARE') || false);
+    console.log('[VAPI DEBUG] - analyzedFileContent includes WORK EXPERIENCE:', analyzedFileContent?.includes('WORK EXPERIENCE') || false);
+    
+    // Build system prompt using template
+    const systemPrompt = buildSystemPrompt({
+      kendallName: assistantName,
+      fullName,
+      nickname,
+      selectedTraits,
+      useCaseChoice,
+      boundaryChoices,
+      userContextAndRules,
+      analyzedFileContent,
+      fileUsageInstructions,
+    });
+    
+    console.log('[VAPI DEBUG] System prompt built:');
+    console.log('[VAPI DEBUG] - System prompt length:', systemPrompt.length);
+    console.log('[VAPI DEBUG] - System prompt includes DETAILED INFORMATION:', systemPrompt.includes('DETAILED INFORMATION'));
+    console.log('[VAPI DEBUG] - System prompt includes WHO THEY ARE:', systemPrompt.includes('WHO THEY ARE'));
+    console.log('[VAPI DEBUG] - System prompt includes WORK EXPERIENCE:', systemPrompt.includes('WORK EXPERIENCE'));
+    console.log('[VAPI DEBUG] - System prompt preview (first 1000 chars):', systemPrompt.substring(0, 1000));
+
+    // Format phone number to E.164 format
+    const formatPhoneNumberToE164 = (phone: string): string | null => {
+      if (!phone || typeof phone !== 'string') {
+        return null;
+      }
+      
+      const trimmed = phone.trim();
+      if (!trimmed) {
+        return null;
+      }
+      
+      let cleaned = trimmed;
+      
+      if (cleaned.startsWith('+')) {
+        const digits = cleaned.replace(/\D/g, '');
+        if (digits.length >= 10) {
+          return `+${digits}`;
+        }
+        return null;
+      }
+      
+      const digits = cleaned.replace(/\D/g, '');
+      
+      if (digits.length < 10) {
+        return null;
+      }
+      
+      if (digits.length === 10) {
+        return `+1${digits}`;
+      }
+      
+      if (digits.length === 11 && digits.startsWith('1')) {
+        return `+${digits}`;
+      }
+      
+      if (digits.length > 11) {
+        return `+${digits}`;
+      }
+      
+      return `+1${digits}`;
+    };
+
+    // Build voice configuration - handle both ElevenLabs and VAPI voices
+    const trimmedVoiceChoice = voiceChoice && typeof voiceChoice === 'string' ? voiceChoice.trim() : '';
+    
+    let voiceConfig: { provider: '11labs' | 'vapi'; voiceId: string } | undefined;
+    
+    if (trimmedVoiceChoice) {
+      // Try to get voice config using helper (handles curated library IDs)
+      const { getVoiceConfigForVAPI } = await import('./voiceConfigHelper');
+      voiceConfig = await getVoiceConfigForVAPI(trimmedVoiceChoice);
+      
+      // Fallback: Check legacy mapping system
+      if (!voiceConfig) {
+        const voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
+        if (voiceMapping?.elevenLabsVoiceId) {
+          voiceConfig = {
+            provider: '11labs',
+            voiceId: voiceMapping.elevenLabsVoiceId,
+          };
+        } else {
+          // Assume VAPI voice name
+          voiceConfig = {
+            provider: 'vapi',
+            voiceId: trimmedVoiceChoice,
+          };
+        }
+      }
+    }
+
+    // Log voice configuration for debugging
+    console.log('[VAPI DEBUG] updateAgentFromTemplate voice configuration:', {
+      agentId: agentId,
+      voiceChoice: voiceChoice,
+      trimmedVoiceChoice: trimmedVoiceChoice,
+      voiceMapping: voiceMapping,
+      voiceConfig: voiceConfig,
+      hasVoiceConfig: !!voiceConfig,
+      provider: voiceConfig?.provider,
+      fullName: fullName,
+    });
+
+    // Build update request body
+    const requestBody: any = {
+      name: `My ${assistantName} - ${fullName}`,
+      model: {
+        provider: 'openai',
+        model: process.env.VAPI_DEFAULT_MODEL || 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+        ],
+        functions: [CAPTURE_NOTE_FUNCTION],
+      },
+      backgroundSound: 'off',
+    };
+
+    // CRITICAL: Always add voice config if provided - this ensures voice is set correctly
+    if (voiceConfig) {
+      requestBody.voice = voiceConfig;
+      console.log('[VAPI DEBUG] Voice config added to update request body:', voiceConfig);
+    } else {
+      console.warn('[VAPI WARNING] No voice config in updateAgentFromTemplate - voiceChoice was:', voiceChoice);
+    }
+
+    // Add forwarding phone number if call forwarding is enabled and valid
+    if (forwardCalls && mobileNumber) {
+      const trimmedMobile = typeof mobileNumber === 'string' ? mobileNumber.trim() : String(mobileNumber).trim();
+      
+      if (trimmedMobile.length > 0) {
+        const formattedNumber = formatPhoneNumberToE164(trimmedMobile);
+        
+        if (formattedNumber && 
+            typeof formattedNumber === 'string' && 
+            formattedNumber.trim().length >= 11 && 
+            formattedNumber.trim().startsWith('+')) {
+          const cleanNumber = formattedNumber.trim();
+          requestBody.forwardingPhoneNumber = cleanNumber;
+          console.log('[VAPI INFO] Setting forwardingPhoneNumber to:', cleanNumber);
+        } else {
+          console.warn('[VAPI WARNING] Invalid formatted number - not adding forwardingPhoneNumber:', {
+            original: trimmedMobile,
+            formatted: formattedNumber,
+          });
+        }
+      }
+    } else if (!forwardCalls) {
+      // Explicitly remove forwarding if disabled
+      requestBody.forwardingPhoneNumber = null;
+    }
+
+    // Add server URL for webhook (note-taking feature)
+    const webhookUrl = process.env.VAPI_WEBHOOK_URL || process.env.NEXT_PUBLIC_WEBHOOK_URL;
+    if (webhookUrl) {
+      requestBody.serverUrl = webhookUrl;
+      console.log('[VAPI INFO] Setting serverUrl to:', webhookUrl);
+    }
+
+    console.log('[VAPI DEBUG] Assistant update (template) request body:', {
+      name: requestBody.name,
+      voice: requestBody.voice,
+      backgroundSound: requestBody.backgroundSound,
+      hasSystemPrompt: !!requestBody.model?.messages?.[0]?.content,
+      systemPromptLength: requestBody.model?.messages?.[0]?.content?.length || 0,
+    });
+
+    // Use PATCH to update existing assistant
+    const response = await fetch(`${VAPI_API_URL}/assistant/${agentId}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || errorData.error || `VAPI API error: ${response.status} ${response.statusText}`;
+      console.error('[VAPI ERROR] updateAgentFromTemplate failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        agentId,
+        fullName,
+        voiceConfig: requestBody.voice,
+      });
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    
+    // Log the response to verify voice was set correctly
+    console.log('[VAPI DEBUG] updateAgentFromTemplate response:', {
+      agentId: result.id || result.agentId || agentId,
+      voice: result.voice,
+      voiceId: result.voice?.voiceId,
+      voiceProvider: result.voice?.provider,
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('[VAPI ERROR] updateAgentFromTemplate failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing VAPI assistant agent
+ */
+export async function updateAgent({
+  agentId,
+  fullName,
+  forwardCalls,
+  mobileNumber,
+  personalityChoices,
+  personalityText,
+  customizationOptions,
+  userContext,
+  additionalInstructions,
+  voiceChoice,
+  kendallName,
+  analyzedFileContent,
+}: {
+  agentId: string;
+  fullName: string;
+  forwardCalls?: boolean;
+  mobileNumber?: string;
+  personalityChoices?: string[];
+  personalityText?: string;
+  customizationOptions?: string[];
+  userContext: string;
+  additionalInstructions?: string;
+  voiceChoice?: string;
+  kendallName?: string;
+  analyzedFileContent?: string;
+}) {
+  try {
+    // Use provided kendallName or default to 'Kendall'
+    const assistantName = (kendallName && kendallName.trim()) || 'Kendall';
+    
+    // Build personality using hybrid logic (same as createAgent)
+    const personality = buildPersonality({
+      choices: personalityChoices,
+      customText: personalityText,
+      options: customizationOptions,
+    });
+
+    // Build call forwarding rules
+    const callForwardingRules = forwardCalls
+      ? `When callers request to speak directly with ${fullName}, forward the call to ${fullName}'s mobile number.`
+      : `Do not forward calls. Handle all inquiries yourself as ${fullName}'s personal assistant.`;
+
+    // Format phone number to E.164 format (same logic as createAgent)
+    const formatPhoneNumberToE164 = (phone: string): string | null => {
+      if (!phone || typeof phone !== 'string') {
+        return null;
+      }
+      
+      const trimmed = phone.trim();
+      if (!trimmed) {
+        return null;
+      }
+      
+      let cleaned = trimmed;
+      
+      if (cleaned.startsWith('+')) {
+        const digits = cleaned.replace(/\D/g, '');
+        if (digits.length >= 10) {
+          return `+${digits}`;
+        }
+        return null;
+      }
+      
+      const digits = cleaned.replace(/\D/g, '');
+      
+      if (digits.length < 10) {
+        return null;
+      }
+      
+      if (digits.length === 10) {
+        return `+1${digits}`;
+      }
+      
+      if (digits.length === 11 && digits.startsWith('1')) {
+        return `+${digits}`;
+      }
+      
+      if (digits.length > 11) {
+        return `+${digits}`;
+      }
+      
+      return `+1${digits}`;
+    };
+
+    // Build purpose description
+    const purposeDescription = `You are ${assistantName}, the personal AI assistant for ${fullName}. Your purpose is to represent ${fullName} professionally and handle calls on their behalf. Use the context about ${fullName} to answer questions accurately and naturally. Be helpful, professional, and make every caller feel valued.`;
+
+    // Build file content section if available with explicit instructions
+    const fileContentSection = analyzedFileContent && analyzedFileContent.trim()
+      ? `=== DETAILED INFORMATION ABOUT ${fullName} ===
+The following information comes from ${fullName}'s professional documents (resume, CV, portfolio). This is your PRIMARY source of specific information about ${fullName}.
+
+${analyzedFileContent}
+
+⚠️ MANDATORY INSTRUCTIONS FOR USING THIS INFORMATION:
+
+1. When asked ANY question about ${fullName}'s experience, background, achievements, or skills, you MUST reference the specific information from the sections above.
+
+2. CRITICAL: Use ALL information from the sections, not just a subset:
+   - From "WORK EXPERIENCE": Mention ALL companies and roles listed (e.g., if there are 3 companies, mention all 3)
+   - From "KEY ACHIEVEMENTS": Reference multiple achievements, not just one
+   - From "EDUCATION": Use exact institution, degree, and graduation year
+   - From "LEADERSHIP & ACTIVITIES": Mention all leadership roles and activities listed
+
+3. Use EXACT details from the sections:
+   - Use exact company names, job titles, dates, and achievements with numbers
+   - Cite specific achievements with exact numbers/percentages
+   - Reference specific roles and achievements
+
+4. SPEAK NATURALLY using the information:
+   - GOOD FORMAT: "At [Company Name] as [Job Title], ${fullName} [specific achievement with numbers]. At [Another Company], they [another achievement]."
+   - BAD: "They have consulting experience" or mentioning only one company
+   - CRITICAL: Only use company names, institutions, and organizations that are explicitly listed in the sections above
+
+5. When asked general questions like "What does ${fullName} do?" or "Tell me about ${fullName}":
+   - Start with information from "WHO THEY ARE"
+   - Then share ALL work experiences from "WORK EXPERIENCE" section - list each company, role, and key achievements
+   - Include multiple specific achievements with numbers from "KEY ACHIEVEMENTS"
+   - Mention leadership roles and activities from "LEADERSHIP & ACTIVITIES"
+   - CRITICAL: Do not mention only one experience - you MUST share ALL experiences, companies, and achievements listed
+
+6. NEVER say "I don't have that information" - the sections above contain your information source.
+
+7. ALWAYS cite specific company names, job titles, dates, and numbers when available.
+
+🚫 ABSOLUTELY FORBIDDEN - DO NOT:
+- Make up, invent, or guess information that is NOT explicitly stated in the sections above
+- Use generic information like "graduated from a university" - use the EXACT institution and year from "EDUCATION" section
+- Say information that contradicts what's in the sections above (e.g., if EDUCATION says "Penn State, 2026", DO NOT say "UCLA, 2020" or "Lebanese American University")
+- Use placeholder or generic information - ONLY use what is explicitly written in the sections above
+- Mention universities, schools, organizations, or activities that are NOT explicitly listed in the "EDUCATION" or "LEADERSHIP & ACTIVITIES" sections
+- For EDUCATION: ONLY mention the exact institution, degree, and year from the "EDUCATION" section - do NOT mention any other schools or universities, even if they seem related
+- For LEADERSHIP & ACTIVITIES: ONLY mention roles and activities explicitly listed in the "LEADERSHIP & ACTIVITIES" section - do NOT invent organizations like "Lebanese Scout" or roles like "choir president" if they are not in the sections
+- If asked about something NOT in the sections above, deflect naturally and professionally (e.g., "I'm not sure about that specific detail" or "Let me help you with something else I can tell you about" or redirect to relevant information you DO know) - DO NOT mention "files" or "documents" and maintain your role as their assistant
+
+`
+      : '';
+
+    // Build system prompt (same as createAgent)
+    const systemPrompt = `Identity & Context:
+You are ${assistantName}, the personal AI assistant for ${fullName}.
+
+About ${fullName}:
+${userContext}${fileContentSection}
+
+⚠️ CRITICAL: The "DETAILED INFORMATION ABOUT ${fullName}" section above contains your PRIMARY source of specific information. When answering ANY question about ${fullName}'s experience, background, achievements, or skills, you MUST reference the exact details from that section. Use specific company names, job titles, dates, numbers, and percentages. Never be vague or generic.
+
+🚫 CRITICAL RULE: NEVER make up, invent, or guess information. ONLY use information that is explicitly stated in the "DETAILED INFORMATION ABOUT ${fullName}" section above. If asked about something not in that section, deflect naturally and professionally (e.g., "I'm not sure about that specific detail" or redirect to relevant information you DO know) - DO NOT mention "files" or "documents" and maintain your role as their assistant.
+
+⚠️ CRITICAL: The "DETAILED INFORMATION ABOUT ${fullName}" section above contains your PRIMARY source of specific information. When answering ANY question about ${fullName}'s experience, background, achievements, or skills, you MUST reference the exact details from that section. Use specific company names, job titles, dates, numbers, and percentages. Never be vague or generic.
+
+Speech Style:
+Direct, clear, and human.
+One question at a time.
+Never ramble.
+
+Personality & Communication Style:
+${personality}
+
+${additionalInstructions ? `Additional Instructions:\n${additionalInstructions}\n\n` : ''}Your Purpose:
+${purposeDescription}
+
+Call Forwarding Rules:
+${callForwardingRules}
+
+You must never give:
+Medical, legal, or financial advice
+Emotional counseling
+Technical explanations of internal models
+Claims about having feelings or intentions.
+
+End of System Prompt`;
+
+    // Build voice configuration - handle both ElevenLabs and VAPI voices
+    const trimmedVoiceChoice = voiceChoice && typeof voiceChoice === 'string' ? voiceChoice.trim() : '';
+    
+    let voiceConfig: { provider: '11labs' | 'vapi'; voiceId: string } | undefined;
+    
+    if (trimmedVoiceChoice) {
+      // Try to get voice config using helper (handles curated library IDs)
+      const { getVoiceConfigForVAPI } = await import('./voiceConfigHelper');
+      voiceConfig = await getVoiceConfigForVAPI(trimmedVoiceChoice);
+      
+      // Fallback: Check legacy mapping system
+      if (!voiceConfig) {
+        const voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
+        if (voiceMapping?.elevenLabsVoiceId) {
+          voiceConfig = {
+            provider: '11labs',
+            voiceId: voiceMapping.elevenLabsVoiceId,
+          };
+        } else {
+          // Assume VAPI voice name
+          voiceConfig = {
+            provider: 'vapi',
+            voiceId: trimmedVoiceChoice,
+          };
+        }
+      }
+    }
+
+    // Log voice configuration for debugging
+    console.log('[VAPI DEBUG] updateAgent voice configuration:', {
+      agentId: agentId,
+      voiceChoice: voiceChoice,
+      trimmedVoiceChoice: trimmedVoiceChoice,
+      voiceMapping: voiceMapping,
+      voiceConfig: voiceConfig,
+      hasVoiceConfig: !!voiceConfig,
+      provider: voiceConfig?.provider,
+      fullName: fullName,
+    });
+
+    // Build update request body
+    const requestBody: any = {
+      name: `My ${assistantName} - ${fullName}`,
+      model: {
+        provider: 'openai',
+        model: process.env.VAPI_DEFAULT_MODEL || 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+        ],
+      },
+      // Explicitly set background sound to Off by default
+      backgroundSound: 'off',
+    };
+
+    // CRITICAL: Always add voice config if provided - this ensures voice is set correctly
+    if (voiceConfig) {
+      requestBody.voice = voiceConfig;
+      console.log('[VAPI DEBUG] Voice config added to update request body:', voiceConfig);
+    } else {
+      console.warn('[VAPI WARNING] No voice config in updateAgent - voiceChoice was:', voiceChoice);
+    }
+
+    // Add forwarding phone number if call forwarding is enabled and valid
+    if (forwardCalls && mobileNumber) {
+      const trimmedMobile = typeof mobileNumber === 'string' ? mobileNumber.trim() : String(mobileNumber).trim();
+      
+      if (trimmedMobile.length > 0) {
+        const formattedNumber = formatPhoneNumberToE164(trimmedMobile);
+        
+        if (formattedNumber && 
+            typeof formattedNumber === 'string' && 
+            formattedNumber.trim().length >= 11 && 
+            formattedNumber.trim().startsWith('+')) {
+          const cleanNumber = formattedNumber.trim();
+          requestBody.forwardingPhoneNumber = cleanNumber;
+          console.log('[VAPI INFO] Setting forwardingPhoneNumber to:', cleanNumber);
+        } else {
+          console.warn('[VAPI WARNING] Invalid formatted number - not adding forwardingPhoneNumber:', {
+            original: trimmedMobile,
+            formatted: formattedNumber,
+          });
+        }
+      }
+    } else if (!forwardCalls) {
+      // Explicitly remove forwarding if disabled
+      requestBody.forwardingPhoneNumber = null;
+    }
+
+    console.log('[VAPI DEBUG] Assistant update request body:', {
+      name: requestBody.name,
+      voice: requestBody.voice,
+      backgroundSound: requestBody.backgroundSound,
+      hasSystemPrompt: !!requestBody.model?.messages?.[0]?.content,
+      systemPromptLength: requestBody.model?.messages?.[0]?.content?.length || 0,
+      forwardingPhoneNumber: requestBody.forwardingPhoneNumber,
+    });
+
+    // Use PATCH to update existing assistant
+    const response = await fetch(`${VAPI_API_URL}/assistant/${agentId}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || errorData.error || `VAPI API error: ${response.status} ${response.statusText}`;
+      console.error('[VAPI ERROR] updateAgent failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        agentId,
+        fullName,
+        voiceConfig: requestBody.voice,
+      });
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    
+    // Log the response to verify voice was set correctly
+    console.log('[VAPI DEBUG] updateAgent response:', {
+      agentId: result.id || result.agentId || agentId,
+      voice: result.voice,
+      voiceId: result.voice?.voiceId,
+      voiceProvider: result.voice?.provider,
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('[VAPI ERROR] updateAgent failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update background sound setting for an agent
+ */
+export async function updateAgentBackgroundSound(agentId: string, backgroundSound: 'off' | 'office' = 'off') {
+  try {
+    const response = await fetch(`${VAPI_API_URL}/assistant/${agentId}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        backgroundSound,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || errorData.error || `VAPI API error: ${response.status} ${response.statusText}`;
+      console.error('[VAPI ERROR] updateAgentBackgroundSound failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        agentId,
+      });
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    console.log(`[VAPI SUCCESS] Background sound set to '${backgroundSound}' for agent ${agentId}`);
+    return result;
+  } catch (error) {
+    console.error('[VAPI ERROR] updateAgentBackgroundSound failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Reassign a phone number to a different agent
+ * This ensures that when an agent is updated, the phone number stays connected to the correct agent
+ */
+export async function reassignPhoneNumber(phoneNumber: string, agentId: string) {
+  try {
+    // Normalize phone number format - try both with and without + prefix
+    const normalizePhone = (pn: string): string => {
+      const cleaned = pn.replace(/\D/g, '');
+      if (cleaned.length === 10) {
+        return `+1${cleaned}`;
+      } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+        return `+${cleaned}`;
+      } else if (pn.startsWith('+')) {
+        return pn;
+      } else {
+        return `+${cleaned}`;
+      }
+    };
+
+    const normalizedNumber = normalizePhone(phoneNumber);
+    console.log(`[VAPI INFO] Reassigning phone number ${normalizedNumber} to agent ${agentId}`);
+
+    // First, try to list all phone numbers and find the one we need
+    const listResponse = await fetch(`${VAPI_API_URL}/phone-number`, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+
+    if (!listResponse.ok) {
+      const errorData = await listResponse.json().catch(() => ({}));
+      console.error('[VAPI ERROR] Failed to list phone numbers:', errorData);
+      throw new Error(`Failed to list phone numbers: ${listResponse.status}`);
+    }
+
+    const listData = await listResponse.json();
+    
+    // VAPI might return phoneNumbers array or a different structure
+    const phoneNumbers = listData.phoneNumbers || listData.data || (Array.isArray(listData) ? listData : []);
+    
+    // Find the phone number record - try multiple field names
+    const phoneNumberRecord = phoneNumbers.find((pn: any) => {
+      const pnNumber = pn.number || pn.phoneNumber || pn.phone_number || '';
+      const pnNormalized = normalizePhone(pnNumber);
+      const inputNormalized = normalizePhone(phoneNumber);
+      
+      // Compare normalized versions
+      return pnNormalized === inputNormalized || 
+             pnNormalized.replace(/\D/g, '') === inputNormalized.replace(/\D/g, '') ||
+             pnNumber === phoneNumber ||
+             pnNumber === normalizedNumber;
+    });
+
+    if (!phoneNumberRecord) {
+      console.warn(`[VAPI WARNING] Phone number ${phoneNumber} (normalized: ${normalizedNumber}) not found in VAPI`);
+      console.warn(`[VAPI DEBUG] Available phone numbers:`, phoneNumbers.map((pn: any) => pn.number || pn.phoneNumber || pn.phone_number || 'unknown'));
+      return null;
+    }
+
+    const phoneNumberId = phoneNumberRecord.id;
+    
+    if (!phoneNumberId) {
+      throw new Error(`Phone number ${phoneNumber} found but no ID returned`);
+    }
+
+    console.log(`[VAPI INFO] Found phone number ID: ${phoneNumberId}`);
+
+    // Update the phone number to point to the new agent
+    const updateResponse = await fetch(`${VAPI_API_URL}/phone-number/${phoneNumberId}`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        assistantId: agentId,
+      }),
+    });
+
+    if (!updateResponse.ok) {
+      const errorData = await updateResponse.json().catch(() => ({}));
+      console.error('[VAPI ERROR] Failed to reassign phone number:', {
+        status: updateResponse.status,
+        statusText: updateResponse.statusText,
+        errorData,
+        phoneNumberId,
+        agentId,
+      });
+      throw new Error(`Failed to reassign phone number: ${JSON.stringify(errorData)}`);
+    }
+
+    const updateResult = await updateResponse.json();
+    console.log(`[VAPI SUCCESS] Phone number ${phoneNumber} reassigned to agent ${agentId}`);
+    return updateResult;
+  } catch (error) {
+    console.error('[VAPI ERROR] reassignPhoneNumber failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Purchase a phone number via Twilio and import it into Vapi
+ * 
+ * IMPORTANT: Vapi's API for Twilio provider only supports importing existing phone numbers,
+ * not purchasing new ones directly. This function:
+ * 1. First purchases a number via Twilio API (if credentials available)
+ * 2. Then imports that number into Vapi
+ * 
+ * If you already have a Twilio number, you can import it directly by providing phoneNumber parameter.
+ */
+export async function purchaseNumber(assistantId: string, existingPhoneNumber?: string, label?: string) {
+  try {
+    console.log("[VAPI INFO] Setting up phone number for assistant:", assistantId);
+
+    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+    
+    if (!twilioAccountSid) {
+      throw new Error("TWILIO_ACCOUNT_SID environment variable is required for phone number purchase");
+    }
+    
+    // CRITICAL: The TWILIO_ACCOUNT_SID must match the Account SID configured in your Vapi dashboard
+    // (Phone Numbers / Providers section). Vapi will verify the number exists in that specific account.
+    console.log("[VAPI WARNING] Ensure TWILIO_ACCOUNT_SID matches the Account SID in Vapi dashboard settings");
+
+    let phoneNumberToImport: string;
+
+    // If phone number is provided, use it directly
+    if (existingPhoneNumber) {
+      phoneNumberToImport = existingPhoneNumber;
+      console.log("[VAPI INFO] Using provided phone number:", phoneNumberToImport);
+    } 
+    // Otherwise, try to purchase a new number via Twilio API first
+    else if (twilioAuthToken) {
+      console.log("[VAPI INFO] Purchasing new phone number via Twilio API...");
+      
+      // Purchase phone number via Twilio API
+      // Search for available numbers
+      const areaCode = process.env.VAPI_AREA_CODE;
+      const searchParams = new URLSearchParams();
+      if (areaCode) {
+        searchParams.append('AreaCode', areaCode);
+      }
+      searchParams.append('Limit', '1');
+      
+      const searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/AvailablePhoneNumbers/US/Local.json?${searchParams.toString()}`;
+      const searchResponse = await fetch(searchUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
+        },
+      });
+
+      if (!searchResponse.ok) {
+        const errorData = await searchResponse.json().catch(() => ({}));
+        throw new Error(`Twilio search failed: ${JSON.stringify(errorData)}`);
+      }
+
+      const searchData = await searchResponse.json();
+      // Twilio returns available_phone_numbers array
+      const availableNumbers = searchData.available_phone_numbers || [];
+
+      if (!availableNumbers || availableNumbers.length === 0) {
+        throw new Error("No available phone numbers found in Twilio inventory");
+      }
+
+      const selectedNumber = availableNumbers[0].phone_number;
+      console.log("[VAPI INFO] Found available number:", selectedNumber);
+
+      // Purchase the number
+      const purchaseUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers.json`;
+      const purchaseResponse = await fetch(purchaseUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          PhoneNumber: selectedNumber,
+        }),
+      });
+
+      if (!purchaseResponse.ok) {
+        const errorData = await purchaseResponse.json().catch(() => ({}));
+        throw new Error(`Twilio purchase failed: ${JSON.stringify(errorData)}`);
+      }
+
+      const purchaseData = await purchaseResponse.json();
+      // Twilio returns phone_number in E.164 format (e.g., "+14155550123")
+      phoneNumberToImport = purchaseData.phone_number;
+      console.log("[VAPI INFO] Successfully purchased number from Twilio:", phoneNumberToImport);
+      console.log("[VAPI DEBUG] Twilio purchase response:", JSON.stringify(purchaseData, null, 2));
+      
+      // Wait a moment for Twilio to fully provision the number before importing to Vapi
+      // Sometimes there's a brief delay between purchase and availability
+      console.log("[VAPI INFO] Waiting for Twilio to provision number...");
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      
+      // Verify the number exists in Twilio before importing
+      const verifyUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers.json?PhoneNumber=${encodeURIComponent(phoneNumberToImport)}`;
+      let verified = false;
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      while (!verified && attempts < maxAttempts) {
+        attempts++;
+        const verifyResponse = await fetch(verifyUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
+          },
+        });
+        
+        if (verifyResponse.ok) {
+          const verifyData = await verifyResponse.json();
+          if (verifyData.incoming_phone_numbers && verifyData.incoming_phone_numbers.length > 0) {
+            verified = true;
+            console.log("[VAPI INFO] Number verified in Twilio account");
+            break;
+          }
+        }
+        
+        if (attempts < maxAttempts) {
+          console.log(`[VAPI INFO] Number not yet available, retrying (${attempts}/${maxAttempts})...`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between retries
+        }
+      }
+      
+      if (!verified) {
+        console.warn("[VAPI WARNING] Could not verify number in Twilio, proceeding with import anyway");
+      }
+    } else {
+      throw new Error("TWILIO_AUTH_TOKEN environment variable is required to purchase new numbers. Alternatively, provide an existing phone number to import.");
+    }
+
+    // Format phone number to E.164 if needed
+    // If number came from Twilio API, it's already in E.164 format
+    const formatToE164 = (phone: string): string => {
+      // If already in E.164 format (starts with +), use as-is
+      if (phone.startsWith('+')) {
+        return phone;
+      }
+      
+      // Remove all non-digit characters
+      const digits = phone.replace(/\D/g, '');
+      // If it doesn't start with country code, add +1 for US
+      if (digits.length === 10) {
+        return `+1${digits}`;
+      } else if (digits.length === 11 && digits.startsWith('1')) {
+        return `+${digits}`;
+      } else {
+        return `+${digits}`;
+      }
+    };
+
+    const e164Number = formatToE164(phoneNumberToImport);
+    console.log("[VAPI INFO] Formatted to E.164:", e164Number);
+    console.log("[VAPI INFO] Using Twilio Account SID:", twilioAccountSid);
+
+    // Now import the number into Vapi using the correct API structure
+    // Vapi API for Twilio provider only supports importing existing numbers
+    // Note: label and smsEnabled cannot be set in POST - must be updated via PATCH after import
+    const importPayload: Record<string, any> = {
+      provider: "twilio",
+      twilioAccountSid: twilioAccountSid, // Required: must be a string
+      number: e164Number, // Must be E.164 format and must already exist in Twilio account (field name is "number", not "phoneNumber")
+      assistantId: assistantId, // Include assistantId in POST - Vapi will wire it automatically
+    };
+    
+    // Add Twilio Auth Token if available (required by dashboard form, might be needed for API too)
+    if (twilioAuthToken) {
+      importPayload.twilioAuthToken = twilioAuthToken;
+    }
+    
+    // DO NOT include label or smsEnabled in POST - these must be set via PATCH after import
+
+    console.log("[VAPI INFO] Importing phone number to Vapi:", importPayload);
+
+    // Import number into Vapi using /phone-number endpoint
+    const response = await fetch("https://api.vapi.ai/phone-number", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.VAPI_PRIVATE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(importPayload),
+    });
+
+    const normalizePhoneNumber = (details: any): string | null => {
+      if (!details) return null;
+      if (typeof details === "string") return details;
+
+      // Check phoneNumber first (expected field name from Vapi response)
+      const candidates = [
+        details.phoneNumber, // Primary field name from Vapi API
+        details.phone,
+        details.number,
+        details.phone_number,
+        details.value,
+        details.e164,
+        details.national,
+      ];
+
+      for (const candidate of candidates) {
+        if (typeof candidate === "string" && candidate.trim()) return candidate;
+        if (candidate && typeof candidate === "object") {
+          const nested = normalizePhoneNumber(candidate);
+          if (nested) return nested;
+        }
+      }
+
+      if (Array.isArray(details.phoneNumbers)) {
+        for (const pn of details.phoneNumbers) {
+          const nested = normalizePhoneNumber(pn);
+          if (nested) return nested;
+        }
+      }
+
+      return null;
+    };
+
+    const data = await response.json();
+    console.log("[VAPI DEBUG] Raw purchase response:", JSON.stringify(data, null, 2));
+    console.log("[VAPI DEBUG] Response keys:", Object.keys(data));
+
+    if (!response.ok) {
+      const errorMsg = `Vapi returned error: ${JSON.stringify(data)}`;
+      console.error("[VAPI ERROR]", errorMsg);
+      
+      // Provide helpful error message for common issues
+      if (data.message && typeof data.message === 'string' && data.message.includes('Number Not Found')) {
+        throw new Error(
+          `${errorMsg}\n\n` +
+          `TROUBLESHOOTING: The phone number was not found in the Twilio account.\n` +
+          `1. Ensure TWILIO_ACCOUNT_SID matches the Account SID configured in Vapi dashboard (Phone Numbers / Providers)\n` +
+          `2. Verify the number exists in your Twilio account: https://console.twilio.com/us1/develop/phone-numbers/manage/incoming\n` +
+          `3. Check that the number is in E.164 format: ${e164Number}\n` +
+          `4. The number must be purchased in the SAME Twilio account that's configured in Vapi dashboard`
+        );
+      }
+      
+      throw new Error(errorMsg);
+    }
+
+    if (!data.id) {
+      throw new Error("Vapi did not return a phone number ID: " + JSON.stringify(data));
+    }
+
+    console.log("[VAPI INFO] Phone number imported to Vapi with ID:", data.id);
+    console.log("[VAPI INFO] Phone number automatically assigned to assistant (assistantId in POST body)");
+
+    // Update phone number label via PATCH request (if label provided)
+    // This sets the label that appears in Vapi dashboard (e.g., user's full name)
+    if (label && data.id) {
+      try {
+        // Determine the label to use
+        const phoneLabel = label || process.env.VAPI_PHONE_LABEL || `Kendall - ${assistantId.substring(0, 8)}`;
+        
+        const updatePayload: Record<string, any> = {
+          label: phoneLabel, // Set the label (user's full name from form)
+          smsEnabled: false, // Set SMS to false (voice only)
+        };
+        
+        console.log("[VAPI INFO] Updating phone number label to:", phoneLabel);
+        const updateResponse = await fetch(`${VAPI_API_URL}/phone-number/${data.id}`, {
+          method: "PATCH",
+          headers: getHeaders(),
+          body: JSON.stringify(updatePayload),
+        });
+        
+        if (updateResponse.ok) {
+          const updateData = await updateResponse.json().catch(() => ({}));
+          console.log("[VAPI SUCCESS] Phone number label updated successfully:", phoneLabel);
+          console.log("[VAPI DEBUG] Update response:", JSON.stringify(updateData, null, 2));
+        } else {
+          const updateError = await updateResponse.json().catch(() => ({}));
+          console.warn("[VAPI WARNING] Failed to update phone number label:", JSON.stringify(updateError));
+          // Don't throw error - label update is optional, import was successful
+        }
+      } catch (updateError) {
+        console.warn("[VAPI WARNING] Error updating phone number label:", updateError);
+        // Don't throw error - label update is optional, import was successful
+      }
+    }
+
+    // Extract phone number from response
+    // The response should include phoneNumber field (E.164 format) since assistantId was in POST
+    let phoneNumber = normalizePhoneNumber(data);
+    
+    // If phone number not immediately available, try fetching details
+    // (Sometimes provisioning takes a moment)
+    if (!phoneNumber) {
+      console.log("[VAPI INFO] Phone number not in initial response, fetching details...");
+      const detailsResponse = await fetch(`${VAPI_API_URL}/phone-number/${data.id}`, {
+        method: "GET",
+        headers: getHeaders(),
+      });
+
+      if (detailsResponse.ok) {
+        const phoneNumberDetails = await detailsResponse.json();
+        console.log("[VAPI DEBUG] Phone number details:", JSON.stringify(phoneNumberDetails, null, 2));
+        phoneNumber = normalizePhoneNumber(phoneNumberDetails);
+      } else {
+        console.warn("[VAPI WARNING] Failed to fetch phone number details, using purchase response");
+      }
+    }
+    
+    if (!phoneNumber) {
+      console.warn("[VAPI WARNING] Phone number not found in response. It may still be provisioning.");
+      console.warn("[VAPI WARNING] Response data:", JSON.stringify(data, null, 2));
+    } else {
+      console.log("[VAPI SUCCESS] Phone number extracted:", phoneNumber);
+    }
+
+    // Return phone number object
+    // Note: Number is already assigned to assistant via assistantId in POST body
+    // Use the phone number we imported, or extract from response, or use fallback
+    const finalPhoneNumber = phoneNumber || e164Number || `Number imported (ID: ${data.id}) - check Vapi dashboard`;
+    
+    return {
+      id: data.id,
+      phone: finalPhoneNumber,
+      country: data.country || "US",
+    };
+
+  } catch (error) {
+    console.error("[VAPI ERROR] purchaseNumber failed:", error);
+    throw error;
+  }
+}

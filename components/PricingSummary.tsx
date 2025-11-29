@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { colors } from '@/lib/config';
 import { getBusinessTypeData } from '@/lib/businessTypes';
+import { calculateTotalMinutes, getRecommendedPackage, PRICING_PACKAGES, type PricingPackage } from '@/lib/pricing';
 import { Info } from 'lucide-react';
 
 interface Star {
@@ -26,41 +27,7 @@ interface PricingSummaryProps {
   shouldAnimate?: boolean;
 }
 
-// Pricing packages with fixed monthly prices
-interface PricingPackage {
-  id: string;
-  name: string;
-  maxMinutes: number;
-  monthlyPrice: number;
-}
-
-const PRICING_PACKAGES: PricingPackage[] = [
-  { id: 'starter', name: 'Starter', maxMinutes: 500, monthlyPrice: 199.99 },
-  { id: 'growth', name: 'Growth', maxMinutes: 1500, monthlyPrice: 549.99 },
-  { id: 'professional', name: 'Professional', maxMinutes: 4000, monthlyPrice: 1199.99 },
-  { id: 'enterprise', name: 'Enterprise', maxMinutes: Infinity, monthlyPrice: 2499.99 },
-];
-
-// Calculate total minutes per month
-// Assumes 30 business days per month
-const calculateTotalMinutes = (callVolume: string | null, callDuration: string | null): number => {
-  if (!callVolume || !callDuration) return 0;
-  const volume = parseFloat(callVolume);
-  const duration = parseFloat(callDuration);
-  if (isNaN(volume) || isNaN(duration)) return 0;
-  // Total minutes = calls per day × minutes per call × 30 days
-  return volume * duration * 30;
-};
-
-// Determine recommended package based on total minutes
-const getRecommendedPackage = (totalMinutes: number): PricingPackage => {
-  for (const pkg of PRICING_PACKAGES) {
-    if (totalMinutes <= pkg.maxMinutes) {
-      return pkg;
-    }
-  }
-  return PRICING_PACKAGES[PRICING_PACKAGES.length - 1]; // Enterprise
-};
+// Pricing packages and calculation utilities are now imported from lib/pricing
 
 // Add-on prices (matching the structure from businessTypes)
 const addOnPrices: Record<string, number> = {
@@ -107,6 +74,25 @@ export default function PricingSummary({
     }
   }, []);
 
+  // Save phoneLines to sessionStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && phoneLines !== undefined) {
+      const savedState = sessionStorage.getItem('wizardState');
+      let currentState = {};
+      if (savedState) {
+        try {
+          currentState = JSON.parse(savedState);
+        } catch (e) {
+          console.error('Failed to parse wizardState:', e);
+        }
+      }
+      sessionStorage.setItem('wizardState', JSON.stringify({
+        ...currentState,
+        phoneLines,
+      }));
+    }
+  }, [phoneLines]);
+
   // Generate stars for the price breakdown box
   useEffect(() => {
     const starColors = [
@@ -139,10 +125,10 @@ export default function PricingSummary({
     if (businessType) {
       if (shouldAnimate) {
         setIsVisible(false);
-        // Animate after KendallPowerUps (4000ms) + 500ms delay
+        // Animate last, after CallDurationStep (3000ms) + 500ms delay
         const timer = setTimeout(() => {
           setIsVisible(true);
-        }, 4500);
+        }, 3500);
         return () => clearTimeout(timer);
       } else {
         // Keep hidden until animation starts

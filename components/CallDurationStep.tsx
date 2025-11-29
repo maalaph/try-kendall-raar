@@ -18,13 +18,13 @@ export default function CallDurationStep({
 }: CallDurationStepProps) {
   const [isVisible, setIsVisible] = useState(false);
   useEffect(() => {
-    if (shouldAnimate) {
-      setIsVisible(false);
-      // Animate after CallVolumeStep (3000ms) + 500ms delay
-      const timer = setTimeout(() => {
-        setIsVisible(true);
-      }, 3500);
-      return () => clearTimeout(timer);
+      if (shouldAnimate) {
+        setIsVisible(false);
+        // Animate after CallVolumeStep (2500ms) + 500ms delay
+        const timer = setTimeout(() => {
+          setIsVisible(true);
+        }, 3000);
+        return () => clearTimeout(timer);
     } else {
       setIsVisible(false);
     }

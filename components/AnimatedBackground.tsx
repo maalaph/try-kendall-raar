@@ -19,17 +19,16 @@ export default function AnimatedBackground() {
   const [sparkles, setSparkles] = useState<Sparkle[]>([]);
 
   useEffect(() => {
-    // Star colors like real stars: white, blue, yellow, orange, red
+    // Star colors - purple and white theme to match brand
     const starColors = [
-      { bg: 'rgba(255, 255, 255, 1)', glow: 'rgba(255, 255, 255, 0.8)' }, // White
-      { bg: 'rgba(173, 216, 255, 1)', glow: 'rgba(173, 216, 255, 0.8)' }, // Blue
-      { bg: 'rgba(255, 255, 200, 1)', glow: 'rgba(255, 255, 200, 0.8)' }, // Yellow
-      { bg: 'rgba(255, 200, 150, 1)', glow: 'rgba(255, 200, 150, 0.8)' }, // Orange
-      { bg: 'rgba(255, 180, 180, 1)', glow: 'rgba(255, 180, 180, 0.8)' }, // Red
+      { bg: 'rgba(255, 255, 255, 1)', glow: 'rgba(255, 255, 255, 0.9)' }, // White
+      { bg: 'rgba(168, 85, 247, 1)', glow: 'rgba(168, 85, 247, 0.9)' }, // Purple (accent)
+      { bg: 'rgba(192, 132, 252, 1)', glow: 'rgba(192, 132, 252, 0.9)' }, // Light purple
+      { bg: 'rgba(139, 92, 246, 1)', glow: 'rgba(139, 92, 246, 0.9)' }, // Medium purple
     ];
     
     // Create minimalistic sparkles - galaxy stars vibe with varying intensity and colors
-    const initialSparkles: Sparkle[] = Array.from({ length: 50 }, (_, i) => {
+    const initialSparkles: Sparkle[] = Array.from({ length: 100 }, (_, i) => {
       const intensity = Math.random(); // 0-1, determines sparkle intensity
       const isBright = intensity > 0.7; // 30% are brighter/more sparkly
       const colorIndex = Math.floor(Math.random() * starColors.length);

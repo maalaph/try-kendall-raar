@@ -55,6 +55,18 @@ button, a {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Remove all focus outlines for a cleaner look */
+button:focus,
+button:focus-visible,
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  outline: none !important;
+}
+
+/* Custom focus styles where needed (handled inline) */
+
 /* Improve text rendering on mobile */
 @media (max-width: 768px) {
   body {
@@ -96,6 +108,48 @@ h1, h2, h3, h4, h5, h6 {
                 0 0 36px rgba(168, 85, 247, 0.3);
     transform: scale(1.01);
   }
+}
+
+/* Custom scrollbar styling - Purple futuristic minimalistic glow */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(168, 85, 247, 0.4);
+  border-radius: 3px;
+  box-shadow: 
+    0 0 8px rgba(168, 85, 247, 0.5),
+    0 0 12px rgba(168, 85, 247, 0.3),
+    inset 0 0 4px rgba(168, 85, 247, 0.2);
+  transition: all 0.2s ease;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(168, 85, 247, 0.6);
+  box-shadow: 
+    0 0 12px rgba(168, 85, 247, 0.7),
+    0 0 18px rgba(168, 85, 247, 0.4),
+    inset 0 0 6px rgba(168, 85, 247, 0.3);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:active {
+  background: rgba(168, 85, 247, 0.8);
+  box-shadow: 
+    0 0 16px rgba(168, 85, 247, 0.9),
+    0 0 24px rgba(168, 85, 247, 0.5),
+    inset 0 0 8px rgba(168, 85, 247, 0.4);
+}
+
+/* Firefox scrollbar - Purple glow */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 85, 247, 0.5) transparent;
 }
 
 /* Minimalistic breathing glow for Kendall text - subtle fade in and out */
@@ -592,6 +646,119 @@ input[type="text"][inputmode="numeric"]::-webkit-outer-spin-button {
   50% {
     transform: translate(-50%, -50%) scale(1.2);
     opacity: 0.9;
+  }
+}
+
+/* Pulsing edge animation for Personal card BUY NOW button */
+@keyframes button-pulse-edge {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.4),
+                0 0 30px rgba(168, 85, 247, 0.3),
+                inset 0 0 10px rgba(168, 85, 247, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.6),
+                0 0 50px rgba(168, 85, 247, 0.4),
+                inset 0 0 15px rgba(168, 85, 247, 0.3);
+  }
+}
+
+/* Question card glow animations */
+@keyframes glow-pulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 
+      0 0 20px rgba(168, 85, 247, 0.6),
+      0 0 40px rgba(168, 85, 247, 0.4),
+      inset 0 0 20px rgba(168, 85, 247, 0.2);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 
+      0 0 30px rgba(168, 85, 247, 0.8),
+      0 0 60px rgba(168, 85, 247, 0.6),
+      inset 0 0 30px rgba(168, 85, 247, 0.3);
+  }
+}
+
+@keyframes glow-inner {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Voice Selection UI Enhancement Keyframes */
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in-scale {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes stagger-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes smooth-glow {
+  0%, 100% {
+    box-shadow: 
+      0 0 10px rgba(168, 85, 247, 0.4),
+      0 0 20px rgba(168, 85, 247, 0.2),
+      0 0 30px rgba(168, 85, 247, 0.1);
+  }
+  50% {
+    box-shadow: 
+      0 0 15px rgba(168, 85, 247, 0.6),
+      0 0 30px rgba(168, 85, 247, 0.4),
+      0 0 45px rgba(168, 85, 247, 0.2);
+  }
+}
+
+@keyframes hover-lift {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    transform: translateY(-4px) scale(1.02);
+  }
+}
+
+@keyframes check-mark-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-90deg);
+  }
+  50% {
+    transform: scale(1.1) rotate(10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
   }
 }
 
