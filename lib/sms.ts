@@ -35,12 +35,12 @@ function formatPhoneNumberToE164(phone: string): string | null {
     return null;
   }
   
-  // If it's exactly 10 digits, assume US number and add +1
+  // If it's exactly 10 digits, assume US/Canada number and add +1 (both use +1 country code)
   if (digits.length === 10) {
     return `+1${digits}`;
   }
   
-  // If it's 11 digits and starts with 1, assume US number
+  // If it's 11 digits and starts with 1, assume US/Canada number
   if (digits.length === 11 && digits.startsWith('1')) {
     return `+${digits}`;
   }
@@ -50,7 +50,7 @@ function formatPhoneNumberToE164(phone: string): string | null {
     return `+${digits}`;
   }
   
-  // Default: assume US number if ambiguous
+  // Default: assume US/Canada number if ambiguous (both use +1 country code)
   return `+1${digits}`;
 }
 
@@ -80,12 +80,29 @@ export async function sendSMS(to: string, message: string, from: string): Promis
       return { success: false, error };
     }
     
-    // Format sender phone number to E.164
-    const formattedFrom = formatPhoneNumberToE164(from);
-    if (!formattedFrom) {
-      const error = `Invalid sender phone number format: ${from}`;
-      console.error('[SMS ERROR]', error);
-      return { success: false, error };
+    // Check if Messaging Service SID is configured (recommended for Canadian numbers to avoid A2P 10DLC issues)
+    const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+    
+    // Build request body - use Messaging Service if available, otherwise use From number
+    const requestBody: Record<string, string> = {
+      To: formattedTo,
+      Body: message,
+    };
+    
+    if (messagingServiceSid) {
+      // Use Messaging Service (recommended - avoids A2P 10DLC warnings for Canadian numbers)
+      requestBody.MessagingServiceSid = messagingServiceSid;
+      console.log('[SMS] Using Messaging Service SID:', messagingServiceSid);
+    } else {
+      // Fallback to direct phone number (may trigger A2P 10DLC warnings)
+      const formattedFrom = formatPhoneNumberToE164(from);
+      if (!formattedFrom) {
+        const error = `Invalid sender phone number format: ${from}`;
+        console.error('[SMS ERROR]', error);
+        return { success: false, error };
+      }
+      requestBody.From = formattedFrom;
+      console.log('[SMS] Using direct phone number (no Messaging Service configured):', formattedFrom);
     }
     
     // Send SMS via Twilio API
@@ -97,11 +114,7 @@ export async function sendSMS(to: string, message: string, from: string): Promis
         'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({
-        From: formattedFrom,
-        To: formattedTo,
-        Body: message,
-      }),
+      body: new URLSearchParams(requestBody),
     });
     
     if (!response.ok) {
@@ -119,7 +132,7 @@ export async function sendSMS(to: string, message: string, from: string): Promis
     const data = await response.json();
     console.log('[SMS SUCCESS] SMS sent successfully:', {
       to: formattedTo,
-      from: formattedFrom,
+      from: messagingServiceSid ? `MessagingService:${messagingServiceSid}` : (data.from || from),
       messageSid: data.sid,
     });
     

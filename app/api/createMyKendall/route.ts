@@ -1,4 +1,4 @@
-import { createUserRecord, updateUserRecord, getUserRecord, formatAttachmentField } from '@/lib/airtable';
+import { createUserRecord, updateUserRecord, getUserRecord, formatAttachmentField, updateCanadianNumberMapping } from '@/lib/airtable';
 import { createAgent, createAgentFromTemplate, purchaseNumber, updateAgent, updateAgentFromTemplate } from '@/lib/vapi';
 import { parseUserContext } from '@/lib/promptBlocks';
 import { sendKendallWelcomeEmail } from '@/lib/email';
@@ -169,6 +169,16 @@ export async function POST(request: NextRequest) {
     }
     recordId = airtableRecord.id;
 
+    // Generate and store threadId for chat functionality
+    try {
+      const { getOrCreateThreadId } = await import('@/lib/airtable');
+      const threadId = await getOrCreateThreadId(recordId);
+      console.log('[API] Generated threadId for user:', threadId);
+    } catch (error) {
+      console.warn('[API WARNING] Failed to generate threadId (non-critical):', error);
+      // Don't fail the request - threadId can be generated later
+    }
+
     // Log voice choice received from frontend
     console.log('[API DEBUG] createMyKendall received voiceChoice:', {
       voiceChoice: voiceChoice,
@@ -183,8 +193,6 @@ export async function POST(request: NextRequest) {
         // Import validation function directly
         const { validateVoiceForVAPI } = await import('../validateVoiceForVAPI/route');
         const validateData = await validateVoiceForVAPI(voiceChoice.trim());
-
-        const validateData = await validateResponse.json();
         
         if (!validateData.valid) {
           console.error('[API ERROR] Voice validation failed:', validateData);
@@ -280,22 +288,63 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 3: Purchase and assign US phone number in one call
+    // Step 3: Purchase and assign Canadian phone number in one call
     // Pass fullName as the label for the phone number in Vapi dashboard
-    const phoneData = await purchaseNumber(agentId, undefined, fullName); // agentId from createAgent(), fullName as label
+    let phoneData;
+    try {
+      phoneData = await purchaseNumber(agentId, undefined, fullName); // agentId from createAgent(), fullName as label
+      console.log("[VAPI INFO] Final phone number returned:", phoneData);
+    } catch (phoneError) {
+      console.error("[VAPI ERROR] Failed to purchase Canadian phone number:", phoneError);
+      // Update status to error but don't fail the entire request
+      if (recordId) {
+        await updateUserRecord(recordId, { 
+          status: "error",
+          vapi_agent_id: agentId, // Still store the agent ID even if phone purchase failed
+        });
+      }
+      // Continue - phone can be provisioned later manually
+      phoneData = null;
+    }
 
-    console.log("[VAPI INFO] Final phone number returned:", phoneData);
-
-    // Extract phone number - check if it's a valid phone number or fallback message
-    let phoneNumberValue = phoneData.phone;
+    // Extract phone number details if purchase was successful
+    let phoneNumberValue: string | undefined = undefined;
+    let vapiPhoneNumberId: string | undefined = undefined;
+    let twilioSid: string | undefined = undefined;
     
-    // If phone is the fallback message, that means we couldn't extract the actual number
-    // Check if it looks like a valid phone number (starts with + or is a number format)
-    if (!phoneNumberValue || phoneNumberValue.includes("Number purchased") || phoneNumberValue.includes("check Vapi dashboard")) {
-      console.warn("[VAPI WARNING] Actual phone number not found, storing fallback message");
-      phoneNumberValue = `Number purchased (ID: ${phoneData.id}) - check Vapi dashboard`;
+    if (phoneData) {
+      phoneNumberValue = phoneData.phone;
+      vapiPhoneNumberId = phoneData.id;
+      twilioSid = phoneData.twilioSid;
+      
+      // If phone is the fallback message, that means we couldn't extract the actual number
+      // Check if it looks like a valid phone number (starts with + or is a number format)
+      if (!phoneNumberValue || phoneNumberValue.includes("Number purchased") || phoneNumberValue.includes("check Vapi dashboard")) {
+        console.warn("[VAPI WARNING] Actual phone number not found, storing fallback message");
+        phoneNumberValue = `Number purchased (ID: ${phoneData.id}) - check Vapi dashboard`;
+      } else {
+        console.log("[VAPI SUCCESS] Valid Canadian phone number extracted:", phoneNumberValue);
+      }
     } else {
-      console.log("[VAPI SUCCESS] Valid phone number extracted:", phoneNumberValue);
+      console.warn("[VAPI WARNING] Phone number purchase failed, continuing without phone number");
+    }
+
+    // Automatically verify owner's phone number in Twilio (for trial accounts)
+    if (mobileNumber && phoneData) {
+      try {
+        const { verifyOwnerPhoneNumber } = await import('@/lib/vapi');
+        const verificationResult = await verifyOwnerPhoneNumber(mobileNumber);
+        if (verificationResult.success) {
+          console.log('[VAPI INFO] Phone verification initiated for owner:', mobileNumber);
+          console.log('[VAPI INFO] Owner will receive a verification call - they need to enter the code');
+        } else {
+          console.warn('[VAPI WARNING] Could not initiate phone verification:', verificationResult.error);
+          // Don't fail agent creation - verification is optional
+        }
+      } catch (error) {
+        console.warn('[VAPI WARNING] Error initiating phone verification:', error);
+        // Don't fail agent creation - verification is optional
+      }
     }
 
     if (!recordId) {
@@ -306,9 +355,29 @@ export async function POST(request: NextRequest) {
     // Step 4: Update Airtable record with agent info and file attachments
     const updateFields: Record<string, any> = {
       vapi_agent_id: agentId,
-      vapi_number: phoneNumberValue,    // Store phone number or fallback message
-      status: "active",
+      status: phoneData ? "active" : "error", // Set to error if phone purchase failed
     };
+    
+    // Store phone number details if available
+    if (phoneNumberValue && vapiPhoneNumberId) {
+      // Use the new helper function to store all phone number details
+      try {
+        await updateCanadianNumberMapping(recordId, phoneNumberValue, vapiPhoneNumberId, twilioSid);
+      } catch (mappingError) {
+        console.error("[AIRTABLE ERROR] Failed to update Canadian number mapping:", mappingError);
+        // Fallback to basic update
+        updateFields.vapi_number = phoneNumberValue;
+        if (vapiPhoneNumberId) {
+          updateFields.vapi_phone_number_id = vapiPhoneNumberId;
+        }
+        if (twilioSid) {
+          updateFields.twilio_phone_sid = twilioSid;
+        }
+      }
+    } else if (phoneNumberValue) {
+      // If we have phone number but not ID, store what we have
+      updateFields.vapi_number = phoneNumberValue;
+    }
 
     // Attach files AFTER agent creation (as per requirements)
     // This will trigger Airtable field agent to analyze files and populate analyzedFileContent
@@ -317,7 +386,10 @@ export async function POST(request: NextRequest) {
       console.log('[AIRTABLE] Attaching files to record:', attachedFileUrls.length, 'files');
     }
 
-    await updateUserRecord(recordId, updateFields);
+    // Only update if we have fields to update (phone number mapping was already done above if successful)
+    if (Object.keys(updateFields).length > 0) {
+      await updateUserRecord(recordId, updateFields);
+    }
     
     // Try to save voiceChoice separately (optional field - don't fail if it doesn't exist)
     if (voiceChoice && voiceChoice.trim()) {
@@ -500,9 +572,10 @@ export async function POST(request: NextRequest) {
 
     console.log("[VAPI SUCCESS] Assistant + phone number creation complete.");
 
-    // Step 5: Send welcome email with phone number and edit link
+    // Step 5: Send welcome email with phone number, edit link, and chat link
     // Generate edit link using Airtable record ID
     const editLink = `/personal-setup?edit=${recordId}`;
+    const chatLink = `/chat?recordId=${recordId}`;
     
     // Only send email if we have a valid phone number
     if (phoneNumberValue && !phoneNumberValue.includes("Number purchased") && !phoneNumberValue.includes("check Vapi dashboard")) {
@@ -512,6 +585,8 @@ export async function POST(request: NextRequest) {
           fullName,
           phoneNumber: phoneNumberValue,
           editLink,
+          chatLink,
+          recordId,
         });
         console.log("[EMAIL SUCCESS] Welcome email sent to:", email);
       } catch (emailError) {
@@ -523,11 +598,18 @@ export async function POST(request: NextRequest) {
       console.warn("[EMAIL WARNING] Skipping email send - phone number not yet available");
     }
 
+    // Get base URL for links
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'http://localhost:3000';
+
     return NextResponse.json({
       success: true,
       agentId,
       phoneNumber: phoneData.phone,
       recordId, // Include recordId for potential edit functionality
+      editLink: `${baseUrl}/personal-setup?edit=${recordId}`,
+      chatLink: `${baseUrl}/chat?recordId=${recordId}`,
     });
   } catch (error) {
     console.error('[ERROR] createMyKendall failed:', error);

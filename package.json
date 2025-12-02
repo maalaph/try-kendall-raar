@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:voices": "tsx scripts/testVoices.ts",
+    "fetch-vapi-voices": "tsx scripts/fetchVAPIElevenLabsVoices.ts"
   },
   "dependencies": {
     "@types/canvas-confetti": "^1.9.0",
@@ -17,6 +19,7 @@
     "mammoth": "^1.11.0",
     "next": "16.0.3",
     "nodemailer": "^7.0.10",
+    "googleapis": "^144.0.0",
     "openai": "^6.9.1",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "3.11.174",
@@ -29,9 +32,12 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16.3.1",
     "eslint": "^9",
     "eslint-config-next": "16.0.3",
+    "ngrok": "^5.0.0-beta.2",
     "tailwindcss": "^4",
+    "tsx": "^4.7.0",
     "typescript": "^5"
   }
 }

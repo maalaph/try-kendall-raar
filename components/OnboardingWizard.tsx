@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { colors } from '@/lib/config';
 import ProgressIndicator from './ProgressIndicator';
 import WizardStep from './WizardStep';
@@ -9,6 +9,7 @@ import UseCaseCards from './UseCaseCards';
 import VoiceSelectionStep from './VoiceSelectionStep';
 import Toggle from './Toggle';
 import { generatePreviewText } from '@/lib/generatePreviewText';
+import { getLanguageName } from '@/lib/languagePreviews';
 import { Play, Loader2, Volume2, Paperclip, AlertCircle, CheckCircle, X, Lock } from 'lucide-react';
 
 interface OnboardingWizardProps {
@@ -25,12 +26,12 @@ export interface WizardData {
   nickname?: string;
   kendallName: string;
   selectedTraits: string[];
-  traitDescriptions?: Record<string, string>; // Map of trait -> voice description
   useCaseChoice: string;
   boundaryChoices: string[];
   userContextAndRules: string;
   forwardCalls: boolean;
   voiceChoice?: string; // VAPI voice ID (e.g., "Elliot", "Leah")
+  selectedLanguage?: string; // Language code (e.g., "en", "es", "ar")
   attachedFileUrls?: Array<{ url: string; filename: string }>; // File URLs for Airtable attachment field
   fileUsageInstructions?: string; // Instructions on how to use attached files
 }
@@ -152,7 +153,6 @@ export default function OnboardingWizard({ onSubmit, isSubmitting = false, initi
         nickname: initialData.nickname || '',
         kendallName: initialData.kendallName || 'Kendall',
         selectedTraits: initialData.selectedTraits || [],
-        traitDescriptions: initialData.traitDescriptions || {},
         useCaseChoice: initialData.useCaseChoice || '',
         boundaryChoices: initialData.boundaryChoices || [],
         userContextAndRules: initialData.userContextAndRules || '',
@@ -169,7 +169,6 @@ export default function OnboardingWizard({ onSubmit, isSubmitting = false, initi
       nickname: '',
       kendallName: 'Kendall',
       selectedTraits: [],
-      traitDescriptions: {},
       useCaseChoice: '',
       boundaryChoices: [],
       userContextAndRules: '',
@@ -204,6 +203,15 @@ export default function OnboardingWizard({ onSubmit, isSubmitting = false, initi
   
   // Focus management ref
   const stepContentRef = useRef<HTMLDivElement | null>(null);
+
+  // Memoized callbacks to prevent infinite loops
+  const handleVoiceSelectionChange = useCallback((voiceId: string | '') => {
+    setFormData(prev => ({ ...prev, voiceChoice: voiceId || undefined }));
+  }, []);
+
+  const handleLanguageChange = useCallback((language: string) => {
+    setFormData(prev => ({ ...prev, selectedLanguage: language }));
+  }, []);
 
   const handleFileUpload = async (files: File[]) => {
     if (files.length === 0) return;
@@ -379,7 +387,6 @@ export default function OnboardingWizard({ onSubmit, isSubmitting = false, initi
       nickname: formData.nickname || undefined,
       kendallName: formData.kendallName?.trim() || 'Kendall',
       selectedTraits: formData.selectedTraits || [],
-      traitDescriptions: formData.traitDescriptions || {},
       useCaseChoice: formData.useCaseChoice,
       boundaryChoices: formData.boundaryChoices || [],
       userContextAndRules: formData.userContextAndRules,
@@ -1024,7 +1031,9 @@ export default function OnboardingWizard({ onSubmit, isSubmitting = false, initi
         return (
           <VoiceSelectionStep
             selectedVoice={formData.voiceChoice || null}
-            onSelectionChange={(voiceId) => setFormData({ ...formData, voiceChoice: voiceId })}
+            onSelectionChange={handleVoiceSelectionChange}
+            onLanguageChange={handleLanguageChange}
+            isEditMode={isEditMode}
           />
         );
         
@@ -1082,16 +1091,6 @@ export default function OnboardingWizard({ onSubmit, isSubmitting = false, initi
             selectedTraits={formData.selectedTraits || []}
             onSelectionChange={(traits) => setFormData({ ...formData, selectedTraits: traits })}
             maxSelections={3}
-            traitDescriptions={formData.traitDescriptions || {}}
-            onTraitDescriptionChange={(trait, description) => {
-              setFormData({
-                ...formData,
-                traitDescriptions: {
-                  ...(formData.traitDescriptions || {}),
-                  [trait]: description,
-                },
-              });
-            }}
           />
         );
         
@@ -1454,6 +1453,18 @@ export default function OnboardingWizard({ onSubmit, isSubmitting = false, initi
                   {formData.useCaseChoice || 'Not selected'}
                 </p>
               </div>
+              <div
+                className="p-4 rounded-lg"
+                style={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                }}
+              >
+                <p className="text-xs mb-1" style={{ color: colors.text, opacity: 0.6 }}>Language</p>
+                <p className="text-sm font-medium" style={{ color: colors.text }}>
+                  {formData.selectedLanguage ? getLanguageName(formData.selectedLanguage) : 'English'}
+                </p>
+              </div>
             </div>
 
             {/* Voice Preview Section */}
@@ -1591,11 +1602,12 @@ export default function OnboardingWizard({ onSubmit, isSubmitting = false, initi
               </div>
             ) : (
               <div
-                className="p-6 rounded-lg flex flex-col items-center gap-3"
+                className="p-6 rounded-lg flex flex-col items-center gap-3 cursor-pointer transition-all duration-200 hover:opacity-90"
                 style={{
                   backgroundColor: 'rgba(255, 255, 255, 0.05)',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
                 }}
+                onClick={() => setCurrentStep(2)}
               >
                 <Volume2 size={32} style={{ color: colors.accent, opacity: 0.7 }} />
                 <div className="text-center">
@@ -1609,15 +1621,28 @@ export default function OnboardingWizard({ onSubmit, isSubmitting = false, initi
                     No Voice Selected
                   </p>
                   <p
-                    className="text-sm"
+                    className="text-sm mb-4"
                     style={{
                       color: colors.text,
                       opacity: 0.7,
                       fontFamily: 'var(--font-inter), sans-serif',
                     }}
                   >
-                    Please go back to Step 2 to choose a voice before completing setup.
+                    Click here to select a voice before completing setup.
                   </p>
+                  <button
+                    className="px-6 py-2 rounded-lg font-medium text-sm transition-all duration-200"
+                    style={{
+                      backgroundColor: colors.accent,
+                      color: '#ffffff',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentStep(2);
+                    }}
+                  >
+                    Select Voice
+                  </button>
                 </div>
               </div>
             )}
@@ -1784,6 +1809,19 @@ export default function OnboardingWizard({ onSubmit, isSubmitting = false, initi
             stepTitles[currentStep - 1]
           )}
         </h2>
+        {/* Sticky current voice container - positioned in top left, only for Vocalize MyKendall step */}
+        {isVocalizationStep && (
+          <div 
+            id="sticky-voice-container"
+            style={{
+              position: 'absolute',
+              top: '0',
+              left: '0',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          />
+        )}
         {/* Helper text for Personalize MyKendall step */}
         {currentStep === 4 && (
           <p

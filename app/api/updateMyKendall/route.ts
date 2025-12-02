@@ -5,11 +5,11 @@ import { rateLimit, getClientIP } from '@/lib/rateLimit';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function PATCH(request: NextRequest) {
-  // Rate limiting: 5 requests per 15 minutes per IP
+  // Rate limiting: 20 requests per 15 minutes per IP (increased for setup flow)
   const clientIP = getClientIP(request);
   const rateLimitResult = rateLimit(clientIP, {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 5,
+    maxRequests: 20, // Increased to allow for setup flow with multiple saves
   });
 
   if (!rateLimitResult.allowed) {

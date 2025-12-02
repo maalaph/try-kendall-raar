@@ -4,6 +4,9 @@ import { enhanceVoiceDescription } from '@/lib/enhanceVoiceDescription';
 import { getElevenLabsMapping } from '@/lib/voiceMapping';
 import { getVoiceById } from '@/lib/voices';
 import { getVoiceSettingsFromPersonality } from '@/lib/generatePreviewText';
+import { getVoiceConfigForVAPI } from '@/lib/voiceConfigHelper';
+import { VAPI_TO_ELEVENLABS_MAPPING } from '@/lib/voiceMapping';
+import { initializeVoiceLibrary, getAllCuratedVoices } from '@/lib/voiceLibrary';
 
 /**
  * Generate voice preview using ElevenLabs API
@@ -66,26 +69,51 @@ export async function POST(request: NextRequest) {
       isLocalhost,
     });
 
-    // Check if voiceId is already an ElevenLabs voice ID (typically 20+ character alphanumeric string)
-    // ElevenLabs voice IDs are usually long alphanumeric strings
-    const isElevenLabsId = /^[a-zA-Z0-9]{15,}$/.test(voiceId);
+    // Ensure voice library is initialized before resolving voice
+    // This is needed for curated voice IDs (KM-XXXXXX) to be found
+    let curatedVoices = getAllCuratedVoices();
+    if (curatedVoices.length === 0) {
+      curatedVoices = await initializeVoiceLibrary();
+    }
     
+    // Use the same voice resolution logic as agent creation
+    // This ensures preview handles curated voice IDs (KM-OS2FRC), ElevenLabs IDs, and VAPI voice names correctly
+    const voiceConfig = await getVoiceConfigForVAPI(voiceId);
+    
+    if (!voiceConfig) {
+      console.error('[VOICE PREVIEW API] Could not resolve voice ID:', voiceId);
+      return NextResponse.json(
+        { 
+          error: `Voice "${voiceId}" could not be resolved. Please select a valid voice.`,
+          hint: 'The voice ID may be invalid or not found in the voice library.',
+        },
+        { status: 400 }
+      );
+    }
+
+    // Extract ElevenLabs voice ID for preview generation
+    // Only ElevenLabs voices can be used for preview (VAPI voices need to go through VAPI)
+    let elevenLabsVoiceId: string | null = null;
     let mapping = null;
-    let elevenLabsVoiceId = null;
     
-    if (isElevenLabsId) {
-      // Voice ID is already an ElevenLabs ID, use it directly
-      elevenLabsVoiceId = voiceId;
-    } else {
-      // Check if we have a mapping for this VAPI voice name
+    if (voiceConfig.provider === '11labs') {
+      elevenLabsVoiceId = voiceConfig.voiceId;
+      // Check if we have a preview URL for this voice (for faster response when no traits)
       mapping = getElevenLabsMapping(voiceId);
-      elevenLabsVoiceId = mapping?.elevenLabsVoiceId;
+      if (!mapping && voiceConfig.voiceId) {
+        // Try to find mapping by ElevenLabs ID
+        const allMappings = Object.values(VAPI_TO_ELEVENLABS_MAPPING);
+        mapping = allMappings.find((m: any) => m.elevenLabsVoiceId === voiceConfig.voiceId) || null;
+      }
+    } else if (voiceConfig.provider === 'vapi') {
+      // For VAPI voices, try to find ElevenLabs mapping
+      mapping = getElevenLabsMapping(voiceConfig.voiceId);
+      elevenLabsVoiceId = mapping?.elevenLabsVoiceId || null;
       
-      // If no mapping exists, try to find closest match automatically
-      if (!mapping) {
-        const vapiVoice = getVoiceById(voiceId);
+      if (!elevenLabsVoiceId) {
+        // Try to find closest match automatically
+        const vapiVoice = getVoiceById(voiceConfig.voiceId);
         if (vapiVoice) {
-          // Fetch ElevenLabs voices and find best match
           try {
             const voicesResponse = await fetch('https://api.elevenlabs.io/v1/voices', {
               headers: { 'xi-api-key': apiKey },
@@ -117,6 +145,61 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    if (!elevenLabsVoiceId) {
+      // Check if voiceId looks like a direct ElevenLabs ID (long alphanumeric string, 20+ characters)
+      // If so, try using it directly with ElevenLabs API
+      const looksLikeElevenLabsId = voiceId && voiceId.length >= 20 && /^[a-zA-Z0-9]+$/.test(voiceId);
+      
+      if (looksLikeElevenLabsId) {
+        console.log('[VOICE PREVIEW API] Voice ID looks like direct ElevenLabs ID, trying directly:', voiceId.substring(0, 20) + '...');
+        // Try using it directly
+        try {
+          const directCheckResponse = await fetch(`https://api.elevenlabs.io/v1/voices/${voiceId}`, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+              'xi-api-key': apiKey,
+            },
+          });
+          
+          if (directCheckResponse.ok) {
+            // Voice exists, use it directly
+            elevenLabsVoiceId = voiceId;
+            console.log('[VOICE PREVIEW API] Direct ElevenLabs ID validated, using it for preview');
+          } else {
+            // Voice doesn't exist in account
+            console.warn('[VOICE PREVIEW API] Direct ElevenLabs ID does not exist in account');
+            return NextResponse.json(
+              { 
+                error: `Preview not available for this voice, but it will work in calls.`,
+                hint: 'This voice may not be available in your ElevenLabs account for preview, but VAPI can still use it.',
+              },
+              { status: 400 }
+            );
+          }
+        } catch (error) {
+          console.error('[VOICE PREVIEW API] Error checking direct ElevenLabs ID:', error);
+          return NextResponse.json(
+            { 
+              error: `Preview not available for this voice, but it will work in calls.`,
+              hint: 'Unable to verify voice for preview, but it should work in actual calls.',
+            },
+            { status: 400 }
+          );
+        }
+      } else {
+        // Not a direct ElevenLabs ID, can't resolve
+        console.error('[VOICE PREVIEW API] Could not resolve to ElevenLabs voice ID:', voiceId);
+        return NextResponse.json(
+          { 
+            error: `Voice preview not available for "${voiceId}". This voice may not have an ElevenLabs equivalent.`,
+            hint: 'Try selecting a different voice that supports preview.',
+          },
+          { status: 400 }
+        );
+      }
+    }
+    
     // If we have a preview URL and no personality traits (for basic voice preview), return it directly (faster)
     // Skip pre-generated URL if traits are provided, as we need to apply personality-based voice settings
     if (mapping?.elevenLabsPreviewUrl && (!traits || !Array.isArray(traits) || traits.length === 0)) {
@@ -132,12 +215,6 @@ export async function POST(request: NextRequest) {
           },
         });
       }
-    }
-
-    // Use mapped, auto-matched, or direct ElevenLabs voice ID
-    if (!elevenLabsVoiceId) {
-      // Fallback: try the voiceId as-is (might be an ElevenLabs ID we didn't detect)
-      elevenLabsVoiceId = voiceId;
     }
 
     // Get optimal voice settings based on text description

@@ -33,6 +33,180 @@ export const curatedVoiceLibrary: CuratedVoice[] = [
 ];
 
 /**
+ * Curate a diverse subset of voices ensuring variety in gender, accent, age, and tone
+ * @param voices Array of voices to curate from
+ * @param maxVoices Maximum number of voices to return (default: 500)
+ * @returns Curated array with diversity
+ */
+function curateDiverseVoices(voices: any[], maxVoices: number = 500): any[] {
+  // First, deduplicate voices by voice_id to ensure no duplicates
+  const uniqueVoicesMap = new Map<string, any>();
+  for (const voice of voices) {
+    const voiceId = voice.voice_id || voice.id || voice.voiceId;
+    if (voiceId) {
+      // Normalize to string and use as key
+      const normalizedId = String(voiceId).trim();
+      if (normalizedId && !uniqueVoicesMap.has(normalizedId)) {
+        uniqueVoicesMap.set(normalizedId, voice);
+      }
+    }
+  }
+  const deduplicatedVoices = Array.from(uniqueVoicesMap.values());
+  
+  if (deduplicatedVoices.length !== voices.length) {
+    console.log(`[VOICE CURATION] Removed ${voices.length - deduplicatedVoices.length} duplicate voices`);
+  }
+  
+  if (deduplicatedVoices.length <= maxVoices) {
+    return deduplicatedVoices;
+  }
+
+  console.log(`[VOICE CURATION] Curating ${maxVoices} diverse voices from ${deduplicatedVoices.length} unique voices...`);
+
+  // Group voices by key characteristics for diversity
+  const byGender: Record<string, any[]> = { male: [], female: [], neutral: [] };
+  const byAccent: Record<string, any[]> = {};
+  const byAge: Record<string, any[]> = { young: [], 'middle-aged': [], older: [] };
+  
+  // Categorize voices
+  for (const voice of deduplicatedVoices) {
+    const gender = (voice.labels?.gender || 'neutral').toLowerCase();
+    const accent = voice.labels?.accent || 'American';
+    const age = voice.labels?.age || '';
+    
+    // Gender
+    if (gender === 'male') byGender.male.push(voice);
+    else if (gender === 'female') byGender.female.push(voice);
+    else byGender.neutral.push(voice);
+    
+    // Accent
+    if (!byAccent[accent]) byAccent[accent] = [];
+    byAccent[accent].push(voice);
+    
+    // Age
+    if (age.includes('young')) byAge.young.push(voice);
+    else if (age.includes('old') || age.includes('elder')) byAge.older.push(voice);
+    else byAge['middle-aged'].push(voice);
+  }
+
+  const curated: any[] = [];
+  const used = new Set<string>();
+  
+  // Strategy: Ensure representation from each category
+  const targetPerGender = Math.floor(maxVoices / 3);
+  const targetPerAge = Math.floor(maxVoices / 3);
+  
+  // First pass: Ensure gender diversity (roughly equal distribution)
+  for (const gender of ['male', 'female', 'neutral'] as const) {
+    const available = byGender[gender].filter(v => !used.has(v.voice_id));
+    const take = Math.min(targetPerGender, available.length);
+    // Shuffle and take diverse selection
+    const shuffled = available.sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, take);
+    selected.forEach(v => {
+      curated.push(v);
+      used.add(v.voice_id);
+    });
+  }
+  
+  // Second pass: Ensure age diversity
+  for (const age of ['young', 'middle-aged', 'older'] as const) {
+    const available = byAge[age].filter(v => !used.has(v.voice_id));
+    const take = Math.min(targetPerAge, available.length);
+    const shuffled = available.sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, take);
+    selected.forEach(v => {
+      if (!used.has(v.voice_id)) {
+        curated.push(v);
+        used.add(v.voice_id);
+      }
+    });
+  }
+  
+  // Third pass: Ensure accent diversity (at least 2-3 per accent)
+  const accents = Object.keys(byAccent).sort();
+  const remainingSlots = maxVoices - curated.length;
+  const perAccent = Math.max(2, Math.floor(remainingSlots / Math.max(1, accents.length)));
+  
+  for (const accent of accents) {
+    const available = byAccent[accent].filter(v => !used.has(v.voice_id));
+    if (available.length > 0 && curated.length < maxVoices) {
+      const take = Math.min(perAccent, available.length, maxVoices - curated.length);
+      const shuffled = available.sort(() => Math.random() - 0.5);
+      const selected = shuffled.slice(0, take);
+      selected.forEach(v => {
+        if (!used.has(v.voice_id) && curated.length < maxVoices) {
+          curated.push(v);
+          used.add(v.voice_id);
+        }
+      });
+    }
+  }
+  
+  // Fill remaining slots with random diverse voices
+  const remaining = maxVoices - curated.length;
+  if (remaining > 0) {
+    const available = deduplicatedVoices.filter(v => !used.has(v.voice_id));
+    const shuffled = available.sort(() => Math.random() - 0.5);
+    const random = shuffled.slice(0, remaining);
+    random.forEach(v => {
+      if (!used.has(v.voice_id)) {
+        curated.push(v);
+        used.add(v.voice_id);
+      }
+    });
+  }
+  
+  // Final deduplication and shuffle for better distribution
+  const finalMap = new Map<string, any>();
+  for (const voice of curated) {
+    const voiceId = voice.voice_id || voice.id || voice.voiceId;
+    if (voiceId) {
+      // Normalize to string and use as key
+      const normalizedId = String(voiceId).trim();
+      if (normalizedId && !finalMap.has(normalizedId)) {
+        finalMap.set(normalizedId, voice);
+      }
+    }
+  }
+  const final = Array.from(finalMap.values())
+    .sort(() => Math.random() - 0.5)
+    .slice(0, maxVoices);
+  
+  if (final.length !== curated.length) {
+    console.log(`[VOICE CURATION] Removed ${curated.length - final.length} duplicate voices from final set`);
+  }
+  
+  // Log diversity stats
+  const finalByGender: Record<string, number> = { male: 0, female: 0, neutral: 0 };
+  const finalByAccent: Record<string, number> = {};
+  const finalByAge: Record<string, number> = { young: 0, 'middle-aged': 0, older: 0 };
+  
+  for (const voice of final) {
+    const gender = (voice.labels?.gender || 'neutral').toLowerCase();
+    const accent = voice.labels?.accent || 'American';
+    const age = voice.labels?.age || '';
+    
+    if (gender === 'male') finalByGender.male++;
+    else if (gender === 'female') finalByGender.female++;
+    else finalByGender.neutral++;
+    
+    finalByAccent[accent] = (finalByAccent[accent] || 0) + 1;
+    
+    if (age.includes('young')) finalByAge.young++;
+    else if (age.includes('old') || age.includes('elder')) finalByAge.older++;
+    else finalByAge['middle-aged']++;
+  }
+  
+  console.log(`[VOICE CURATION] Curated ${final.length} voices with diversity:`);
+  console.log(`[VOICE CURATION] - Gender: ${finalByGender.male} male, ${finalByGender.female} female, ${finalByGender.neutral} neutral`);
+  console.log(`[VOICE CURATION] - Age: ${finalByAge.young} young, ${finalByAge['middle-aged']} middle-aged, ${finalByAge.older} older`);
+  console.log(`[VOICE CURATION] - Accents: ${Object.keys(finalByAccent).length} different accents`);
+  
+  return final;
+}
+
+/**
  * Initialize the curated voice library by fetching ElevenLabs voices and adding VAPI voices
  * This should be called on server startup or when needed
  */
@@ -57,6 +231,19 @@ export async function initializeVoiceLibrary(): Promise<CuratedVoice[]> {
     languages: ['en', 'es', 'ar', 'fr', 'de', 'it', 'pt', 'zh', 'ja', 'ko', 'hi', 'nl', 'pl', 'ru', 'tr'],
     quality: 'standard', // VAPI voices are standard quality
   }));
+
+  // Load VAPI-verified ElevenLabs voices from JSON file
+  let verifiedElevenLabsVoiceIds: Set<string> = new Set();
+  try {
+    const { getAllVAPIElevenLabsVoices } = await import('./vapiElevenLabsVoices');
+    const verifiedVoices = getAllVAPIElevenLabsVoices();
+    verifiedElevenLabsVoiceIds = new Set(verifiedVoices.map(v => v.voiceId));
+    console.log(`[VOICE LIBRARY] Loaded ${verifiedVoices.length} VAPI-verified ElevenLabs voices from vapiElevenLabsVoices.json`);
+  } catch (error) {
+    console.warn('[VOICE LIBRARY] Could not load VAPI-verified ElevenLabs voices. Run "npm run fetch-vapi-voices" to generate the file.');
+    console.warn('[VOICE LIBRARY] Will include all ElevenLabs voices (not filtered to VAPI-verified only)');
+  }
+
   const apiKey = process.env.ELEVENLABS_API_KEY;
   
   if (!apiKey) {
@@ -65,21 +252,92 @@ export async function initializeVoiceLibrary(): Promise<CuratedVoice[]> {
   }
 
   try {
-    // Fetch all available voices from ElevenLabs
-    const response = await fetch('https://api.elevenlabs.io/v1/voices', {
-      headers: { 'xi-api-key': apiKey },
-    });
+    // Fetch voices from ElevenLabs with pagination
+    // Continue fetching until we have enough verified voices OR checked enough pages
+    let allElevenLabsVoices: any[] = [];
+    let verifiedVoicesFound: any[] = [];
+    let page = 1;
+    let hasMore = true;
+    const pageSize = 100;
+    const MIN_VERIFIED_VOICES = 1500; // Minimum to curate 500 diverse voices
+    const MAX_PAGES = 100; // Check up to 100 pages to find verified voices
 
-    if (!response.ok) {
-      console.error('[VOICE LIBRARY] Failed to fetch voices from ElevenLabs');
-      return [];
+    console.log('[VOICE LIBRARY] Fetching voices from ElevenLabs (will continue until we have enough verified voices)...');
+
+    while (hasMore && page <= MAX_PAGES) {
+      const response = await fetch(`https://api.elevenlabs.io/v1/voices?page=${page}&page_size=${pageSize}`, {
+        headers: { 'xi-api-key': apiKey },
+      });
+
+      if (!response.ok) {
+        if (page === 1) {
+          console.error('[VOICE LIBRARY] Failed to fetch voices from ElevenLabs');
+          return [];
+        } else {
+          // If we've already fetched some pages, stop here
+          console.log(`[VOICE LIBRARY] Reached end of pagination at page ${page}`);
+          break;
+        }
+      }
+
+      const data = await response.json();
+      const voices = data.voices || [];
+      
+      if (voices.length === 0) {
+        hasMore = false;
+      } else {
+        allElevenLabsVoices.push(...voices);
+        
+        // Filter to verified voices as we go
+        if (verifiedElevenLabsVoiceIds.size > 0) {
+          const verifiedInPage = voices.filter((voice: any) => verifiedElevenLabsVoiceIds.has(voice.voice_id));
+          verifiedVoicesFound.push(...verifiedInPage);
+        } else {
+          // If no verification list, treat all as verified
+          verifiedVoicesFound.push(...voices);
+        }
+        
+        console.log(`[VOICE LIBRARY] Page ${page}: ${voices.length} voices (${verifiedVoicesFound.length} verified so far)`);
+        
+        // Stop if we have enough verified voices AND we've checked at least 10 pages
+        if (verifiedVoicesFound.length >= MIN_VERIFIED_VOICES && page >= 10) {
+          console.log(`[VOICE LIBRARY] Reached target of ${MIN_VERIFIED_VOICES} verified voices after ${page} pages. Stopping fetch.`);
+          hasMore = false;
+          break;
+        }
+        
+        // Check if there's more
+        if (data.has_more === false || voices.length < pageSize) {
+          hasMore = false;
+        } else {
+          page++;
+        }
+      }
     }
 
-    const data = await response.json();
-    const voices = data.voices || [];
+    console.log(`[VOICE LIBRARY] Total voices fetched from ElevenLabs: ${allElevenLabsVoices.length}`);
+    console.log(`[VOICE LIBRARY] Total verified voices found: ${verifiedVoicesFound.length}`);
 
-    // Map ElevenLabs voices to curated library format
-    const mappedVoices: CuratedVoice[] = voices.map((voice: any) => {
+    // Use the verified voices we collected during fetching
+    // If we have a verification list, use only verified voices; otherwise use all fetched
+    const voicesToProcess = verifiedElevenLabsVoiceIds.size > 0
+      ? verifiedVoicesFound
+      : allElevenLabsVoices;
+
+    if (verifiedElevenLabsVoiceIds.size > 0) {
+      console.log(`[VOICE LIBRARY] Using ${voicesToProcess.length} VAPI-verified ElevenLabs voices (fetched ${allElevenLabsVoices.length} total)`);
+    } else {
+      console.log(`[VOICE LIBRARY] Using ${voicesToProcess.length} voices (no verification list - all voices)`);
+    }
+
+    // CURATE: Select diverse subset of 200-500 voices for performance
+    // Only use VAPI-verified voices, ensure variety, NO DUPLICATES
+    const MAX_VOICES = 500;
+    const curatedVoices = curateDiverseVoices(voicesToProcess, MAX_VOICES);
+    console.log(`[VOICE LIBRARY] Curated ${curatedVoices.length} diverse voices from ${voicesToProcess.length} verified voices`);
+
+    // Map curated voices to library format
+    const mappedVoices: CuratedVoice[] = curatedVoices.map((voice: any) => {
       const gender = (voice.labels?.gender || '').toLowerCase();
       const accent = voice.labels?.accent || '';
       const age = voice.labels?.age || '';
@@ -218,12 +476,40 @@ export async function initializeVoiceLibrary(): Promise<CuratedVoice[]> {
     // Combine all voices before validation
     const allVoices = [...mappedVoices, ...vapiCuratedVoices];
     
+    // Deduplicate by voice ID before validation
+    const uniqueVoicesMap = new Map<string, CuratedVoice>();
+    for (const voice of allVoices) {
+      const voiceId = voice.elevenLabsVoiceId || voice.vapiVoiceId || voice.id;
+      if (voiceId && !uniqueVoicesMap.has(voiceId)) {
+        uniqueVoicesMap.set(voiceId, voice);
+      }
+    }
+    const deduplicatedVoices = Array.from(uniqueVoicesMap.values());
+    
+    if (deduplicatedVoices.length !== allVoices.length) {
+      console.log(`[VOICE LIBRARY] Removed ${allVoices.length - deduplicatedVoices.length} duplicate voices before validation`);
+    }
+    
     // Validate voices against ElevenLabs to ensure they all exist
-    const { validVoices, removedVoices } = await validateVoicesAgainstElevenLabs(allVoices);
+    const { validVoices, removedVoices } = await validateVoicesAgainstElevenLabs(deduplicatedVoices);
+    
+    // Final deduplication after validation (in case validation creates duplicates)
+    const finalUniqueMap = new Map<string, CuratedVoice>();
+    for (const voice of validVoices) {
+      const voiceId = voice.elevenLabsVoiceId || voice.vapiVoiceId || voice.id;
+      if (voiceId && !finalUniqueMap.has(voiceId)) {
+        finalUniqueMap.set(voiceId, voice);
+      }
+    }
+    const finalUniqueVoices = Array.from(finalUniqueMap.values());
+    
+    if (finalUniqueVoices.length !== validVoices.length) {
+      console.log(`[VOICE LIBRARY] Removed ${validVoices.length - finalUniqueVoices.length} duplicate voices after validation`);
+    }
     
     // Store validated voices in library: ElevenLabs voices first (higher quality), then VAPI voices
     curatedVoiceLibrary.length = 0;
-    curatedVoiceLibrary.push(...validVoices);
+    curatedVoiceLibrary.push(...finalUniqueVoices);
     
     // Enhanced logging: Log voice count and quality distribution
     const validElevenLabsVoices = validVoices.filter(v => v.source === 'elevenlabs');

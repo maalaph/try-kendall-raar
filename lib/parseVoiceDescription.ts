@@ -458,6 +458,10 @@ export function parseVoiceDescription(
       // (prevents "South African" from being parsed as generic "Southern" or "US Southern")
       { pattern: /south african/i, accent: 'South African' },
       { pattern: /nigerian|nigeria/i, accent: 'Nigerian' },
+      // South Asian countries (check BEFORE generic "Indian" and "Asian" patterns)
+      { pattern: /pakistani|pakistan/i, accent: 'Pakistani' },
+      { pattern: /bangladeshi|bangladesh/i, accent: 'Bangladeshi' },
+      { pattern: /sri lankan|sri lanka/i, accent: 'Sri Lankan' },
       { pattern: /southern[- ]american|southern american|us southern/i, accent: 'Southern American' },
       { pattern: /northern[- ]american|northern american/i, accent: 'Northern American' },
       // Regional accents (generic patterns - check AFTER compound accents)
@@ -479,7 +483,7 @@ export function parseVoiceDescription(
       { pattern: /british|uk|england|brit/i, accent: 'British' },
       { pattern: /australian|australia|aussie/i, accent: 'Australian' },
       { pattern: /canadian|canada/i, accent: 'Canadian' },
-      { pattern: /indian|india/i, accent: 'Indian' },
+      { pattern: /indian|india/i, accent: 'Indian' }, // Check AFTER Pakistani/Bangladeshi patterns
       { pattern: /mexican|mexico/i, accent: 'Mexican' },
       { pattern: /spanish|spain|spanish american|español/i, accent: 'Spanish' },
       { pattern: /\blatin\b/i, accent: 'Latin American' }, // Only match standalone "latin", not "latino"/"latina"
@@ -487,10 +491,16 @@ export function parseVoiceDescription(
       { pattern: /french|france/i, accent: 'French' },
       { pattern: /german|germany/i, accent: 'German' },
       { pattern: /italian|italy/i, accent: 'Italian' },
+      { pattern: /vietnamese|vietnam/i, accent: 'Vietnamese' },
+      { pattern: /thai|thailand/i, accent: 'Thai' },
+      { pattern: /filipino|philippines|philippine/i, accent: 'Filipino' },
+      { pattern: /indonesian|indonesia/i, accent: 'Indonesian' },
+      { pattern: /malaysian|malaysia/i, accent: 'Malaysian' },
       { pattern: /chinese|china/i, accent: 'Chinese' },
       { pattern: /japanese|japan/i, accent: 'Japanese' },
       { pattern: /korean|korea/i, accent: 'Korean' },
       { pattern: /new zealand|kiwi/i, accent: 'New Zealand' },
+      { pattern: /asian|asia/i, accent: 'Asian' }, // Broader Asian pattern (East/Southeast Asian) - check AFTER specific Asian countries
       { pattern: /african|africa/i, accent: 'African' }, // Broader African pattern (should match Nigerian, South African, etc.) - check AFTER specific African countries
       { pattern: /american|usa|us/i, accent: 'American' },
       { pattern: /russian|russia/i, accent: 'Russian' },

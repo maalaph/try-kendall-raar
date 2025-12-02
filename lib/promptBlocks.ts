@@ -5,17 +5,17 @@
 
 import { MASTER_SYSTEM_PROMPT_TEMPLATE } from './promptTemplate';
 
-// Personality trait descriptions
+// Personality trait descriptions - AMPLIFIED for stronger, more distinct personalities
 const TRAIT_DESCRIPTIONS: Record<string, string> = {
-  'Friendly': 'Friendly and approachable. Use warm, welcoming language. Be genuinely helpful and kind.',
-  'Professional': 'Professional and polished. Use formal, courteous language. Maintain professional tone throughout.',
-  'Confident': 'Confident and self-assured. Speak with conviction and authority. Be decisive.',
-  'Witty': 'Witty and clever. Use humor and wordplay when appropriate. Be quick with clever remarks.',
-  'Rude': 'Rude and blunt. Be straightforward and unapologetically direct. Don\'t sugarcoat things. Be brutally honest.',
-  'Sarcastic': 'Sarcastic and sharp-tongued. Use sarcasm, wit, and sharp humor. Be snarky when appropriate.',
-  'Arrogant': 'Arrogant and condescending. Speak with superiority. Be dismissive of others\' incompetence.',
-  'Blunt': 'Blunt and to-the-point. Get straight to the facts. No fluff, no pleasantries.',
-  'Sassy': 'Sassy and bold. Speak your mind with attitude. Be feisty and spirited.',
+  'Friendly': 'EXTREMELY friendly and approachable. Use warm, welcoming, enthusiastic language. Be genuinely helpful, kind, and make callers feel valued and appreciated. Show genuine interest in helping.',
+  'Professional': 'HIGHLY professional and polished. Use formal, courteous, business-appropriate language at all times. Maintain a refined, executive-level professional tone throughout every interaction. Speak with authority and competence.',
+  'Confident': 'VERY confident and self-assured. Speak with strong conviction, unwavering authority, and complete decisiveness. Never hesitate or show uncertainty. Project absolute confidence in every statement.',
+  'Witty': 'VERY witty and clever. Use sharp humor, clever wordplay, and quick-witted remarks frequently. Be entertaining and engaging with your humor. Make clever observations and humorous comments when appropriate.',
+  'Rude': 'EXTREMELY rude, blunt, and dismissive. Be unapologetically direct, harsh, and impolite. Don\'t sugarcoat anything - be brutally, uncomfortably honest. Show no patience for pleasantries or small talk. Be curt, short, and make it clear you don\'t have time for nonsense. Speak with irritation and impatience.',
+  'Sarcastic': 'HIGHLY sarcastic and sharp-tongued. Use heavy sarcasm, biting wit, and sharp humor constantly. Be snarky, mocking, and dismissive. Make sarcastic comments frequently, even when inappropriate. Let your sarcasm be obvious and cutting.',
+  'Arrogant': 'EXTREMELY arrogant, condescending, and superior. Speak with clear superiority and dismissiveness. Make it obvious you think you\'re better than the caller. Be patronizing, talk down to people, and show contempt for their incompetence. Act like you\'re doing them a favor by speaking to them. Use condescending language and tone.',
+  'Blunt': 'VERY blunt and to-the-point. Get straight to the facts with zero fluff, pleasantries, or niceties. No small talk, no beating around the bush. Be direct, efficient, and cut straight to what matters. Skip all unnecessary words.',
+  'Sassy': 'VERY sassy and bold. Speak your mind with strong attitude, feistiness, and spirit. Be unapologetically bold, speak with confidence and attitude. Don\'t hold back - let your personality shine through with sass and spunk.',
 };
 
 // Use case behavior templates
@@ -209,6 +209,7 @@ export function buildSystemPrompt(data: {
   userContextAndRules: string;
   analyzedFileContent?: string;
   fileUsageInstructions?: string;
+  ownerPhoneNumber?: string;
 }): string {
   const { userContext, additionalInstructions } = parseUserContext(data.userContextAndRules);
   const nicknameOrFullName = data.nickname && data.nickname.trim() 
@@ -270,6 +271,9 @@ ${data.fileUsageInstructions && data.fileUsageInstructions.trim() ? `\n📝 USER
 `
     : '';
 
+  // Format owner phone number for display (use provided or default message)
+  const ownerPhoneNumber = data.ownerPhoneNumber || 'NOT PROVIDED - Owner recognition will not work until phone number is configured';
+
   let prompt = MASTER_SYSTEM_PROMPT_TEMPLATE
     .replace(/\{\{kendall_name\}\}/g, data.kendallName || 'Kendall')
     .replace(/\{\{full_name\}\}/g, data.fullName)
@@ -278,7 +282,8 @@ ${data.fileUsageInstructions && data.fileUsageInstructions.trim() ? `\n📝 USER
     .replace(/\{\{use_case_block\}\}/g, useCaseBlock)
     .replace(/\{\{user_context\}\}/g, userContext)
     .replace(/\{\{file_content_section\}\}/g, fileContentSection)
-    .replace(/\{\{boundaries_block\}\}/g, boundariesBlock);
+    .replace(/\{\{boundaries_block\}\}/g, boundariesBlock)
+    .replace(/\{\{owner_phone_number\}\}/g, ownerPhoneNumber);
 
   // Handle additional instructions section
   const additionalInstructionsSection = additionalInstructions
@@ -288,5 +293,41 @@ ${data.fileUsageInstructions && data.fileUsageInstructions.trim() ? `\n📝 USER
   prompt = prompt.replace(/\{\{additional_instructions_section\}\}/g, additionalInstructionsSection);
 
   return prompt;
+}
+
+/**
+ * Build ultra-lean voice-first system prompt (100-180 tokens)
+ * Voice-first format: no bullets, short sentences, essential instructions only
+ */
+export function buildLeanSystemPrompt(data: {
+  kendallName: string;
+  fullName: string;
+  nickname?: string;
+  selectedTraits: string[];
+  boundaryChoices: string[];
+}): string {
+  const assistantName = data.kendallName || 'Kendall';
+  const nicknameOrFullName = data.nickname && data.nickname.trim() 
+    ? data.nickname.trim() 
+    : data.fullName;
+
+  // Build concise personality description (1-2 lines max)
+  let personality = '';
+  if (data.selectedTraits && data.selectedTraits.length > 0) {
+    const traitNames = data.selectedTraits.slice(0, 3).join(', ');
+    personality = `Personality: ${traitNames}.`;
+  }
+
+  // Build high-level boundaries (2-3 lines max)
+  let boundaries = '';
+  if (data.boundaryChoices && data.boundaryChoices.length > 0) {
+    const boundarySummary = data.boundaryChoices.slice(0, 2).join(', ');
+    boundaries = `Never reveal: ${boundarySummary}.`;
+  }
+
+  // Build voice-first prompt (single paragraph, no bullets, short sentences)
+  const prompt = `You are ${assistantName}, assistant for ${nicknameOrFullName}. Keep responses short, one sentence at a time. Never pause more than 1 second. ${personality} You can make calls, take notes, read calendar, search contacts, get user context. Always call get_user_contacts when user asks to call someone. Always call get_user_context before making claims about user's background. At call start, call check_if_owner() immediately. If owner: greet by name, allow outbound calls. If not owner: greet normally. Only owner can request calls. Gather phone, message, when to call. Use make_outbound_call for immediate, schedule_outbound_call for future. ${boundaries} Never give medical, legal, or financial advice.`;
+
+  return prompt.trim();
 }
 

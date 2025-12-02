@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, startTransition } from 'react';
 import { colors } from '@/lib/config';
 import { Volume2, Play, Loader2, CheckCircle2, Circle, FileText, Lightbulb, Globe, ChevronDown, Users, MapPin, Palette, Calendar, Tag, Search } from 'lucide-react';
 import { parseVoiceDescription } from '@/lib/parseVoiceDescription';
@@ -11,6 +11,8 @@ import { scorePromptQuality } from '@/lib/promptQualityScorer';
 interface VoiceSelectionStepProps {
   selectedVoice: string | null;
   onSelectionChange: (voiceId: string | '') => void;
+  onLanguageChange?: (language: string) => void;
+  isEditMode?: boolean;
 }
 
 // Voice option interface matching API response - Branded as RAAR
@@ -42,11 +44,14 @@ interface VoiceOption {
 export default function VoiceSelectionStep({
   selectedVoice,
   onSelectionChange,
+  onLanguageChange,
+  isEditMode = false,
 }: VoiceSelectionStepProps) {
   const [previewingVoiceId, setPreviewingVoiceId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'male' | 'female'>('all');
+  const [isScrolled, setIsScrolled] = useState(false);
   // Support all available languages
   const availableLanguages = getAvailableLanguages();
   type LanguageCode = 'all' | typeof availableLanguages[number];
@@ -72,9 +77,13 @@ export default function VoiceSelectionStep({
   const [isLoadingVoices, setIsLoadingVoices] = useState(true);
   const [languageNote, setLanguageNote] = useState<string | null>(null);
   const [descriptionHash, setDescriptionHash] = useState<string>('');
+  const [isProcessingClick, setIsProcessingClick] = useState<boolean>(false); // State to disable all cards during processing
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const descriptionAudioRef = useRef<HTMLAudioElement | null>(null);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const stickyElementOriginalParentRef = useRef<HTMLElement | null>(null);
+  const clickProcessingRef = useRef<Set<string>>(new Set()); // Track which voice IDs are currently being processed
+  const isProcessingSelectionRef = useRef<boolean>(false); // Global flag to prevent any clicks during processing
 
   // Track if any filter dropdown is open so we can adjust layout below
   const isAnyFilterDropdownOpen =
@@ -92,6 +101,25 @@ export default function VoiceSelectionStep({
     setIsStyleDropdownOpen(false);
     setIsAgeGroupDropdownOpen(false);
   };
+
+  // Notify parent when language changes
+  const prevLanguageRef = useRef<string>(activeLanguage === 'all' ? 'en' : activeLanguage);
+  const onLanguageChangeRef = useRef(onLanguageChange);
+  
+  // Keep ref updated with latest callback (but don't trigger effect)
+  useEffect(() => {
+    onLanguageChangeRef.current = onLanguageChange;
+  }, [onLanguageChange]);
+  
+  useEffect(() => {
+    const currentLanguage = activeLanguage === 'all' ? 'en' : activeLanguage;
+    
+    // Only call if language actually changed
+    if (prevLanguageRef.current !== currentLanguage && onLanguageChangeRef.current) {
+      prevLanguageRef.current = currentLanguage;
+      onLanguageChangeRef.current(currentLanguage);
+    }
+  }, [activeLanguage]); // Only depend on activeLanguage to prevent infinite loop
 
   // Get preview text based on selected language
   // Use useCallback to ensure we always get the current activeLanguage value
@@ -152,6 +180,200 @@ export default function VoiceSelectionStep({
 
     fetchVoices();
   }, [activeLanguage, activeFilter]);
+
+  // CRITICAL: useLayoutEffect runs synchronously BEFORE React reconciliation
+  // This ensures we restore the sticky element before React tries to unmount it
+  useLayoutEffect(() => {
+    if (!selectedVoice) {
+      // When voice is deselected, immediately restore sticky element to original location
+      // This must happen BEFORE React tries to unmount it
+      // Use requestAnimationFrame to ensure DOM is ready and avoid conflicts
+      requestAnimationFrame(() => {
+        const stickyElement = document.getElementById('current-voice-sticky');
+        const stickyContainer = document.getElementById('sticky-voice-container');
+        
+        if (stickyElement && stickyElement.parentNode) {
+          // Verify element is still in DOM before manipulating
+          if (!document.contains(stickyElement)) {
+            stickyElementOriginalParentRef.current = null;
+            return; // Element already removed, skip
+          }
+          
+          // If element was moved to stickyContainer, restore it
+          if (stickyContainer && stickyElement.parentElement === stickyContainer) {
+            try {
+              // Try to restore to original parent if we have it
+              if (stickyElementOriginalParentRef.current) {
+                const originalParent = stickyElementOriginalParentRef.current;
+                if (originalParent && document.contains(originalParent)) {
+                  originalParent.appendChild(stickyElement);
+                } else {
+                  // Original parent no longer exists, just remove from stickyContainer
+                  if (stickyElement.parentNode === stickyContainer) {
+                    stickyContainer.removeChild(stickyElement);
+                  }
+                }
+              } else {
+                // No original parent stored, just remove from stickyContainer
+                if (stickyElement.parentNode === stickyContainer) {
+                  stickyContainer.removeChild(stickyElement);
+                }
+              }
+            } catch (e) {
+              // Element might already be removed or in transition - that's okay
+              // Silently fail to prevent errors
+            }
+          }
+        }
+        // Clear the ref since we're done
+        stickyElementOriginalParentRef.current = null;
+      });
+    }
+  }, [selectedVoice]);
+
+  // Handle scroll to show/hide sticky current voice
+  // Show sticky current voice in top left only when scrolled past the search button
+  // Works for both personal-setup and edit mode
+  useEffect(() => {
+    if (!selectedVoice) {
+      setIsScrolled(false);
+      return;
+    }
+    
+    // Explicitly hide sticky element on mount and store original parent
+    // Use requestAnimationFrame to avoid conflicts with React reconciliation
+    requestAnimationFrame(() => {
+      const stickyElement = document.getElementById('current-voice-sticky');
+      if (stickyElement && document.contains(stickyElement)) {
+        stickyElement.style.display = 'none';
+        // Store original parent if not already stored (in case element was just rendered)
+        if (!stickyElementOriginalParentRef.current && stickyElement.parentElement) {
+          stickyElementOriginalParentRef.current = stickyElement.parentElement as HTMLElement;
+        }
+      }
+    });
+    
+    const handleScroll = () => {
+      // Find the search button to detect when we've scrolled past it
+      const searchButton = document.getElementById('voice-search-button');
+      const stickyElement = document.getElementById('current-voice-sticky');
+      const stickyContainer = document.getElementById('sticky-voice-container');
+      
+      if (!searchButton || !stickyElement || !stickyContainer) {
+        return;
+      }
+      
+      // Check if scrolled past the search button
+      const rect = searchButton.getBoundingClientRect();
+      // Only show sticky if we've actually scrolled past (element is above viewport)
+      // Use a small threshold to ensure we're definitely past it
+      const isScrolledPast = rect.top < -10; // 10px threshold to ensure we're past it
+      
+      setIsScrolled(isScrolledPast);
+      
+      // Move sticky element to container when scrolled past, but only if not already there
+      if (isScrolledPast) {
+        // Only move if not already in the container to prevent glitches
+        // Verify elements are still in DOM before manipulating
+        if (stickyElement.parentElement !== stickyContainer && 
+            document.contains(stickyElement) && 
+            document.contains(stickyContainer)) {
+          try {
+            // Store reference to original parent before moving (critical for restoration)
+            if (!stickyElementOriginalParentRef.current && stickyElement.parentElement) {
+              stickyElementOriginalParentRef.current = stickyElement.parentElement as HTMLElement;
+            }
+            stickyContainer.appendChild(stickyElement);
+          } catch (e) {
+            // If appendChild fails, just hide the element
+            console.warn('Could not move sticky element:', e);
+            if (document.contains(stickyElement)) {
+              stickyElement.style.display = 'none';
+            }
+            return;
+          }
+        }
+        if (document.contains(stickyElement)) {
+          stickyElement.style.display = 'flex';
+        }
+      } else {
+        // Hide sticky element but keep it in DOM to prevent layout shifts
+        if (document.contains(stickyElement)) {
+          stickyElement.style.display = 'none';
+        }
+      }
+    };
+    
+    // Listen to both window scroll and any scrollable parent containers
+    const scrollContainers: (Window | Element)[] = [window];
+    
+    // Find scrollable parent containers
+    const findScrollContainers = (element: HTMLElement | null): Element[] => {
+      const containers: Element[] = [];
+      let current = element?.parentElement;
+      while (current) {
+        const style = window.getComputedStyle(current);
+        if (style.overflowY === 'auto' || style.overflowY === 'scroll' || 
+            style.overflow === 'auto' || style.overflow === 'scroll') {
+          containers.push(current);
+        }
+        current = current.parentElement;
+      }
+      return containers;
+    };
+    
+    // Find scroll containers using the search button
+    const searchButton = document.getElementById('voice-search-button');
+    const parentContainers = findScrollContainers(searchButton);
+    scrollContainers.push(...parentContainers);
+    
+    // Also find and listen to the voice cards scroll container specifically
+    const voiceScrollContainer = document.querySelector('[data-voice-scroll-container]');
+    if (voiceScrollContainer && !scrollContainers.includes(voiceScrollContainer)) {
+      scrollContainers.push(voiceScrollContainer);
+    }
+    
+    // Add scroll listeners to all scroll containers
+    scrollContainers.forEach(container => {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+    });
+    
+    // Also listen to window scroll
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    // Check initial state after DOM is ready - but ensure it starts hidden
+    setTimeout(() => {
+      handleScroll(); // Check scroll position after DOM is ready
+    }, 100);
+    
+    return () => {
+      // Clean up scroll listeners
+      scrollContainers.forEach(container => {
+        container.removeEventListener('scroll', handleScroll);
+      });
+      window.removeEventListener('scroll', handleScroll);
+      
+      // Clean up sticky element if it was moved
+      // This prevents the removeChild error when deselecting
+      try {
+        const stickyElement = document.getElementById('current-voice-sticky');
+        const stickyContainer = document.getElementById('sticky-voice-container');
+        
+        // If sticky element is in the stickyContainer, try to restore it
+        if (stickyElement && stickyContainer && stickyElement.parentElement === stickyContainer) {
+          // The element will be removed by React, so we just need to detach it safely
+          // Try-catch to handle any errors gracefully
+          try {
+            stickyContainer.removeChild(stickyElement);
+          } catch (e) {
+            // Element might already be removed or in transition - that's okay
+          }
+        }
+      } catch (e) {
+        // Silently handle any cleanup errors
+      }
+    };
+  }, [selectedVoice, isEditMode]);
 
   // Stop any playing audio when component unmounts and cleanup debounce
   useEffect(() => {
@@ -872,11 +1094,14 @@ export default function VoiceSelectionStep({
     if (generatedVoices.length > 0) {
       // Show ALL generated voices regardless of audioBase64 (preview can be generated on demand)
       // Only filter out voices that are completely invalid (no ID at all)
-      return generatedVoices.filter(voice => {
+      const filtered = generatedVoices.filter(voice => {
         // Voice must have at least an ID (generatedVoiceId, voiceId, or id)
         const hasId = !!(voice.generatedVoiceId || voice.voiceId || voice.id);
         return hasId;
       });
+      
+      // Don't sort - keep voices in their original positions
+      return filtered;
     }
     
     // Otherwise, show full catalog with all filters applied
@@ -918,8 +1143,9 @@ export default function VoiceSelectionStep({
       result = result.filter(voice => voice.ageGroup === activeAgeGroup);
     }
     
+    // Don't sort - keep voices in their original positions
     return result;
-  }, [generatedVoices, voices, activeFilter, activeLanguage, activeAccent, activeStyle, activeAgeGroup]);
+  }, [generatedVoices, voices, activeFilter, activeLanguage, activeAccent, activeStyle, activeAgeGroup, selectedVoice]);
 
   // Use the SAME parsing logic as backend for 100% accuracy
   // This ensures what user types = what gets checked
@@ -953,8 +1179,44 @@ export default function VoiceSelectionStep({
         flex: 1,
       }}
     >
+      {/* Custom scrollbar styling - match voice library cards with purple glow */}
+      <style>{`
+        .voice-selection-scrollbar::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .voice-selection-scrollbar::-webkit-scrollbar-track {
+          background: rgba(8, 8, 10, 0.92);
+          border-radius: 3px;
+        }
+        .voice-selection-scrollbar::-webkit-scrollbar-thumb {
+          background: ${colors.accent};
+          border-radius: 3px;
+          box-shadow: 0 0 8px ${colors.accent}80, 0 0 16px ${colors.accent}60;
+        }
+        .voice-selection-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: ${colors.accent};
+          box-shadow: 0 0 12px ${colors.accent}90, 0 0 24px ${colors.accent}70;
+        }
+        /* For Firefox */
+        .voice-selection-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: ${colors.accent} rgba(8, 8, 10, 0.92);
+        }
+      `}</style>
       {/* Voice Library Header */}
-      <div style={{ marginBottom: '1.5rem', width: '100%', flexShrink: 0 }}>
+      <div 
+        id="voice-library-header"
+        style={{ 
+          marginBottom: '1.5rem', 
+          width: '100%', 
+          flexShrink: 0,
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
         <h2
           className="text-2xl sm:text-3xl font-bold mb-3"
           style={{
@@ -985,16 +1247,8 @@ export default function VoiceSelectionStep({
             Voice Library
           </span>
         </h2>
-        <p
-          className="text-sm sm:text-base"
-          style={{
-            color: colors.text,
-            opacity: 0.75,
-            fontFamily: 'var(--font-inter), sans-serif',
-            lineHeight: '1.5',
-            fontWeight: 400,
-          }}
-        ></p>
+        {/* Sticky current voice placeholder - managed by OnboardingWizard title section */}
+        <div id="sticky-voice-container" style={{ display: 'none' }}></div>
       </div>
 
       {/* Voice Description Input */}
@@ -1028,6 +1282,7 @@ export default function VoiceSelectionStep({
               }}
             />
             <div
+              id="voice-search-button"
               className="relative flex items-center gap-2"
               style={{
                 height: '52px',
@@ -1213,11 +1468,100 @@ export default function VoiceSelectionStep({
         </div>
       </div>
 
+      {/* Current Voice Section - Sticky display in top left when scrolled past Available Voices */}
+      {selectedVoice && selectedVoice.trim() !== '' && (() => {
+        // Find the current voice from all available voices
+        const currentVoice = [...voices, ...generatedVoices].find(
+          v => v.id === selectedVoice || v.voiceId === selectedVoice
+        );
+        
+        if (currentVoice) {
+          const isCurrentVoicePlaying = previewingVoiceId === currentVoice.id && isPlaying;
+          const isCurrentVoiceLoading = previewingVoiceId === currentVoice.id && isLoading;
+          const isCurrentVoicePreviewing = previewingVoiceId === currentVoice.id;
+          
+          return (
+            <>
+              {/* Sticky current voice (shown when scrolling past Available Voices) - positioned in top left via OnboardingWizard */}
+              <div
+                id="current-voice-sticky"
+                className="flex items-center gap-3"
+                style={{
+                  display: 'none', // Hidden by default, shown via scroll detection
+                  padding: '0.5rem 1rem',
+                  borderRadius: '12px',
+                  backgroundColor: 'rgba(8, 8, 10, 0.95)',
+                  backdropFilter: 'blur(10px)',
+                  border: `1px solid rgba(255, 255, 255, 0.1)`,
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
+                }}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePreview(currentVoice);
+                  }}
+                  className="flex items-center justify-center rounded-full transition-all duration-300 flex-shrink-0"
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    backgroundColor: 'rgba(0,0,0,0.9)',
+                    border: `1px solid ${colors.accent}`,
+                    boxShadow:
+                      isCurrentVoicePreviewing && isCurrentVoicePlaying
+                        ? `0 0 18px ${colors.accent}90, 0 0 32px ${colors.accent}60`
+                        : `0 0 12px ${colors.accent}70`,
+                  }}
+                >
+                  {isCurrentVoiceLoading ? (
+                    <Loader2
+                      size={20}
+                      className="animate-spin"
+                      style={{ color: colors.accent }}
+                    />
+                  ) : isCurrentVoicePreviewing && isCurrentVoicePlaying ? (
+                    <Volume2 size={22} style={{ color: colors.accent }} />
+                  ) : (
+                    <Play
+                      size={20}
+                      fill="#000"
+                      stroke={colors.accent}
+                      strokeWidth={2}
+                      style={{ marginLeft: '1px' }}
+                    />
+                  )}
+                </button>
+                <span
+                  className="text-sm"
+                  style={{
+                    color: colors.text,
+                    opacity: 0.7,
+                    fontFamily: 'var(--font-inter), sans-serif',
+                  }}
+                >
+                  Current Voice
+                </span>
+                <span
+                  className="text-sm font-semibold"
+                  style={{
+                    color: colors.text,
+                    fontFamily: 'var(--font-inter), sans-serif',
+                  }}
+                >
+                  {currentVoice.name}
+                </span>
+              </div>
+            </>
+          );
+        }
+        return null;
+      })()}
 
       {/* Voice Library Section Header - Premium Spacing */}
       <div style={{ marginBottom: '1.25rem', width: '100%', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <h3
+            id="available-voices-heading"
             className="text-lg sm:text-xl font-semibold"
               style={{
               color: colors.text,
@@ -1255,10 +1599,8 @@ export default function VoiceSelectionStep({
       >
         {/* Filters row - horizontal pills, scrollable on smaller screens */}
         <div
-          className="flex flex-nowrap gap-2.5 items-center overflow-x-auto"
+          className="flex flex-nowrap gap-2.5 items-center overflow-x-auto voice-selection-scrollbar"
           style={{
-            scrollbarWidth: 'thin',
-            scrollbarColor: `${colors.accent}40 transparent`,
             overflowY: 'visible',
             overflow: 'visible',
             paddingBottom: '0.25rem',
@@ -1417,7 +1759,7 @@ export default function VoiceSelectionStep({
               <div
                 className="fixed inset-0"
                 onClick={(e) => {
-                  // Only close if clicking directly on backdrop, not on dropdown
+                  // Only close if clicking directly on backdrop, not on dropdown or voice cards
                   if (e.target === e.currentTarget) {
                     closeAllDropdowns();
                   }
@@ -1425,11 +1767,18 @@ export default function VoiceSelectionStep({
                 onMouseDown={(e) => {
                   // Prevent backdrop from blocking dropdown clicks
                   const target = e.target as HTMLElement;
-                  if (target.closest('.rounded-xl')) {
+                  if (target.closest('.rounded-xl') || target.closest('.voice-card')) {
                     e.preventDefault();
                   }
                 }}
                 style={{ cursor: 'pointer', zIndex: 9998, pointerEvents: 'auto' }}
+                onPointerDown={(e) => {
+                  // Allow voice card clicks to pass through
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.voice-card')) {
+                    e.stopPropagation();
+                  }
+                }}
               />
             </>
           )}
@@ -1551,7 +1900,20 @@ export default function VoiceSelectionStep({
               </div>
               <div
                 className="fixed inset-0"
-                onClick={closeAllDropdowns}
+                onClick={(e) => {
+                  // Only close if clicking directly on backdrop, not on voice cards
+                  const target = e.target as HTMLElement;
+                  if (!target.closest('.voice-card') && e.target === e.currentTarget) {
+                    closeAllDropdowns();
+                  }
+                }}
+                onPointerDown={(e) => {
+                  // Allow voice card clicks to pass through
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.voice-card')) {
+                    e.stopPropagation();
+                  }
+                }}
                 style={{ cursor: 'pointer', zIndex: 9998, pointerEvents: 'auto' }}
               />
             </>
@@ -1726,7 +2088,20 @@ export default function VoiceSelectionStep({
                 </div>
               <div
                 className="fixed inset-0"
-                onClick={closeAllDropdowns}
+                onClick={(e) => {
+                  // Only close if clicking directly on backdrop, not on voice cards
+                  const target = e.target as HTMLElement;
+                  if (!target.closest('.voice-card') && e.target === e.currentTarget) {
+                    closeAllDropdowns();
+                  }
+                }}
+                onPointerDown={(e) => {
+                  // Allow voice card clicks to pass through
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.voice-card')) {
+                    e.stopPropagation();
+                  }
+                }}
                 style={{ cursor: 'pointer', zIndex: 350, pointerEvents: 'auto' }}
                 />
               </>
@@ -1882,7 +2257,20 @@ export default function VoiceSelectionStep({
                 </div>
               <div
                 className="fixed inset-0"
-                onClick={closeAllDropdowns}
+                onClick={(e) => {
+                  // Only close if clicking directly on backdrop, not on voice cards
+                  const target = e.target as HTMLElement;
+                  if (!target.closest('.voice-card') && e.target === e.currentTarget) {
+                    closeAllDropdowns();
+                  }
+                }}
+                onPointerDown={(e) => {
+                  // Allow voice card clicks to pass through
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.voice-card')) {
+                    e.stopPropagation();
+                  }
+                }}
                 style={{ cursor: 'pointer', zIndex: 350, pointerEvents: 'auto' }}
                 />
               </>
@@ -2006,7 +2394,20 @@ export default function VoiceSelectionStep({
               </div>
               <div
                 className="fixed inset-0"
-                onClick={closeAllDropdowns}
+                onClick={(e) => {
+                  // Only close if clicking directly on backdrop, not on voice cards
+                  const target = e.target as HTMLElement;
+                  if (!target.closest('.voice-card') && e.target === e.currentTarget) {
+                    closeAllDropdowns();
+                  }
+                }}
+                onPointerDown={(e) => {
+                  // Allow voice card clicks to pass through
+                  const target = e.target as HTMLElement;
+                  if (target.closest('.voice-card')) {
+                    e.stopPropagation();
+                  }
+                }}
                 style={{ cursor: 'pointer', zIndex: 9998, pointerEvents: 'auto' }}
               />
             </>
@@ -2275,13 +2676,13 @@ export default function VoiceSelectionStep({
           paddingBottom: '2.5rem',
           flex: 1,
           minHeight: 0,
-          overflowY: 'visible',
+          overflowY: 'auto',
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
           scrollBehavior: 'smooth',
-          zIndex: 1, // Lower z-index so dropdowns (z-index 10000) appear above cards
+          zIndex: 10001, // Above backdrop (9998) but below dropdown menus (10000+)
         }}
-        className="scrollbar-thin"
+        className="voice-selection-scrollbar"
       >
         {isLoadingVoices ? (
           <div
@@ -2379,15 +2780,41 @@ export default function VoiceSelectionStep({
               maxWidth: '400px',
               lineHeight: '1.6',
             }}>
-              No voices match your current filters. Try adjusting your selection or describe a custom voice above to generate one.
+              No voices match your current search. Go back to browse the full voice library.
             </p>
             <button
               onClick={() => {
+                // Clear ALL search-related state to show full library
+                setVoiceDescription('');
+                setGeneratedVoices([]);
+                setDescriptionHash('');
+                setMatchedVoiceId(null);
+                setIsPreviewingDescription(false);
+                setIsPlaying(false);
+                // Stop any playing audio
+                if (descriptionAudioRef.current) {
+                  descriptionAudioRef.current.pause();
+                  descriptionAudioRef.current = null;
+                }
+                // Reset all filters
                 setActiveFilter('all');
                 setActiveLanguage('all');
                 setActiveAccent('all');
                 setActiveStyle('all');
                 setActiveAgeGroup('all');
+                // Scroll to voice library section to show the results
+                setTimeout(() => {
+                  const voiceSection = document.getElementById('available-voices-heading');
+                  if (voiceSection) {
+                    voiceSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  } else {
+                    // Fallback: scroll to top of voice cards container
+                    const voiceCardsContainer = document.querySelector('[data-voice-scroll-container]');
+                    if (voiceCardsContainer) {
+                      voiceCardsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }
+                }, 150);
               }}
               className="px-6 py-3 rounded-full text-sm font-medium transition-all duration-300"
               style={{
@@ -2407,7 +2834,7 @@ export default function VoiceSelectionStep({
                 e.currentTarget.style.transform = 'scale(1)';
               }}
             >
-              Clear All Filters
+              Go Back to Library
             </button>
           </div>
         ) : (
@@ -2426,7 +2853,7 @@ export default function VoiceSelectionStep({
             selectedVoice === voice.voiceId ||
             selectedVoice === voice.id;
           const isPreviewing = previewingVoiceId === voice.id;
-          const hasSelection = selectedVoice !== null;
+          const hasSelection = selectedVoice !== null && selectedVoice !== '';
           const isDarkened = hasSelection && !isSelected;
 
           // Compact tag set for card header - filter out incorrect tags
@@ -2462,31 +2889,56 @@ export default function VoiceSelectionStep({
             });
           }
 
-          // Create unique key combining id, source, and index to avoid duplicates
-          const uniqueKey = `${voice.source || 'unknown'}-${voice.id || index}-${index}`;
+          // Create stable unique key using voice ID - don't use index as it changes with filtering
+          // Use voiceId or id as primary, fallback to generatedVoiceId, then index only as last resort
+          const stableKey = voice.voiceId || voice.id || voice.generatedVoiceId || `voice-${index}`;
+          const uniqueKey = `${voice.source || 'unknown'}-${stableKey}`;
 
           return (
             <div
               key={uniqueKey}
-              onClick={async (e) => {
-                // Prevent event bubbling if clicking on preview button
-                if ((e.target as HTMLElement).closest('button')) {
+              onClick={(e) => {
+                // Prevent any parent handlers from interfering
+                e.stopPropagation();
+                e.preventDefault();
+                
+                // CRITICAL: Block ALL clicks if we're processing ANY selection
+                // Check both ref and state to ensure no clicks get through
+                if (isProcessingSelectionRef.current || isProcessingClick) {
                   return;
                 }
-                // Toggle selection - if already selected, deselect
-                if (isSelected) {
-                  onSelectionChange('');
-                  console.log('[FRONTEND DEBUG] Voice deselected');
-                } else {
-                  // CRITICAL: Validate and convert voice before selection
-                  // Generated voices MUST be converted to permanent voices
-                  let voiceIdToUse = voice.id;
-                  let validationError: string | null = null;
-                  
-                  if (voice.source === 'generated' && voice.generatedVoiceId) {
-                    try {
-                      // Create permanent voice from generated preview - MANDATORY
-                      const createResponse = await fetch('/api/createVoiceFromPreview', {
+                
+                // Prevent rapid clicks on the same card from causing multiple state updates
+                const voiceIdentifier = voice.voiceId || voice.id || voice.generatedVoiceId;
+                if (!voiceIdentifier) {
+                  return;
+                }
+                
+                // Set flags IMMEDIATELY and synchronously to block all subsequent clicks
+                isProcessingSelectionRef.current = true;
+                setIsProcessingClick(true); // This will disable pointer events on all cards
+                clickProcessingRef.current.add(voiceIdentifier);
+                
+                // Process the selection immediately (no delay - delay was causing issues)
+                startTransition(() => {
+                  if (isSelected) {
+                    // Deselect if already selected
+                    onSelectionChange('');
+                    // Clear flags after DOM settles
+                    setTimeout(() => {
+                      clickProcessingRef.current.delete(voiceIdentifier);
+                      isProcessingSelectionRef.current = false;
+                      setIsProcessingClick(false);
+                    }, 600);
+                  } else {
+                    // Select immediately - works for both darkened and normal cards
+                    if (voice.source === 'generated' && voice.generatedVoiceId) {
+                      // Select with the generated ID first for immediate feedback
+                      if (voice.id) {
+                        onSelectionChange(voice.id);
+                      }
+                      // Convert in background without blocking
+                      fetch('/api/createVoiceFromPreview', {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',
@@ -2496,191 +2948,150 @@ export default function VoiceSelectionStep({
                           voiceName: voice.name,
                           voiceDescription: voice.description,
                         }),
-                      });
-
-                      if (createResponse.ok) {
-                        const createData = await createResponse.json();
-                        if (createData.voiceId) {
-                          voiceIdToUse = createData.voiceId;
-                          console.log('[FRONTEND DEBUG] Created permanent voice:', createData.voiceId);
-                        } else {
-                          validationError = 'Failed to create permanent voice: No voice ID returned';
-                        }
-                      } else {
-                        const errorData = await createResponse.json().catch(() => ({}));
-                        validationError = errorData.error || 'Failed to create permanent voice. This voice cannot be used.';
-                        console.error('[FRONTEND DEBUG] Voice conversion failed:', errorData);
-                      }
-                    } catch (error) {
-                      validationError = 'Failed to convert voice to permanent voice. Please try again.';
-                      console.error('[FRONTEND DEBUG] Error creating voice:', error);
+                      })
+                        .then(res => res.json())
+                        .then(data => {
+                          if (data.voiceId) {
+                            // Use startTransition for the final update too
+                            startTransition(() => {
+                              onSelectionChange(data.voiceId);
+                            });
+                          }
+                          // Clear flags after DOM settles
+                          setTimeout(() => {
+                            clickProcessingRef.current.delete(voiceIdentifier);
+                            isProcessingSelectionRef.current = false;
+                            setIsProcessingClick(false);
+                          }, 600);
+                        })
+                        .catch(err => {
+                          console.error('Failed to convert voice:', err);
+                          clickProcessingRef.current.delete(voiceIdentifier);
+                          isProcessingSelectionRef.current = false;
+                          setIsProcessingClick(false);
+                        });
+                    } else {
+                      // Regular voice - select immediately using voiceId or id
+                      onSelectionChange(voiceIdentifier);
+                      // Clear flags after DOM settles
+                      setTimeout(() => {
+                        clickProcessingRef.current.delete(voiceIdentifier);
+                        isProcessingSelectionRef.current = false;
+                        setIsProcessingClick(false);
+                      }, 600);
                     }
                   }
-                  
-                  // Validate voice can be used with VAPI before allowing selection
-                  if (!validationError) {
-                    try {
-                      const validateResponse = await fetch('/api/validateVoiceForVAPI', {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                          voiceId: voiceIdToUse,
-                        }),
-                      });
-
-                      const validateData = await validateResponse.json();
-                      
-                      if (!validateData.valid) {
-                        validationError = validateData.error || 'Voice cannot be used with VAPI. Please select a different voice.';
-                        console.error('[FRONTEND DEBUG] Voice validation failed:', validateData);
-                      }
-                    } catch (error) {
-                      // If validation fails, still allow selection but log warning
-                      console.warn('[FRONTEND DEBUG] Voice validation check failed, proceeding with selection:', error);
-                    }
-                  }
-                  
-                  // Only allow selection if voice is valid
-                  if (validationError) {
-                    alert(`Cannot select this voice:\n\n${validationError}\n\nPlease try selecting a different voice or generating a new one.`);
-                    return;
-                  }
-                  
-                  onSelectionChange(voiceIdToUse);
-                  console.log('[FRONTEND DEBUG] Voice selected and validated:', {
-                    voiceId: voiceIdToUse,
-                    originalId: voice.id,
-                    voiceName: voice.name,
-                    gender: voice.gender,
-                    accent: voice.accent,
-                    description: voice.description,
-                    source: voice.source,
-                  });
-                }
+                });
               }}
-              className="voice-card cursor-pointer transition-all duration-300 ease-out rounded-2xl relative flex flex-col group"
+              className="voice-card transition-all duration-300 ease-out rounded-2xl relative flex flex-col group"
               style={{
+                // Processing state - physically disable clicks and show visual feedback
+                cursor: isProcessingClick ? 'not-allowed' : 'pointer',
+                pointerEvents: isProcessingClick ? 'none' : 'auto', // Physically disable clicks during processing
+                // Card styling
                 backgroundColor: isSelected
                   ? `${colors.accent}20`
+                  : isDarkened
+                  ? 'rgba(0, 0, 0, 0.6)'
                   : 'rgba(8, 8, 10, 0.92)',
                 backgroundImage: isSelected
                   ? `linear-gradient(135deg, ${colors.accent}40 0%, ${colors.accent}15 35%, rgba(0, 0, 0, 0.9) 100%)`
+                  : isDarkened
+                  ? `linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.9) 100%)`
                   : `linear-gradient(135deg, ${colors.accent}18 0%, rgba(12, 10, 24, 0.95) 45%, rgba(0, 0, 0, 0.98) 100%)`,
-                border: `1.5px solid ${
+                border: `2px solid ${
                   isSelected
                     ? colors.accent
-                    : 'rgba(148, 163, 184, 0.35)'
+                    : isDarkened
+                    ? 'rgba(255, 255, 255, 0.05)'
+                    : 'rgba(255, 255, 255, 0.1)'
                 }`,
                 borderRadius: '16px',
                 boxShadow: isSelected
-                  ? `0 18px 45px rgba(0, 0, 0, 0.9), 0 0 40px ${colors.accent}55, 0 0 0 1px ${colors.accent}35 inset`
+                  ? `0 8px 32px ${colors.accent}50, 0 0 30px ${colors.accent}40, 0 0 50px ${colors.accent}30, inset 0 0 20px ${colors.accent}10`
+                  : isDarkened
+                  ? '0 10px 30px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(0, 0, 0, 0.5)'
                   : '0 10px 30px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(15, 23, 42, 0.9)',
                 height: '100%',
                 minHeight: '190px',
                 padding: '1.1rem 1.2rem',
-                transform: isSelected ? 'translateY(-6px) scale(1.03)' : 'translateY(0) scale(1)',
+                transform: isSelected ? 'translateY(-4px) scale(1.02)' : 'translateY(0) scale(1)',
                 backdropFilter: 'blur(26px)',
                 WebkitBackdropFilter: 'blur(26px)',
                 position: 'relative',
                 overflow: 'visible',
-                opacity: isDarkened ? 0.35 : 1,
-                zIndex: isSelected ? 10 : 1,
-                pointerEvents: 'auto',
-                cursor: 'pointer',
+                opacity: isProcessingClick ? 0.6 : (isDarkened ? 0.4 : 1), // Processing state overrides darkened state
+                zIndex: isSelected ? 10002 : 10001, // Above backdrop (9998) but below dropdown menus (10000+)
                 animation: 'fade-in-scale 0.4s ease-out',
                 animationDelay: `${index * 0.05}s`,
                 animationFillMode: 'both',
                 transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
               }}
               onMouseEnter={(e) => {
-                if (!isSelected && !isDarkened) {
-                  e.currentTarget.style.transform = 'translateY(-6px) scale(1.03)';
-                  e.currentTarget.style.boxShadow = `0 6px 16px rgba(0,0,0,0.2), 0 8px 32px rgba(168, 85, 247, 0.3), 0 12px 48px rgba(168, 85, 247, 0.2)`;
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                  e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.5)';
-                  // Fade other cards slightly
-                  const cards = e.currentTarget.parentElement?.children;
-                  if (cards) {
-                    Array.from(cards).forEach((card: any) => {
-                      if (card !== e.currentTarget && !card.classList.contains('voice-card-selected')) {
-                        card.style.opacity = '0.6';
-                      }
-                    });
+                if (!isSelected) {
+                  if (isDarkened) {
+                    // Keep darkened cards dark on hover - minimal hover effect only
+                    e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
+                    e.currentTarget.style.opacity = '0.5'; // Slight increase for feedback
+                    // Keep all dark colors - don't restore bright colors
+                    e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
+                    e.currentTarget.style.backgroundImage = `linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.9) 100%)`;
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(0, 0, 0, 0.5)';
+                  } else {
+                    // Normal hover effect for non-darkened cards
+                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)';
+                    e.currentTarget.style.boxShadow = `0 4px 16px ${colors.accent}30`;
+                    e.currentTarget.style.backgroundColor = 'rgba(8, 8, 10, 0.92)';
+                    e.currentTarget.style.backgroundImage = `linear-gradient(135deg, ${colors.accent}18 0%, rgba(12, 10, 24, 0.95) 45%, rgba(0, 0, 0, 0.98) 100%)`;
                   }
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isSelected) {
-                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1), 0 4px 16px rgba(0, 0, 0, 0.15)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                  // Restore other cards
-                  const cards = e.currentTarget.parentElement?.children;
-                  if (cards) {
-                    Array.from(cards).forEach((card: any) => {
-                      if (card !== e.currentTarget) {
-                        const isSelected = card.classList.contains('voice-card-selected');
-                        card.style.opacity = isSelected ? '1' : '1';
-                      }
-                    });
+                  if (isDarkened) {
+                    // Revert to darkened state (not original bright colors)
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.opacity = '0.4';
+                    e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.6)';
+                    e.currentTarget.style.backgroundImage = `linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.9) 100%)`;
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(0, 0, 0, 0.5)';
+                  } else {
+                    // Revert to normal state for non-darkened cards
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(15, 23, 42, 0.9)';
+                    e.currentTarget.style.backgroundColor = 'rgba(8, 8, 10, 0.92)';
+                    e.currentTarget.style.backgroundImage = `linear-gradient(135deg, ${colors.accent}18 0%, rgba(12, 10, 24, 0.95) 45%, rgba(0, 0, 0, 0.98) 100%)`;
                   }
                 }
               }}
             >
-              {/* Enhanced animated glow border for selected state */}
+              {/* Animated glow border for selected state - matching QuestionCard exactly */}
               {isSelected && (
                 <>
-                  {/* Outer glow ring - enhanced multi-layer with smooth pulse */}
+                  {/* Outer glow ring - matches QuestionCard structure */}
                   <div
-                    className="absolute pointer-events-none"
+                    className="absolute inset-0 rounded-2xl pointer-events-none"
                     style={{
-                      top: '-4px',
-                      left: '-4px',
-                      right: '-4px',
-                      bottom: '-4px',
-                      borderRadius: '20px',
-                      animation: 'selected-glow-pulse 2.5s ease-in-out infinite',
+                      border: `2px solid ${colors.accent}`,
+                      borderRadius: '16px',
+                      animation: 'glow-pulse 2s ease-in-out infinite',
                       boxShadow: `
-                        0 0 24px ${colors.accent}70,
-                        0 0 48px ${colors.accent}60,
-                        0 0 72px ${colors.accent}50,
-                        inset 0 0 24px ${colors.accent}25
+                        0 0 20px ${colors.accent}60,
+                        0 0 40px ${colors.accent}40,
+                        inset 0 0 20px ${colors.accent}20
                       `,
-                      zIndex: -1,
                     }}
                   />
-                  {/* Inner glow effect - enhanced with radial gradient */}
+                  {/* Inner glow effect - matches QuestionCard structure */}
                   <div
-                    className="absolute inset-[2px] rounded-[16px] pointer-events-none"
+                    className="absolute inset-[2px] rounded-xl pointer-events-none"
                     style={{
-                      background: `radial-gradient(circle at 30% 30%, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.08) 40%, transparent 70%)`,
-                      animation: 'glow-inner-pulse 3s ease-in-out infinite',
-                      zIndex: -1,
+                      background: `radial-gradient(circle at center, ${colors.accent}10 0%, transparent 70%)`,
+                      animation: 'glow-inner 2s ease-in-out infinite',
                     }}
                   />
-                  <style>{`
-                    @keyframes selected-glow-pulse {
-                      0%, 100% {
-                        opacity: 0.8;
-                        transform: scale(1);
-                      }
-                      50% {
-                        opacity: 1;
-                        transform: scale(1.02);
-                      }
-                    }
-                    @keyframes glow-inner-pulse {
-                      0%, 100% {
-                        opacity: 0.6;
-                      }
-                      50% {
-                        opacity: 1;
-                      }
-                    }
-                  `}</style>
                 </>
               )}
 
@@ -2764,6 +3175,19 @@ export default function VoiceSelectionStep({
                       isPreviewing && isPlaying
                         ? `0 0 18px ${colors.accent}90, 0 0 32px ${colors.accent}60`
                         : `0 0 12px ${colors.accent}70`,
+                    transform: 'scale(1)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.15)';
+                    e.currentTarget.style.boxShadow = isPreviewing && isPlaying
+                      ? `0 0 24px ${colors.accent}100, 0 0 40px ${colors.accent}70`
+                      : `0 0 18px ${colors.accent}85, 0 0 28px ${colors.accent}60`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = isPreviewing && isPlaying
+                      ? `0 0 18px ${colors.accent}90, 0 0 32px ${colors.accent}60`
+                      : `0 0 12px ${colors.accent}70`;
                   }}
                 >
                   {isLoading && previewingVoiceId === voice.id ? (

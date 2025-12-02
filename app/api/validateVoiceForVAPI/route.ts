@@ -50,13 +50,14 @@ export async function validateVoiceForVAPI(voiceId: string): Promise<{ valid: bo
                   },
                   voiceName: curatedVoice.name,
                 };
-              } else {
-                return {
-                  valid: false,
-                  error: 'Voice not found in ElevenLabs',
-                  details: `Voice ID ${curatedVoice.elevenLabsVoiceId} does not exist`,
-                };
-              }
+          } else {
+            const errorText = await response.text().catch(() => '');
+            return {
+              valid: false,
+              error: 'Voice not available in your ElevenLabs account',
+              details: `The voice "${curatedVoice.name}" (ID: ${curatedVoice.elevenLabsVoiceId}) is not available in your ElevenLabs account. Please select a different voice from the available options.`,
+            };
+          }
             } catch (error) {
               console.error('[VOICE VALIDATION] Error checking ElevenLabs voice:', error);
               return {
@@ -75,6 +76,61 @@ export async function validateVoiceForVAPI(voiceId: string): Promise<{ valid: bo
               voiceId: curatedVoice.vapiVoiceId,
             },
             voiceName: curatedVoice.name,
+          };
+        }
+      }
+
+      // Check if it looks like an ElevenLabs voice ID (long alphanumeric string)
+      // This handles direct ElevenLabs IDs that weren't found in the curated library
+      const looksLikeElevenLabsId = /^[a-zA-Z0-9]{15,}$/.test(trimmedVoiceId) && 
+                                     trimmedVoiceId.length >= 15 && 
+                                     trimmedVoiceId.length <= 25 &&
+                                     !trimmedVoiceId.includes('-') &&
+                                     !trimmedVoiceId.includes(' ');
+      
+      if (looksLikeElevenLabsId) {
+        // It's an ElevenLabs voice ID - validate it exists
+        const apiKey = process.env.ELEVENLABS_API_KEY;
+        if (apiKey) {
+          try {
+            const response = await fetch(`https://api.elevenlabs.io/v1/voices/${trimmedVoiceId}`, {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json',
+                'xi-api-key': apiKey,
+              },
+            });
+
+            if (response.ok) {
+              const voiceData = await response.json();
+              return {
+                valid: true,
+                voiceConfig: {
+                  provider: '11labs',
+                  voiceId: trimmedVoiceId,
+                },
+                voiceName: voiceData.name || 'Unknown',
+              };
+            } else {
+              const errorText = await response.text().catch(() => '');
+              return {
+                valid: false,
+                error: 'Voice not available in your ElevenLabs account',
+                details: `The selected voice (ID: ${trimmedVoiceId}) is not available in your ElevenLabs account. This voice may not exist or may not be accessible with your API key. Please select a different voice from the available options.`,
+              };
+            }
+          } catch (error) {
+            console.error('[VOICE VALIDATION] Error checking ElevenLabs voice:', error);
+            return {
+              valid: false,
+              error: 'Failed to validate voice with ElevenLabs',
+              details: error instanceof Error ? error.message : 'Unknown error',
+            };
+          }
+        } else {
+          return {
+            valid: false,
+            error: 'ElevenLabs API key not configured',
           };
         }
       }
@@ -107,10 +163,11 @@ export async function validateVoiceForVAPI(voiceId: string): Promise<{ valid: bo
               voiceName: voiceData.name || 'Unknown',
             };
           } else {
+            const errorText = await response.text().catch(() => '');
             return {
               valid: false,
-              error: 'Voice not found in ElevenLabs',
-              details: `Voice ID ${voiceConfig.voiceId} does not exist in ElevenLabs`,
+              error: 'Voice not available in your ElevenLabs account',
+              details: `The selected voice (ID: ${voiceConfig.voiceId}) is not available in your ElevenLabs account. This voice may not exist or may not be accessible with your API key. Please select a different voice from the available options.`,
             };
           }
         } catch (error) {

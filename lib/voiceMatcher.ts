@@ -16,7 +16,7 @@ const REGIONAL_ACCENT_GROUPS: { [key: string]: string[] } = {
   // Eastern European
   'eastern european': ['russian', 'ukrainian', 'polish', 'czech', 'hungarian', 'romanian', 'bulgarian', 'serbian', 'croatian', 'slovak', 'slovenian'],
   'russian': ['ukrainian', 'polish', 'eastern european'],
-  'ukrainian': ['russian', 'polish', 'eastern european'],
+  'ukrainian': ['russian', 'polish', 'bulgarian', 'romanian', 'czech', 'hungarian', 'serbian', 'croatian', 'eastern european'],
   'polish': ['russian', 'ukrainian', 'eastern european'],
   'czech': ['russian', 'ukrainian', 'polish', 'eastern european'],
   'hungarian': ['russian', 'ukrainian', 'polish', 'eastern european'],
@@ -48,23 +48,33 @@ const REGIONAL_ACCENT_GROUPS: { [key: string]: string[] } = {
   'southern american': ['american'], // CRITICAL: Do NOT match with "South African" - different regions
   'us southern': ['southern american', 'american'], // Variant name for Southern American
   
-  // Asian
-  'chinese': ['mandarin', 'cantonese'],
-  'japanese': ['korean'],
-  'korean': ['japanese'],
+  // Asian (East/Southeast Asian only - excludes South Asian like Indian/Pakistani)
+  'asian': ['chinese', 'japanese', 'korean', 'vietnamese', 'thai', 'filipino', 'indonesian', 'malaysian'],
+  'chinese': ['mandarin', 'cantonese', 'asian'],
+  'japanese': ['korean', 'asian'],
+  'korean': ['japanese', 'asian'],
+  'vietnamese': ['asian'],
+  'thai': ['asian'],
+  'filipino': ['asian'],
+  'indonesian': ['asian'],
+  'malaysian': ['asian'],
+  
+  // South Asian (separate from East Asian)
+  'pakistani': ['indian'],
+  'indian': ['pakistani'],
   
   // Middle Eastern / Arab (same group)
   'arabic': ['middle eastern', 'arab'],
   'middle eastern': ['arabic', 'arab'],
   'arab': ['arabic', 'middle eastern'],
   
-  // African (includes African-American)
+  // African (includes African-American AND other African countries)
   'african': ['nigerian', 'south african', 'african-american', 'kenyan', 'ghanaian', 'ethiopian', 'tanzanian', 'ugandan', 'zimbabwean'],
-  'nigerian': ['african', 'south african', 'african-american'],
-  'south african': ['african', 'nigerian', 'african-american'],
-  'african-american': ['african', 'nigerian', 'south african'],
-  'kenyan': ['african', 'nigerian', 'south african', 'african-american'],
-  'ghanaian': ['african', 'nigerian', 'south african', 'african-american'],
+  'nigerian': ['african', 'south african'],
+  'south african': ['african', 'nigerian'],
+  'kenyan': ['african', 'nigerian', 'south african'],
+  'ghanaian': ['african', 'nigerian', 'south african'],
+  'african-american': ['african'],
   
   // Scandinavian
   'swedish': ['norwegian', 'danish', 'scandinavian'],
@@ -121,17 +131,33 @@ function normalizeAccent(accent: string): string {
  * These accents should NEVER match each other, even if they share words
  */
 const ACCENT_EXCLUSIONS: { [key: string]: string[] } = {
-  // South African must NOT match any US accents
-  'south african': ['southern american', 'us southern', 'us-southern', 'southern', 'american', 'northern american', 'us'],
+  // South African must NOT match any US accents (but can match other African countries)
+  'south african': ['southern american', 'us southern', 'us-southern', 'southern', 'american', 'northern american', 'us', 'african-american'],
+  // African can match African-American (they're in the same group) but NOT other US accents
   'african': ['southern american', 'us southern', 'us-southern', 'southern', 'northern american', 'us'],
-  'nigerian': ['southern american', 'us southern', 'us-southern', 'southern', 'american', 'us'],
-  'african-american': ['southern american', 'us southern', 'us-southern', 'southern', 'us'],
+  'nigerian': ['southern american', 'us southern', 'us-southern', 'southern', 'american', 'us', 'african-american'],
+  'kenyan': ['african-american'],
+  'ghanaian': ['african-american'],
+  
+  // African-American can match 'african' group (so "African" searches show African-American)
+  // But must NOT match individual African countries or US accents
+  'african-american': ['south african', 'nigerian', 'kenyan', 'ghanaian', 'ethiopian', 'tanzanian', 'ugandan', 'zimbabwean', 'southern american', 'us southern', 'us-southern', 'southern', 'us'],
   
   // US Southern must NOT match African accents (normalized variations)
-  'southern american': ['south african', 'african', 'nigerian', 'african-american'],
-  'us southern': ['south african', 'african', 'nigerian', 'african-american'],
-  'us-southern': ['south african', 'african', 'nigerian', 'african-american'],
-  'southern': ['south african', 'african', 'nigerian', 'african-american'], // Generic "Southern" shouldn't match African
+  'southern american': ['south african', 'african', 'nigerian', 'kenyan', 'ghanaian'],
+  'us southern': ['south african', 'african', 'nigerian', 'kenyan', 'ghanaian'],
+  'us-southern': ['south african', 'african', 'nigerian', 'kenyan', 'ghanaian'],
+  'southern': ['south african', 'african', 'nigerian', 'kenyan', 'ghanaian'], // Generic "Southern" shouldn't match African
+  
+  // Asian (East/Southeast Asian) must NOT match South Asian (Indian/Pakistani)
+  'asian': ['indian', 'pakistani'],
+  'chinese': ['indian', 'pakistani'],
+  'japanese': ['indian', 'pakistani'],
+  'korean': ['indian', 'pakistani'],
+  
+  // South Asian must NOT match East/Southeast Asian
+  'indian': ['asian', 'chinese', 'japanese', 'korean', 'vietnamese', 'thai', 'filipino'],
+  'pakistani': ['asian', 'chinese', 'japanese', 'korean', 'vietnamese', 'thai', 'filipino'],
   
   // Eastern European must NOT match British
   'ukrainian': ['british', 'irish', 'scottish', 'welsh', 'english'],
@@ -147,7 +173,16 @@ function areAccentsExcluded(accent1: string, accent2: string): boolean {
   const acc1 = normalizeAccent(accent1);
   const acc2 = normalizeAccent(accent2);
   
-  // Check exclusion rules (check both normalized and original forms)
+  // Get original forms (lowercase, trimmed)
+  const acc1Original = accent1.toLowerCase().trim();
+  const acc2Original = accent2.toLowerCase().trim();
+  
+  // Check exclusion rules with all combinations:
+  // 1. Normalized vs Normalized
+  // 2. Original vs Original
+  // 3. Normalized vs Original (both ways)
+  
+  // Check normalized forms
   if (ACCENT_EXCLUSIONS[acc1] && ACCENT_EXCLUSIONS[acc1].includes(acc2)) {
     return true;
   }
@@ -155,13 +190,25 @@ function areAccentsExcluded(accent1: string, accent2: string): boolean {
     return true;
   }
   
-  // Also check original forms
-  const acc1Original = accent1.toLowerCase().trim();
-  const acc2Original = accent2.toLowerCase().trim();
+  // Check original forms
   if (ACCENT_EXCLUSIONS[acc1Original] && ACCENT_EXCLUSIONS[acc1Original].includes(acc2Original)) {
     return true;
   }
   if (ACCENT_EXCLUSIONS[acc2Original] && ACCENT_EXCLUSIONS[acc2Original].includes(acc1Original)) {
+    return true;
+  }
+  
+  // Check normalized vs original (both ways)
+  if (ACCENT_EXCLUSIONS[acc1] && ACCENT_EXCLUSIONS[acc1].includes(acc2Original)) {
+    return true;
+  }
+  if (ACCENT_EXCLUSIONS[acc1Original] && ACCENT_EXCLUSIONS[acc1Original].includes(acc2)) {
+    return true;
+  }
+  if (ACCENT_EXCLUSIONS[acc2] && ACCENT_EXCLUSIONS[acc2].includes(acc1Original)) {
+    return true;
+  }
+  if (ACCENT_EXCLUSIONS[acc2Original] && ACCENT_EXCLUSIONS[acc2Original].includes(acc1)) {
     return true;
   }
   
@@ -175,21 +222,27 @@ function areAccentsSimilar(accent1: string, accent2: string): boolean {
   // Normalize accents first
   const acc1 = normalizeAccent(accent1);
   const acc2 = normalizeAccent(accent2);
+  const acc1Original = accent1.toLowerCase().trim();
+  const acc2Original = accent2.toLowerCase().trim();
   
-  // Check explicit exclusions first - these should NEVER match
-  if (areAccentsExcluded(acc1, acc2)) {
+  // CRITICAL: Check explicit exclusions first - these should NEVER match
+  // Check ALL combinations: normalized, original, and cross-combinations
+  if (areAccentsExcluded(acc1, acc2) || 
+      areAccentsExcluded(acc1Original, acc2Original) ||
+      areAccentsExcluded(acc1, acc2Original) ||
+      areAccentsExcluded(acc1Original, acc2)) {
     return false;
   }
   
-  // Exact match (after normalization)
-  if (acc1 === acc2) return true;
+  // Exact match (after normalization or original)
+  if (acc1 === acc2 || acc1Original === acc2Original) return true;
   
   // Check if one is similar to the other
-  const similar1 = getSimilarAccents(acc1);
-  if (similar1.includes(acc2)) return true;
+  const similar1 = getSimilarAccents(acc1Original);
+  if (similar1.includes(acc2) || similar1.includes(acc2Original)) return true;
   
-  const similar2 = getSimilarAccents(acc2);
-  if (similar2.includes(acc1)) return true;
+  const similar2 = getSimilarAccents(acc2Original);
+  if (similar2.includes(acc1) || similar2.includes(acc1Original)) return true;
   
   return false;
 }
@@ -254,11 +307,16 @@ export function matchDescriptionToVoice(
     let hasMatchingAccent = accentExists;
     if (!hasMatchingAccent) {
       // Check for similar accents from the same regional group
+      // CRITICAL: Filter out excluded accents when checking for similar accents
       const similarAccents = getSimilarAccents(parsedAccentLower);
-      hasMatchingAccent = similarAccents.some(similarAccent => availableAccents.has(similarAccent));
+      const validSimilarAccents = similarAccents.filter(similarAccent => {
+        // Only consider accents that exist in library AND are not excluded
+        return availableAccents.has(similarAccent) && !areAccentsExcluded(parsedAccentLower, similarAccent);
+      });
+      hasMatchingAccent = validSimilarAccents.length > 0;
       
       if (hasMatchingAccent) {
-        console.log(`[VOICE MATCHER] Accent "${attributes.accent}" not found, but similar regional accent exists. Will use regional matching.`);
+        console.log(`[VOICE MATCHER] Accent "${attributes.accent}" not found, but similar regional accent exists. Will use regional matching. Valid similar accents:`, validSimilarAccents);
         // Don't return empty - allow matching to proceed with regional fallback
       }
     }
@@ -270,10 +328,21 @@ export function matchDescriptionToVoice(
     }
     
     // CRITICAL: Verify that at least one voice with this accent or similar accent exists
+    // Also ensure that excluded accents are not considered as matches
     const voicesWithAccent = curatedVoices.filter(v => {
       if (!v.accent) return false;
       const voiceAccent = v.accent.toLowerCase().trim();
-      return voiceAccent === parsedAccentLower || areAccentsSimilar(voiceAccent, parsedAccentLower);
+      const isExactMatch = voiceAccent === parsedAccentLower;
+      const isSimilar = areAccentsSimilar(voiceAccent, parsedAccentLower);
+      
+      // If there's a match (exact or similar), double-check it's not excluded
+      if (isExactMatch || isSimilar) {
+        // Double-check exclusions - this should never be true if areAccentsSimilar is working, but safety check
+        if (!areAccentsExcluded(parsedAccentLower, voiceAccent)) {
+          return true;
+        }
+      }
+      return false;
     });
     
     if (voicesWithAccent.length === 0) {
@@ -359,7 +428,11 @@ export function matchDescriptionToVoice(
       const voiceAccentOriginal = voice.accent.toLowerCase().trim();
 
       // CRITICAL: Check explicit exclusions first - these should NEVER match
-      if (areAccentsExcluded(attrAccent, voiceAccent)) {
+      // Check ALL combinations: normalized, original, and cross-combinations
+      if (areAccentsExcluded(attrAccent, voiceAccent) || 
+          areAccentsExcluded(attrAccentOriginal, voiceAccentOriginal) ||
+          areAccentsExcluded(attrAccent, voiceAccentOriginal) ||
+          areAccentsExcluded(attrAccentOriginal, voiceAccent)) {
         console.log(`[VOICE MATCHER] Explicit exclusion: "${attrAccentOriginal}" cannot match "${voiceAccentOriginal}" - filtering out ${voice.name}`);
         return false; // Filter out - explicit exclusion rule
       }
@@ -369,6 +442,7 @@ export function matchDescriptionToVoice(
       
       // Check for regional match (e.g., Ukrainian matches Russian, Polish from Eastern European group)
       // When searching "African", should match Nigerian, South African, African-American, etc.
+      // Note: areAccentsSimilar already checks exclusions internally, but double-check here
       const regionalMatch = areAccentsSimilar(voiceAccentOriginal, attrAccentOriginal);
       
       if (!exactMatch && !regionalMatch) {
@@ -385,6 +459,13 @@ export function matchDescriptionToVoice(
   });
 
   console.log(`[VOICE MATCHER] Pre-filtered ${preFilteredVoices.length} voices from ${curatedVoices.length} (matched critical attributes)`);
+
+  // CRITICAL: If accent was specified and no voices remain after pre-filtering, return empty
+  // This prevents fallback to keyword/age/gender matching when accent doesn't match
+  if (attributes.accent && preFilteredVoices.length === 0) {
+    console.log(`[VOICE MATCHER] Accent "${attributes.accent}" was specified but no voices matched after pre-filtering. Returning empty results.`);
+    return [];
+  }
 
   // Score each pre-filtered voice
   const matches: VoiceMatch[] = preFilteredVoices.map(voice => {

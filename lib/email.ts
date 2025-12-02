@@ -32,11 +32,15 @@ export async function sendKendallWelcomeEmail({
   fullName,
   phoneNumber,
   editLink,
+  chatLink,
+  recordId,
 }: {
   to: string;
   fullName: string;
   phoneNumber: string;
   editLink: string;
+  chatLink?: string;
+  recordId: string;
 }) {
   try {
     const transporter = createTransporter();
@@ -58,11 +62,18 @@ export async function sendKendallWelcomeEmail({
     const formattedPhone = formatPhoneForDisplay(phoneNumber);
 
     // Get base URL from environment or use relative URL
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : 'http://localhost:3000';
+    // Priority: NEXT_PUBLIC_BASE_URL > https://VERCEL_URL > localhost
+    // ✅ Fix: Properly prioritize NEXT_PUBLIC_BASE_URL over VERCEL_URL
+    let baseUrl = 'http://localhost:3000';
+    if (process.env.NEXT_PUBLIC_BASE_URL) {
+      baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    } else if (process.env.VERCEL_URL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    }
     
     const fullEditLink = editLink.startsWith('http') ? editLink : `${baseUrl}${editLink}`;
+    // ✅ Fix: Ensure relative chat links get base URL prepended
+    const fullChatLink = chatLink?.startsWith('http') ? chatLink : `${baseUrl}${chatLink || `/chat?recordId=${recordId}`}`;
 
     const mailOptions = {
       from: `"My Kendall" <${process.env.GMAIL_USER}>`,
@@ -99,9 +110,17 @@ export async function sendKendallWelcomeEmail({
                         
                         <table role="presentation" style="width: 100%; margin: 30px 0;">
                           <tr>
+                            <td align="center" style="padding-bottom: 15px;">
+                              <a href="${fullChatLink}" 
+                                 style="display: inline-block; padding: 14px 32px; background-color: #a855f7; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                                Chat with Kendall
+                              </a>
+                            </td>
+                          </tr>
+                          <tr>
                             <td align="center">
                               <a href="${fullEditLink}" 
-                                 style="display: inline-block; padding: 14px 32px; background-color: #a855f7; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                                 style="display: inline-block; padding: 14px 32px; background-color: transparent; color: #a855f7; text-decoration: none; border: 2px solid #a855f7; border-radius: 6px; font-weight: 600; font-size: 16px;">
                                 Edit My Kendall
                               </a>
                             </td>
@@ -109,7 +128,7 @@ export async function sendKendallWelcomeEmail({
                         </table>
                         
                         <p style="margin: 30px 0 0 0; font-size: 14px; line-height: 1.5; color: #999999; border-top: 1px solid #eeeeee; padding-top: 20px;">
-                          This link allows you to update your Kendall's personality, voice, and settings as many times as you'd like.
+                          Chat with your Kendall anytime to get updates, request calls, or share information. You can also edit your Kendall's personality, voice, and settings as many times as you'd like.
                         </p>
                       </td>
                     </tr>
@@ -125,10 +144,13 @@ Hi ${fullName},
 
 ${formattedPhone}
 
-You can edit your Kendall's personality and settings anytime:
+Chat with your Kendall:
+${fullChatLink}
+
+Edit your Kendall's personality and settings:
 ${fullEditLink}
 
-This link allows you to update your Kendall's personality, voice, and settings as many times as you'd like.
+Chat with your Kendall anytime to get updates, request calls, or share information. You can also edit your Kendall's personality, voice, and settings as many times as you'd like.
       `.trim(),
     };
 
@@ -161,9 +183,12 @@ export async function sendBusinessTrialWelcomeEmail({
     const transporter = createTransporter();
 
     // Get base URL from environment or use relative URL
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.VERCEL_URL 
-      ? `https://${process.env.VERCEL_URL}` 
-      : 'http://localhost:3000';
+    let baseUrl = 'http://localhost:3000';
+    if (process.env.NEXT_PUBLIC_BASE_URL) {
+      baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+    } else if (process.env.VERCEL_URL) {
+      baseUrl = `https://${process.env.VERCEL_URL}`;
+    }
 
     const mailOptions = {
       from: `"Kendall Business" <${process.env.GMAIL_USER}>`,
@@ -231,4 +256,3 @@ Welcome to the future of business communication.
     throw error;
   }
 }
-

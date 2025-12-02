@@ -2,10 +2,92 @@
  * VAPI helper functions for My Kendall agent creation and phone number management
  */
 
-import { buildSystemPrompt } from './promptBlocks';
+import { buildSystemPrompt, buildLeanSystemPrompt } from './promptBlocks';
 import { getElevenLabsMapping } from './voiceMapping';
 
 const VAPI_API_URL = 'https://api.vapi.ai';
+
+/**
+ * Format phone number to E.164 format (e.g., +1XXXXXXXXXX)
+ * E.164 format requires: +[country code][number] with no spaces or special characters
+ */
+export function formatPhoneNumberToE164(phone: string): string | null {
+  if (!phone || typeof phone !== 'string') {
+    return null;
+  }
+  
+  const trimmed = phone.trim();
+  if (!trimmed) {
+    return null;
+  }
+  
+  let cleaned = trimmed;
+  
+  if (cleaned.startsWith('+')) {
+    const digits = cleaned.replace(/\D/g, '');
+    // E.164 format for US: +1XXXXXXXXXX (12 digits total)
+    if (digits.length === 11 && digits.startsWith('1')) {
+      return `+${digits}`;
+    }
+    if (digits.length >= 10) {
+      // If it's already 10+ digits with +, validate it's properly formatted
+      if (digits.length === 11 && digits.startsWith('1')) {
+        return `+${digits}`;
+      }
+      // If starts with + but wrong length, return as-is (let API handle validation)
+      return `+${digits}`;
+    }
+    return null;
+  }
+  
+  const digits = cleaned.replace(/\D/g, '');
+  
+  if (digits.length < 10) {
+    return null;
+  }
+  
+  // Exactly 10 digits: add +1 prefix
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  
+  // 11 digits starting with 1: add + prefix only
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+  
+  // 11 digits NOT starting with 1: assume typo, take last 10 digits
+  if (digits.length === 11 && !digits.startsWith('1')) {
+    const lastTen = digits.slice(-10);
+    return `+1${lastTen}`;
+  }
+  
+  // More than 11 digits: invalid, return null
+  if (digits.length > 11) {
+    return null;
+  }
+  
+  // Fallback: should not reach here, but if we do, treat as 10 digits
+  if (digits.length >= 10) {
+    const lastTen = digits.slice(-10);
+    return `+1${lastTen}`;
+  }
+  
+  return null;
+}
+
+/**
+ * VAPI function definition for checking if the caller is the owner
+ */
+const CHECK_IF_OWNER_FUNCTION = {
+  name: 'check_if_owner',
+  description: 'Call this function at the very start of every conversation to check if the caller is the owner. This will help you greet the owner by name immediately.',
+  parameters: {
+    type: 'object',
+    properties: {},
+    required: [],
+  },
+};
 
 /**
  * VAPI function definition for capturing notes/messages from callers
@@ -26,6 +108,120 @@ const CAPTURE_NOTE_FUNCTION = {
       },
     },
     required: ['note_content', 'caller_phone'],
+  },
+};
+
+/**
+ * VAPI function definition for making outbound calls
+ */
+const MAKE_OUTBOUND_CALL_FUNCTION = {
+  name: 'make_outbound_call',
+  description: 'Make an outbound call to a specified phone number and deliver a message on behalf of the owner. Use this when the owner requests an immediate call that should execute RIGHT NOW during the current call. Do NOT use this for "after we hang up" requests - use schedule_outbound_call instead.',
+  parameters: {
+    type: 'object',
+    properties: {
+      phone_number: {
+        type: 'string',
+        description: 'The phone number to call in E.164 format (e.g., +14155551234)',
+      },
+      message: {
+        type: 'string',
+        description: 'The message to deliver during the call',
+      },
+      caller_name: {
+        type: 'string',
+        description: 'Optional: The name of the person making the request (the owner)',
+      },
+      scheduled_time: {
+        type: 'string',
+        description: 'Optional: ISO 8601 format timestamp for scheduling the call. If not provided, call is made immediately.',
+      },
+    },
+    required: ['phone_number', 'message'],
+  },
+};
+
+/**
+ * VAPI function definition for scheduling outbound calls
+ */
+const SCHEDULE_OUTBOUND_CALL_FUNCTION = {
+  name: 'schedule_outbound_call',
+  description: 'Schedule an outbound call to a specified phone number for a future date/time. Use this when the owner requests a call to be made at a specific time (e.g., "in 15 minutes", "tomorrow at 8pm") OR when they say "after we hang up" or "after we get off the phone" - in that case, schedule for 1-2 minutes in the future.',
+  parameters: {
+    type: 'object',
+    properties: {
+      phone_number: {
+        type: 'string',
+        description: 'The phone number to call in E.164 format (e.g., +14155551234)',
+      },
+      message: {
+        type: 'string',
+        description: 'The message to deliver during the call',
+      },
+      scheduled_time: {
+        type: 'string',
+        description: 'ISO 8601 format timestamp for when the call should be made',
+      },
+      caller_name: {
+        type: 'string',
+        description: 'Optional: The name of the person making the request (the owner)',
+      },
+    },
+    required: ['phone_number', 'message', 'scheduled_time'],
+  },
+};
+
+/**
+ * VAPI function definition for getting user context
+ */
+const GET_USER_CONTEXT_FUNCTION = {
+  name: 'get_user_context',
+  description: 'Get information about the user. ALWAYS call this before making claims about the user\'s background, history, or experience.',
+  parameters: {
+    type: 'object',
+    properties: {
+      topic: {
+        type: 'string',
+        description: 'Specific topic to retrieve (optional)',
+      },
+    },
+    required: [],
+  },
+};
+
+/**
+ * VAPI function definition for getting user contacts
+ */
+const GET_USER_CONTACTS_FUNCTION = {
+  name: 'get_user_contacts',
+  description: 'Search for a contact by name. ALWAYS call this when the user asks to call someone or find a phone number.',
+  parameters: {
+    type: 'object',
+    properties: {
+      contactName: {
+        type: 'string',
+        description: 'Name of the contact',
+      },
+    },
+    required: [],
+  },
+};
+
+/**
+ * VAPI function definition for getting user documents
+ */
+const GET_USER_DOCUMENTS_FUNCTION = {
+  name: 'get_user_documents',
+  description: 'Get information from user\'s uploaded documents. ALWAYS call this when user asks about documents, files, resumes, menus, invoices, or any uploaded content. Returns max 5 document summaries.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'What to search for in documents (e.g., "resume", "menu", "invoice", "document")',
+      },
+    },
+    required: [],
   },
 };
 
@@ -168,65 +364,6 @@ export async function createAgent({
       ? `When callers request to speak directly with ${fullName}, forward the call to ${fullName}'s mobile number.`
       : `Do not forward calls. Handle all inquiries yourself as ${fullName}'s personal assistant.`;
 
-    // Format phone number to E.164 format (e.g., +1XXXXXXXXXX)
-    // E.164 format requires: +[country code][number] with no spaces or special characters
-    const formatPhoneNumberToE164 = (phone: string): string | null => {
-      if (!phone || typeof phone !== 'string') {
-        return null;
-      }
-      
-      const trimmed = phone.trim();
-      if (!trimmed) {
-        return null;
-      }
-      
-      // Remove all non-digit characters except +
-      let cleaned = trimmed;
-      
-      // If it already starts with +, validate it's properly formatted
-      if (cleaned.startsWith('+')) {
-        // Extract all digits (including the country code)
-        const digits = cleaned.replace(/\D/g, '');
-        // E.164 requires at least 10 digits total (country code + number)
-        // Minimum: 1 digit country code + 9 digit number = 10 digits
-        // Typical US: 1 (country) + 10 (area code + number) = 11 digits
-        if (digits.length >= 10) {
-          // Return with + prefix and all digits
-          return `+${digits}`;
-        }
-        return null;
-      }
-      
-      // If no + prefix, extract only digits
-      const digits = cleaned.replace(/\D/g, '');
-      
-      // Must have at least 10 digits
-      if (digits.length < 10) {
-        return null;
-      }
-      
-      // If it's exactly 10 digits, assume US number and add +1
-      if (digits.length === 10) {
-        return `+1${digits}`;
-      }
-      
-      // If it's 11 digits and starts with 1, assume US number
-      if (digits.length === 11 && digits.startsWith('1')) {
-        return `+${digits}`;
-      }
-      
-      // For other lengths, assume first 1-3 digits are country code
-      // For safety, if we can't determine, default to US (+1) for 10-digit numbers
-      // For longer numbers, prepend +
-      if (digits.length > 11) {
-        // Already has country code included
-        return `+${digits}`;
-      }
-      
-      // Default: assume US number if ambiguous
-      return `+1${digits}`;
-    };
-
     // Use provided kendallName or default to 'Kendall'
     const assistantName = (kendallName && kendallName.trim()) || 'Kendall';
 
@@ -321,6 +458,7 @@ End of System Prompt`;
     const trimmedVoiceChoice = voiceChoice && typeof voiceChoice === 'string' ? voiceChoice.trim() : '';
     
     let voiceConfig: { provider: '11labs' | 'vapi'; voiceId: string } | undefined;
+    let voiceMapping: any = undefined; // Initialize outside the if block for logging
     
     if (trimmedVoiceChoice) {
       // Try to get voice config using helper (handles curated library IDs)
@@ -329,19 +467,44 @@ End of System Prompt`;
       
       // Fallback: Check legacy mapping system
       if (!voiceConfig) {
-        const voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
+        voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
         if (voiceMapping?.elevenLabsVoiceId) {
           voiceConfig = {
             provider: '11labs',
             voiceId: voiceMapping.elevenLabsVoiceId,
           };
         } else {
-          // Assume VAPI voice name
-          voiceConfig = {
-            provider: 'vapi',
-            voiceId: trimmedVoiceChoice,
-          };
+          // Check if it looks like an ElevenLabs voice ID (long alphanumeric string)
+          // ElevenLabs IDs are typically 17-20 characters, alphanumeric
+          const looksLikeElevenLabsId = /^[a-zA-Z0-9]{15,}$/.test(trimmedVoiceChoice) && 
+                                         trimmedVoiceChoice.length >= 15 && 
+                                         trimmedVoiceChoice.length <= 25;
+          
+          if (looksLikeElevenLabsId) {
+            // It's an ElevenLabs voice ID - use 11labs provider
+            voiceConfig = {
+              provider: '11labs',
+              voiceId: trimmedVoiceChoice,
+            };
+          } else {
+            // Assume VAPI voice name (short, simple names like "Elliot", "Kylie")
+            voiceConfig = {
+              provider: 'vapi',
+              voiceId: trimmedVoiceChoice,
+            };
+          }
         }
+        
+        // Log fallback logic for debugging
+        console.log('[VAPI DEBUG] Voice config fallback logic:', {
+          trimmedVoiceChoice,
+          hasMapping: !!voiceMapping,
+          looksLikeElevenLabsId: /^[a-zA-Z0-9]{15,}$/.test(trimmedVoiceChoice) && 
+                                 trimmedVoiceChoice.length >= 15 && 
+                                 trimmedVoiceChoice.length <= 25,
+          finalProvider: voiceConfig?.provider,
+          finalVoiceId: voiceConfig?.voiceId,
+        });
       }
     }
 
@@ -368,7 +531,8 @@ End of System Prompt`;
           },
         ],
       },
-      firstMessage: 'Hello!',
+      // Removed firstMessage to allow check_if_owner function to be called first
+      // firstMessage: 'Hello!',
       // Explicitly set background sound to Off by default
       backgroundSound: 'off',
     };
@@ -494,64 +658,23 @@ export async function createAgentFromTemplate({
     // Use provided kendallName or default to 'Kendall'
     const assistantName = (kendallName && kendallName.trim()) || 'Kendall';
     
-    // Build system prompt using template
-    const systemPrompt = buildSystemPrompt({
+    // Format owner phone number for prompt (use E.164 format for consistency)
+    const ownerPhoneNumber = mobileNumber ? (formatPhoneNumberToE164(mobileNumber) || mobileNumber) : undefined;
+    
+    // Build lean voice-first system prompt (100-180 tokens)
+    const systemPrompt = buildLeanSystemPrompt({
       kendallName: assistantName,
       fullName,
       nickname,
       selectedTraits,
-      useCaseChoice,
       boundaryChoices,
-      userContextAndRules,
-      analyzedFileContent,
     });
-
-    // Format phone number to E.164 format
-    const formatPhoneNumberToE164 = (phone: string): string | null => {
-      if (!phone || typeof phone !== 'string') {
-        return null;
-      }
-      
-      const trimmed = phone.trim();
-      if (!trimmed) {
-        return null;
-      }
-      
-      let cleaned = trimmed;
-      
-      if (cleaned.startsWith('+')) {
-        const digits = cleaned.replace(/\D/g, '');
-        if (digits.length >= 10) {
-          return `+${digits}`;
-        }
-        return null;
-      }
-      
-      const digits = cleaned.replace(/\D/g, '');
-      
-      if (digits.length < 10) {
-        return null;
-      }
-      
-      if (digits.length === 10) {
-        return `+1${digits}`;
-      }
-      
-      if (digits.length === 11 && digits.startsWith('1')) {
-        return `+${digits}`;
-      }
-      
-      if (digits.length > 11) {
-        return `+${digits}`;
-      }
-      
-      return `+1${digits}`;
-    };
 
     // Build voice configuration - handle both ElevenLabs and VAPI voices
     const trimmedVoiceChoice = voiceChoice && typeof voiceChoice === 'string' ? voiceChoice.trim() : '';
     
     let voiceConfig: { provider: '11labs' | 'vapi'; voiceId: string } | undefined;
+    let voiceMapping: any = undefined; // Initialize outside the if block for logging
     
     if (trimmedVoiceChoice) {
       // Try to get voice config using helper (handles curated library IDs)
@@ -560,19 +683,44 @@ export async function createAgentFromTemplate({
       
       // Fallback: Check legacy mapping system
       if (!voiceConfig) {
-        const voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
+        voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
         if (voiceMapping?.elevenLabsVoiceId) {
           voiceConfig = {
             provider: '11labs',
             voiceId: voiceMapping.elevenLabsVoiceId,
           };
         } else {
-          // Assume VAPI voice name
-          voiceConfig = {
-            provider: 'vapi',
-            voiceId: trimmedVoiceChoice,
-          };
+          // Check if it looks like an ElevenLabs voice ID (long alphanumeric string)
+          // ElevenLabs IDs are typically 17-20 characters, alphanumeric
+          const looksLikeElevenLabsId = /^[a-zA-Z0-9]{15,}$/.test(trimmedVoiceChoice) && 
+                                         trimmedVoiceChoice.length >= 15 && 
+                                         trimmedVoiceChoice.length <= 25;
+          
+          if (looksLikeElevenLabsId) {
+            // It's an ElevenLabs voice ID - use 11labs provider
+            voiceConfig = {
+              provider: '11labs',
+              voiceId: trimmedVoiceChoice,
+            };
+          } else {
+            // Assume VAPI voice name (short, simple names like "Elliot", "Kylie")
+            voiceConfig = {
+              provider: 'vapi',
+              voiceId: trimmedVoiceChoice,
+            };
+          }
         }
+        
+        // Log fallback logic for debugging
+        console.log('[VAPI DEBUG] Voice config fallback logic:', {
+          trimmedVoiceChoice,
+          hasMapping: !!voiceMapping,
+          looksLikeElevenLabsId: /^[a-zA-Z0-9]{15,}$/.test(trimmedVoiceChoice) && 
+                                 trimmedVoiceChoice.length >= 15 && 
+                                 trimmedVoiceChoice.length <= 25,
+          finalProvider: voiceConfig?.provider,
+          finalVoiceId: voiceConfig?.voiceId,
+        });
       }
     }
 
@@ -587,6 +735,21 @@ export async function createAgentFromTemplate({
       fullName: fullName,
     });
 
+    // Get webhook URL for serverless functions
+    const webhookUrl = process.env.VAPI_WEBHOOK_URL || process.env.NEXT_PUBLIC_WEBHOOK_URL;
+    
+    // Create function definitions with explicit serverUrl for real-time execution
+    // VAPI requires serverUrl on each function for real-time webhook calls
+    const functionsWithServerUrl = [
+      { ...CHECK_IF_OWNER_FUNCTION, serverUrl: webhookUrl },
+      { ...CAPTURE_NOTE_FUNCTION, serverUrl: webhookUrl },
+      { ...MAKE_OUTBOUND_CALL_FUNCTION, serverUrl: webhookUrl },
+      { ...SCHEDULE_OUTBOUND_CALL_FUNCTION, serverUrl: webhookUrl },
+      { ...GET_USER_CONTEXT_FUNCTION, serverUrl: webhookUrl },
+      { ...GET_USER_CONTACTS_FUNCTION, serverUrl: webhookUrl },
+      { ...GET_USER_DOCUMENTS_FUNCTION, serverUrl: webhookUrl },
+    ].filter(fn => fn.serverUrl); // Only include functions if webhookUrl is available
+
     // Create the assistant with proper API structure
     const requestBody: any = {
       name: `My ${assistantName} - ${fullName}`,
@@ -599,9 +762,10 @@ export async function createAgentFromTemplate({
             content: systemPrompt,
           },
         ],
-        functions: [CAPTURE_NOTE_FUNCTION],
+        functions: functionsWithServerUrl.length > 0 ? functionsWithServerUrl : [CHECK_IF_OWNER_FUNCTION, CAPTURE_NOTE_FUNCTION, MAKE_OUTBOUND_CALL_FUNCTION, SCHEDULE_OUTBOUND_CALL_FUNCTION, GET_USER_CONTEXT_FUNCTION, GET_USER_CONTACTS_FUNCTION, GET_USER_DOCUMENTS_FUNCTION],
       },
-      firstMessage: 'Hello!',
+      // Removed firstMessage to allow check_if_owner function to be called first
+      // firstMessage: 'Hello!',
       backgroundSound: 'off',
     };
 
@@ -613,11 +777,13 @@ export async function createAgentFromTemplate({
       console.warn('[VAPI WARNING] No voice config in createAgentFromTemplate - voiceChoice was:', voiceChoice);
     }
 
-    // Add server URL for webhook (note-taking feature)
-    const webhookUrl = process.env.VAPI_WEBHOOK_URL || process.env.NEXT_PUBLIC_WEBHOOK_URL;
+    // Add server URL for webhook (for end-of-call events and fallback)
     if (webhookUrl) {
       requestBody.serverUrl = webhookUrl;
       console.log('[VAPI INFO] Setting serverUrl to:', webhookUrl);
+      console.log('[VAPI INFO] Functions configured with serverUrl for real-time execution:', functionsWithServerUrl.map(f => f.name));
+    } else {
+      console.warn('[VAPI WARNING] No webhook URL configured - functions will not work in real-time');
     }
 
     // Add forwarding phone number if call forwarding is enabled
@@ -725,72 +891,27 @@ export async function updateAgentFromTemplate({
     console.log('[VAPI DEBUG] - analyzedFileContent includes WHO THEY ARE:', analyzedFileContent?.includes('WHO THEY ARE') || false);
     console.log('[VAPI DEBUG] - analyzedFileContent includes WORK EXPERIENCE:', analyzedFileContent?.includes('WORK EXPERIENCE') || false);
     
-    // Build system prompt using template
-    const systemPrompt = buildSystemPrompt({
+    // Format owner phone number for prompt (use E.164 format for consistency)
+    const ownerPhoneNumber = mobileNumber ? (formatPhoneNumberToE164(mobileNumber) || mobileNumber) : undefined;
+    
+    // Build lean voice-first system prompt (100-180 tokens)
+    const systemPrompt = buildLeanSystemPrompt({
       kendallName: assistantName,
       fullName,
       nickname,
       selectedTraits,
-      useCaseChoice,
       boundaryChoices,
-      userContextAndRules,
-      analyzedFileContent,
-      fileUsageInstructions,
     });
     
-    console.log('[VAPI DEBUG] System prompt built:');
+    console.log('[VAPI DEBUG] Lean system prompt built:');
     console.log('[VAPI DEBUG] - System prompt length:', systemPrompt.length);
-    console.log('[VAPI DEBUG] - System prompt includes DETAILED INFORMATION:', systemPrompt.includes('DETAILED INFORMATION'));
-    console.log('[VAPI DEBUG] - System prompt includes WHO THEY ARE:', systemPrompt.includes('WHO THEY ARE'));
-    console.log('[VAPI DEBUG] - System prompt includes WORK EXPERIENCE:', systemPrompt.includes('WORK EXPERIENCE'));
-    console.log('[VAPI DEBUG] - System prompt preview (first 1000 chars):', systemPrompt.substring(0, 1000));
-
-    // Format phone number to E.164 format
-    const formatPhoneNumberToE164 = (phone: string): string | null => {
-      if (!phone || typeof phone !== 'string') {
-        return null;
-      }
-      
-      const trimmed = phone.trim();
-      if (!trimmed) {
-        return null;
-      }
-      
-      let cleaned = trimmed;
-      
-      if (cleaned.startsWith('+')) {
-        const digits = cleaned.replace(/\D/g, '');
-        if (digits.length >= 10) {
-          return `+${digits}`;
-        }
-        return null;
-      }
-      
-      const digits = cleaned.replace(/\D/g, '');
-      
-      if (digits.length < 10) {
-        return null;
-      }
-      
-      if (digits.length === 10) {
-        return `+1${digits}`;
-      }
-      
-      if (digits.length === 11 && digits.startsWith('1')) {
-        return `+${digits}`;
-      }
-      
-      if (digits.length > 11) {
-        return `+${digits}`;
-      }
-      
-      return `+1${digits}`;
-    };
+    console.log('[VAPI DEBUG] - System prompt token estimate:', Math.ceil(systemPrompt.length / 4));
 
     // Build voice configuration - handle both ElevenLabs and VAPI voices
     const trimmedVoiceChoice = voiceChoice && typeof voiceChoice === 'string' ? voiceChoice.trim() : '';
     
     let voiceConfig: { provider: '11labs' | 'vapi'; voiceId: string } | undefined;
+    let voiceMapping: any = undefined; // Initialize outside the if block for logging
     
     if (trimmedVoiceChoice) {
       // Try to get voice config using helper (handles curated library IDs)
@@ -799,19 +920,44 @@ export async function updateAgentFromTemplate({
       
       // Fallback: Check legacy mapping system
       if (!voiceConfig) {
-        const voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
+        voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
         if (voiceMapping?.elevenLabsVoiceId) {
           voiceConfig = {
             provider: '11labs',
             voiceId: voiceMapping.elevenLabsVoiceId,
           };
         } else {
-          // Assume VAPI voice name
-          voiceConfig = {
-            provider: 'vapi',
-            voiceId: trimmedVoiceChoice,
-          };
+          // Check if it looks like an ElevenLabs voice ID (long alphanumeric string)
+          // ElevenLabs IDs are typically 17-20 characters, alphanumeric
+          const looksLikeElevenLabsId = /^[a-zA-Z0-9]{15,}$/.test(trimmedVoiceChoice) && 
+                                         trimmedVoiceChoice.length >= 15 && 
+                                         trimmedVoiceChoice.length <= 25;
+          
+          if (looksLikeElevenLabsId) {
+            // It's an ElevenLabs voice ID - use 11labs provider
+            voiceConfig = {
+              provider: '11labs',
+              voiceId: trimmedVoiceChoice,
+            };
+          } else {
+            // Assume VAPI voice name (short, simple names like "Elliot", "Kylie")
+            voiceConfig = {
+              provider: 'vapi',
+              voiceId: trimmedVoiceChoice,
+            };
+          }
         }
+        
+        // Log fallback logic for debugging
+        console.log('[VAPI DEBUG] Voice config fallback logic:', {
+          trimmedVoiceChoice,
+          hasMapping: !!voiceMapping,
+          looksLikeElevenLabsId: /^[a-zA-Z0-9]{15,}$/.test(trimmedVoiceChoice) && 
+                                 trimmedVoiceChoice.length >= 15 && 
+                                 trimmedVoiceChoice.length <= 25,
+          finalProvider: voiceConfig?.provider,
+          finalVoiceId: voiceConfig?.voiceId,
+        });
       }
     }
 
@@ -827,6 +973,20 @@ export async function updateAgentFromTemplate({
       fullName: fullName,
     });
 
+    // Get webhook URL for serverless functions
+    const webhookUrl = process.env.VAPI_WEBHOOK_URL || process.env.NEXT_PUBLIC_WEBHOOK_URL;
+    
+    // Create function definitions with explicit serverUrl for real-time execution
+    const functionsWithServerUrl = [
+      { ...CHECK_IF_OWNER_FUNCTION, serverUrl: webhookUrl },
+      { ...CAPTURE_NOTE_FUNCTION, serverUrl: webhookUrl },
+      { ...MAKE_OUTBOUND_CALL_FUNCTION, serverUrl: webhookUrl },
+      { ...SCHEDULE_OUTBOUND_CALL_FUNCTION, serverUrl: webhookUrl },
+      { ...GET_USER_CONTEXT_FUNCTION, serverUrl: webhookUrl },
+      { ...GET_USER_CONTACTS_FUNCTION, serverUrl: webhookUrl },
+      { ...GET_USER_DOCUMENTS_FUNCTION, serverUrl: webhookUrl },
+    ].filter(fn => fn.serverUrl); // Only include functions if webhookUrl is available
+
     // Build update request body
     const requestBody: any = {
       name: `My ${assistantName} - ${fullName}`,
@@ -839,9 +999,10 @@ export async function updateAgentFromTemplate({
             content: systemPrompt,
           },
         ],
-        functions: [CAPTURE_NOTE_FUNCTION],
+        functions: functionsWithServerUrl.length > 0 ? functionsWithServerUrl : [CHECK_IF_OWNER_FUNCTION, CAPTURE_NOTE_FUNCTION, MAKE_OUTBOUND_CALL_FUNCTION, SCHEDULE_OUTBOUND_CALL_FUNCTION, GET_USER_CONTEXT_FUNCTION, GET_USER_CONTACTS_FUNCTION, GET_USER_DOCUMENTS_FUNCTION],
       },
       backgroundSound: 'off',
+      firstMessage: null, // Explicitly remove firstMessage to allow check_if_owner to be called first
     };
 
     // CRITICAL: Always add voice config if provided - this ensures voice is set correctly
@@ -878,11 +1039,13 @@ export async function updateAgentFromTemplate({
       requestBody.forwardingPhoneNumber = null;
     }
 
-    // Add server URL for webhook (note-taking feature)
-    const webhookUrl = process.env.VAPI_WEBHOOK_URL || process.env.NEXT_PUBLIC_WEBHOOK_URL;
+    // Add server URL for webhook (for end-of-call events and fallback)
     if (webhookUrl) {
       requestBody.serverUrl = webhookUrl;
       console.log('[VAPI INFO] Setting serverUrl to:', webhookUrl);
+      console.log('[VAPI INFO] Functions configured with serverUrl for real-time execution:', functionsWithServerUrl.map(f => f.name));
+    } else {
+      console.warn('[VAPI WARNING] No webhook URL configured - functions will not work in real-time');
     }
 
     console.log('[VAPI DEBUG] Assistant update (template) request body:', {
@@ -977,48 +1140,6 @@ export async function updateAgent({
       ? `When callers request to speak directly with ${fullName}, forward the call to ${fullName}'s mobile number.`
       : `Do not forward calls. Handle all inquiries yourself as ${fullName}'s personal assistant.`;
 
-    // Format phone number to E.164 format (same logic as createAgent)
-    const formatPhoneNumberToE164 = (phone: string): string | null => {
-      if (!phone || typeof phone !== 'string') {
-        return null;
-      }
-      
-      const trimmed = phone.trim();
-      if (!trimmed) {
-        return null;
-      }
-      
-      let cleaned = trimmed;
-      
-      if (cleaned.startsWith('+')) {
-        const digits = cleaned.replace(/\D/g, '');
-        if (digits.length >= 10) {
-          return `+${digits}`;
-        }
-        return null;
-      }
-      
-      const digits = cleaned.replace(/\D/g, '');
-      
-      if (digits.length < 10) {
-        return null;
-      }
-      
-      if (digits.length === 10) {
-        return `+1${digits}`;
-      }
-      
-      if (digits.length === 11 && digits.startsWith('1')) {
-        return `+${digits}`;
-      }
-      
-      if (digits.length > 11) {
-        return `+${digits}`;
-      }
-      
-      return `+1${digits}`;
-    };
-
     // Build purpose description
     const purposeDescription = `You are ${assistantName}, the personal AI assistant for ${fullName}. Your purpose is to represent ${fullName} professionally and handle calls on their behalf. Use the context about ${fullName} to answer questions accurately and naturally. Be helpful, professional, and make every caller feel valued.`;
 
@@ -1112,6 +1233,7 @@ End of System Prompt`;
     const trimmedVoiceChoice = voiceChoice && typeof voiceChoice === 'string' ? voiceChoice.trim() : '';
     
     let voiceConfig: { provider: '11labs' | 'vapi'; voiceId: string } | undefined;
+    let voiceMapping: any = undefined; // Initialize outside the if block for logging
     
     if (trimmedVoiceChoice) {
       // Try to get voice config using helper (handles curated library IDs)
@@ -1120,19 +1242,44 @@ End of System Prompt`;
       
       // Fallback: Check legacy mapping system
       if (!voiceConfig) {
-        const voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
+        voiceMapping = getElevenLabsMapping(trimmedVoiceChoice);
         if (voiceMapping?.elevenLabsVoiceId) {
           voiceConfig = {
             provider: '11labs',
             voiceId: voiceMapping.elevenLabsVoiceId,
           };
         } else {
-          // Assume VAPI voice name
-          voiceConfig = {
-            provider: 'vapi',
-            voiceId: trimmedVoiceChoice,
-          };
+          // Check if it looks like an ElevenLabs voice ID (long alphanumeric string)
+          // ElevenLabs IDs are typically 17-20 characters, alphanumeric
+          const looksLikeElevenLabsId = /^[a-zA-Z0-9]{15,}$/.test(trimmedVoiceChoice) && 
+                                         trimmedVoiceChoice.length >= 15 && 
+                                         trimmedVoiceChoice.length <= 25;
+          
+          if (looksLikeElevenLabsId) {
+            // It's an ElevenLabs voice ID - use 11labs provider
+            voiceConfig = {
+              provider: '11labs',
+              voiceId: trimmedVoiceChoice,
+            };
+          } else {
+            // Assume VAPI voice name (short, simple names like "Elliot", "Kylie")
+            voiceConfig = {
+              provider: 'vapi',
+              voiceId: trimmedVoiceChoice,
+            };
+          }
         }
+        
+        // Log fallback logic for debugging
+        console.log('[VAPI DEBUG] Voice config fallback logic:', {
+          trimmedVoiceChoice,
+          hasMapping: !!voiceMapping,
+          looksLikeElevenLabsId: /^[a-zA-Z0-9]{15,}$/.test(trimmedVoiceChoice) && 
+                                 trimmedVoiceChoice.length >= 15 && 
+                                 trimmedVoiceChoice.length <= 25,
+          finalProvider: voiceConfig?.provider,
+          finalVoiceId: voiceConfig?.voiceId,
+        });
       }
     }
 
@@ -1163,6 +1310,7 @@ End of System Prompt`;
       },
       // Explicitly set background sound to Off by default
       backgroundSound: 'off',
+      firstMessage: null, // Explicitly remove firstMessage to allow check_if_owner to be called first
     };
 
     // CRITICAL: Always add voice config if provided - this ensures voice is set correctly
@@ -1403,6 +1551,7 @@ export async function purchaseNumber(assistantId: string, existingPhoneNumber?: 
     console.log("[VAPI WARNING] Ensure TWILIO_ACCOUNT_SID matches the Account SID in Vapi dashboard settings");
 
     let phoneNumberToImport: string;
+    let twilioSid: string | undefined = undefined;
 
     // If phone number is provided, use it directly
     if (existingPhoneNumber) {
@@ -1411,64 +1560,126 @@ export async function purchaseNumber(assistantId: string, existingPhoneNumber?: 
     } 
     // Otherwise, try to purchase a new number via Twilio API first
     else if (twilioAuthToken) {
-      console.log("[VAPI INFO] Purchasing new phone number via Twilio API...");
+      console.log("[VAPI INFO] Purchasing new Canadian phone number via Twilio API...");
       
-      // Purchase phone number via Twilio API
-      // Search for available numbers
-      const areaCode = process.env.VAPI_AREA_CODE;
-      const searchParams = new URLSearchParams();
-      if (areaCode) {
-        searchParams.append('AreaCode', areaCode);
-      }
-      searchParams.append('Limit', '1');
+      // Retry logic for number purchase with exponential backoff
+      const maxRetries = 3;
+      let lastError: Error | null = null;
       
-      const searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/AvailablePhoneNumbers/US/Local.json?${searchParams.toString()}`;
-      const searchResponse = await fetch(searchUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
-        },
-      });
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          // Purchase phone number via Twilio API
+          // Search for available Canadian numbers (no area code filtering - use any available)
+          const searchParams = new URLSearchParams();
+          searchParams.append('Limit', '1');
+          
+          // Use Canadian numbers instead of US
+          const searchUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/AvailablePhoneNumbers/CA/Local.json?${searchParams.toString()}`;
+          const searchResponse = await fetch(searchUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
+            },
+          });
 
-      if (!searchResponse.ok) {
-        const errorData = await searchResponse.json().catch(() => ({}));
-        throw new Error(`Twilio search failed: ${JSON.stringify(errorData)}`);
+          if (!searchResponse.ok) {
+            const errorData = await searchResponse.json().catch(() => ({}));
+            throw new Error(`Twilio search failed: ${JSON.stringify(errorData)}`);
+          }
+
+          const searchData = await searchResponse.json();
+          // Twilio returns available_phone_numbers array
+          const availableNumbers = searchData.available_phone_numbers || [];
+
+          if (!availableNumbers || availableNumbers.length === 0) {
+            throw new Error("No available Canadian phone numbers found in Twilio inventory");
+          }
+
+          const selectedNumber = availableNumbers[0].phone_number;
+          console.log("[VAPI INFO] Found available Canadian number:", selectedNumber);
+
+          // Purchase the number
+          const purchaseUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers.json`;
+          const purchaseResponse = await fetch(purchaseUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              PhoneNumber: selectedNumber,
+            }),
+          });
+
+          if (!purchaseResponse.ok) {
+            const errorData = await purchaseResponse.json().catch(() => ({}));
+            throw new Error(`Twilio purchase failed: ${JSON.stringify(errorData)}`);
+          }
+
+          const purchaseData = await purchaseResponse.json();
+          // Twilio returns phone_number in E.164 format (e.g., "+14165550123")
+          phoneNumberToImport = purchaseData.phone_number;
+          twilioSid = purchaseData.sid; // Store Twilio SID for later use
+          console.log("[VAPI INFO] Successfully purchased Canadian number from Twilio:", phoneNumberToImport);
+          console.log("[VAPI INFO] Twilio SID:", twilioSid);
+          console.log("[VAPI DEBUG] Twilio purchase response:", JSON.stringify(purchaseData, null, 2));
+          
+          // Configure SMS webhook URL automatically
+          if (twilioSid) {
+            try {
+              const smsWebhookUrl = process.env.SMS_WEBHOOK_URL || 
+                (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+                (process.env.NEXT_PUBLIC_BASE_URL || 'https://your-domain.com') + '/api/twilio-sms-webhook';
+              
+              console.log("[VAPI INFO] Configuring SMS webhook URL:", smsWebhookUrl);
+              
+              const updateUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers/${twilioSid}.json`;
+              const updateResponse = await fetch(updateUrl, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
+                  'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                  SmsUrl: smsWebhookUrl,
+                  SmsMethod: 'POST',
+                }),
+              });
+              
+              if (updateResponse.ok) {
+                const updateData = await updateResponse.json();
+                console.log("[VAPI SUCCESS] SMS webhook configured successfully");
+                console.log("[VAPI DEBUG] Update response:", JSON.stringify(updateData, null, 2));
+              } else {
+                const errorData = await updateResponse.json().catch(() => ({}));
+                console.warn("[VAPI WARNING] Failed to configure SMS webhook:", JSON.stringify(errorData));
+                // Don't throw - webhook config is optional, number purchase was successful
+              }
+            } catch (webhookError) {
+              console.warn("[VAPI WARNING] Error configuring SMS webhook:", webhookError);
+              // Don't throw - webhook config is optional, number purchase was successful
+            }
+          }
+          
+          // Success - break out of retry loop
+          break;
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          console.error(`[VAPI ERROR] Canadian number purchase attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+          
+          if (attempt < maxRetries) {
+            // Exponential backoff: wait 2^attempt seconds
+            const delayMs = Math.pow(2, attempt) * 1000;
+            console.log(`[VAPI INFO] Retrying in ${delayMs / 1000} seconds...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        }
       }
-
-      const searchData = await searchResponse.json();
-      // Twilio returns available_phone_numbers array
-      const availableNumbers = searchData.available_phone_numbers || [];
-
-      if (!availableNumbers || availableNumbers.length === 0) {
-        throw new Error("No available phone numbers found in Twilio inventory");
+      
+      // If all retries failed, throw the last error
+      if (!phoneNumberToImport) {
+        throw new Error(`Failed to purchase Canadian number after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
       }
-
-      const selectedNumber = availableNumbers[0].phone_number;
-      console.log("[VAPI INFO] Found available number:", selectedNumber);
-
-      // Purchase the number
-      const purchaseUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/IncomingPhoneNumbers.json`;
-      const purchaseResponse = await fetch(purchaseUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          PhoneNumber: selectedNumber,
-        }),
-      });
-
-      if (!purchaseResponse.ok) {
-        const errorData = await purchaseResponse.json().catch(() => ({}));
-        throw new Error(`Twilio purchase failed: ${JSON.stringify(errorData)}`);
-      }
-
-      const purchaseData = await purchaseResponse.json();
-      // Twilio returns phone_number in E.164 format (e.g., "+14155550123")
-      phoneNumberToImport = purchaseData.phone_number;
-      console.log("[VAPI INFO] Successfully purchased number from Twilio:", phoneNumberToImport);
-      console.log("[VAPI DEBUG] Twilio purchase response:", JSON.stringify(purchaseData, null, 2));
       
       // Wait a moment for Twilio to fully provision the number before importing to Vapi
       // Sometimes there's a brief delay between purchase and availability
@@ -1522,7 +1733,7 @@ export async function purchaseNumber(assistantId: string, existingPhoneNumber?: 
       
       // Remove all non-digit characters
       const digits = phone.replace(/\D/g, '');
-      // If it doesn't start with country code, add +1 for US
+      // If it doesn't start with country code, add +1 for US/Canada (both use +1)
       if (digits.length === 10) {
         return `+1${digits}`;
       } else if (digits.length === 11 && digits.startsWith('1')) {
@@ -1553,17 +1764,84 @@ export async function purchaseNumber(assistantId: string, existingPhoneNumber?: 
     
     // DO NOT include label or smsEnabled in POST - these must be set via PATCH after import
 
-    console.log("[VAPI INFO] Importing phone number to Vapi:", importPayload);
+    console.log("[VAPI INFO] Importing Canadian phone number to Vapi:", importPayload);
 
-    // Import number into Vapi using /phone-number endpoint
-    const response = await fetch("https://api.vapi.ai/phone-number", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.VAPI_PRIVATE_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(importPayload),
-    });
+    // Import number into Vapi using /phone-number endpoint with retry logic
+    let response: Response;
+    let data: any;
+    let importAttempts = 0;
+    const maxImportRetries = 3;
+    let lastImportError: Error | null = null;
+    
+    for (let attempt = 1; attempt <= maxImportRetries; attempt++) {
+      try {
+        response = await fetch("https://api.vapi.ai/phone-number", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.VAPI_PRIVATE_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(importPayload),
+        });
+        
+        data = await response.json();
+        
+        if (response.ok) {
+          // Success - break out of retry loop
+          importAttempts = attempt;
+          break;
+        }
+        
+        // If it's a non-retryable error (like authentication), throw immediately
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(`Vapi authentication/authorization error: ${JSON.stringify(data)}`);
+        }
+        
+        // For other errors, try again
+        lastImportError = new Error(`Vapi import failed (attempt ${attempt}/${maxImportRetries}): ${JSON.stringify(data)}`);
+        console.warn(`[VAPI WARNING] Import attempt ${attempt}/${maxImportRetries} failed:`, lastImportError.message);
+        
+        if (attempt < maxImportRetries) {
+          // Exponential backoff: wait 2^attempt seconds
+          const delayMs = Math.pow(2, attempt) * 1000;
+          console.log(`[VAPI INFO] Retrying import in ${delayMs / 1000} seconds...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      } catch (error) {
+        lastImportError = error instanceof Error ? error : new Error(String(error));
+        console.error(`[VAPI ERROR] Import attempt ${attempt}/${maxImportRetries} exception:`, lastImportError.message);
+        
+        if (attempt < maxImportRetries) {
+          // Exponential backoff: wait 2^attempt seconds
+          const delayMs = Math.pow(2, attempt) * 1000;
+          console.log(`[VAPI INFO] Retrying import in ${delayMs / 1000} seconds...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+    
+    // If all retries failed, throw error but keep the Twilio number (don't release it)
+    if (!response! || !response!.ok) {
+      const errorMsg = `Failed to import Canadian number to Vapi after ${maxImportRetries} attempts: ${lastImportError?.message || JSON.stringify(data)}`;
+      console.error("[VAPI ERROR]", errorMsg);
+      console.warn("[VAPI WARNING] Twilio number purchased but not imported to Vapi. Number SID:", twilioSid);
+      console.warn("[VAPI WARNING] Manual intervention may be required to import the number or release it from Twilio.");
+      
+      // Provide helpful error message for common issues
+      if (data && data.message && typeof data.message === 'string' && data.message.includes('Number Not Found')) {
+        throw new Error(
+          `${errorMsg}\n\n` +
+          `TROUBLESHOOTING: The phone number was not found in the Twilio account.\n` +
+          `1. Ensure TWILIO_ACCOUNT_SID matches the Account SID configured in Vapi dashboard (Phone Numbers / Providers)\n` +
+          `2. Verify the number exists in your Twilio account: https://console.twilio.com/us1/develop/phone-numbers/manage/incoming\n` +
+          `3. Check that the number is in E.164 format: ${e164Number}\n` +
+          `4. The number must be purchased in the SAME Twilio account that's configured in Vapi dashboard\n` +
+          `5. Twilio number SID: ${twilioSid || 'N/A'} - you may need to manually import or release this number`
+        );
+      }
+      
+      throw new Error(errorMsg);
+    }
 
     const normalizePhoneNumber = (details: any): string | null => {
       if (!details) return null;
@@ -1598,28 +1876,8 @@ export async function purchaseNumber(assistantId: string, existingPhoneNumber?: 
       return null;
     };
 
-    const data = await response.json();
-    console.log("[VAPI DEBUG] Raw purchase response:", JSON.stringify(data, null, 2));
+    console.log(`[VAPI DEBUG] Raw import response (attempt ${importAttempts}):`, JSON.stringify(data, null, 2));
     console.log("[VAPI DEBUG] Response keys:", Object.keys(data));
-
-    if (!response.ok) {
-      const errorMsg = `Vapi returned error: ${JSON.stringify(data)}`;
-      console.error("[VAPI ERROR]", errorMsg);
-      
-      // Provide helpful error message for common issues
-      if (data.message && typeof data.message === 'string' && data.message.includes('Number Not Found')) {
-        throw new Error(
-          `${errorMsg}\n\n` +
-          `TROUBLESHOOTING: The phone number was not found in the Twilio account.\n` +
-          `1. Ensure TWILIO_ACCOUNT_SID matches the Account SID configured in Vapi dashboard (Phone Numbers / Providers)\n` +
-          `2. Verify the number exists in your Twilio account: https://console.twilio.com/us1/develop/phone-numbers/manage/incoming\n` +
-          `3. Check that the number is in E.164 format: ${e164Number}\n` +
-          `4. The number must be purchased in the SAME Twilio account that's configured in Vapi dashboard`
-        );
-      }
-      
-      throw new Error(errorMsg);
-    }
 
     if (!data.id) {
       throw new Error("Vapi did not return a phone number ID: " + JSON.stringify(data));
@@ -1637,7 +1895,7 @@ export async function purchaseNumber(assistantId: string, existingPhoneNumber?: 
         
         const updatePayload: Record<string, any> = {
           label: phoneLabel, // Set the label (user's full name from form)
-          smsEnabled: false, // Set SMS to false (voice only)
+          smsEnabled: true, // Enable SMS for Canadian numbers (supports both voice and SMS)
         };
         
         console.log("[VAPI INFO] Updating phone number label to:", phoneLabel);
@@ -1699,11 +1957,84 @@ export async function purchaseNumber(assistantId: string, existingPhoneNumber?: 
     return {
       id: data.id,
       phone: finalPhoneNumber,
-      country: data.country || "US",
+      country: data.country || "CA", // Default to CA for Canadian numbers
+      twilioSid: twilioSid, // Include Twilio SID if available
     };
 
   } catch (error) {
     console.error("[VAPI ERROR] purchaseNumber failed:", error);
     throw error;
+  }
+}
+
+/**
+ * Verify owner's phone number in Twilio (for trial accounts)
+ * This initiates a verification call to the owner's number
+ */
+export async function verifyOwnerPhoneNumber(phoneNumber: string): Promise<{ success: boolean; verificationSid?: string; error?: string }> {
+  try {
+    const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID;
+    const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN;
+    
+    if (!twilioAccountSid || !twilioAuthToken) {
+      return { success: false, error: 'Twilio credentials not configured' };
+    }
+    
+    // Format phone number to E.164
+    const formatPhoneNumberToE164 = (phone: string): string | null => {
+      if (!phone || typeof phone !== 'string') return null;
+      const trimmed = phone.trim();
+      if (!trimmed) return null;
+      
+      if (trimmed.startsWith('+')) {
+        const digits = trimmed.replace(/\D/g, '');
+        if (digits.length >= 10) return `+${digits}`;
+        return null;
+      }
+      
+      const digits = trimmed.replace(/\D/g, '');
+      if (digits.length < 10) return null;
+      if (digits.length === 10) return `+1${digits}`;
+      if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+      return `+1${digits}`;
+    };
+    
+    const formattedPhone = formatPhoneNumberToE164(phoneNumber);
+    if (!formattedPhone) {
+      return { success: false, error: 'Invalid phone number format' };
+    }
+    
+    // Use Twilio's Outgoing Caller IDs API to verify the number
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/OutgoingCallerIds.json`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        PhoneNumber: formattedPhone,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || `Twilio API error: ${response.status}`;
+      console.warn('[VAPI WARNING] Failed to initiate phone verification:', errorMessage);
+      return { success: false, error: errorMessage };
+    }
+    
+    const data = await response.json();
+    console.log('[VAPI SUCCESS] Phone verification initiated:', {
+      phoneNumber: formattedPhone,
+      verificationSid: data.sid,
+      status: data.status,
+    });
+    
+    return { success: true, verificationSid: data.sid };
+  } catch (error) {
+    console.error('[VAPI ERROR] Exception while verifying phone number:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

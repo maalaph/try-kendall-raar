@@ -3,10 +3,14 @@
  * Run this after starting your dev server to verify .env.local is working
  */
 
+// Load environment variables from .env.local
+require('dotenv').config({ path: '.env.local' });
+
 const requiredEnvVars = {
   AIRTABLE_API_KEY: 'Your Airtable Personal Access Token',
   AIRTABLE_BASE_ID: 'appRzrock4whokZZ7',
   AIRTABLE_TABLE_ID: 'tblEXG9wp3Dm3nPte',
+  AIRTABLE_SCHEDULED_CALLS_TABLE_ID: 'Scheduled Calls Table ID (for outbound calls)',
   VAPI_PRIVATE_KEY: 'Your Vapi Private Key',
   VAPI_DEFAULT_MODEL: 'gpt-4o',
   VAPI_COUNTRY: 'US'
@@ -48,6 +52,9 @@ if (allPresent) {
   console.log('   3. Server was restarted after adding variables');
   process.exit(1);
 }
+
+
+
 
 
 

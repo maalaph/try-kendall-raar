@@ -106,6 +106,10 @@ export function getVoiceSettingsFromPersonality(traits: string[]): {
     similarity_boost = 0.65;
   }
 
+  // Clamp values to ensure they're within ElevenLabs API acceptable range (0-1)
+  stability = Math.max(0, Math.min(1, stability));
+  similarity_boost = Math.max(0, Math.min(1, similarity_boost));
+
   return { stability, similarity_boost };
 }
 

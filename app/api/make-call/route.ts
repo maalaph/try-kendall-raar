@@ -1,0 +1,276 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createScheduledCallTask } from '@/lib/airtable';
+import { parseTimeExpression, isFutureTime } from '@/lib/timeParser';
+
+const VAPI_API_URL = 'https://api.vapi.ai';
+
+const getHeaders = () => {
+  const apiKey = process.env.VAPI_PRIVATE_KEY;
+  
+  if (!apiKey) {
+    throw new Error('VAPI_PRIVATE_KEY environment variable is not configured');
+  }
+  
+  return {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
+};
+
+/**
+ * Format phone number to E.164 format
+ */
+function formatPhoneNumberToE164(phone: string): string | null {
+  if (!phone || typeof phone !== 'string') {
+    return null;
+  }
+  
+  const trimmed = phone.trim();
+  if (!trimmed) {
+    return null;
+  }
+  
+  // Remove all non-digit characters except +
+  let cleaned = trimmed;
+  
+  // If it already starts with +, validate it's properly formatted
+  if (cleaned.startsWith('+')) {
+    const digits = cleaned.replace(/\D/g, '');
+    if (digits.length >= 10) {
+      return `+${digits}`;
+    }
+    return null;
+  }
+  
+  // If no + prefix, extract only digits
+  const digits = cleaned.replace(/\D/g, '');
+  
+  // Must have at least 10 digits
+  if (digits.length < 10) {
+    return null;
+  }
+  
+  // If it's exactly 10 digits, assume US number and add +1
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  
+  // If it's 11 digits and starts with 1, assume US number
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+  
+  // For other lengths, assume first 1-3 digits are country code
+  if (digits.length > 11) {
+    return `+${digits}`;
+  }
+  
+  // Default: assume US number if ambiguous
+  return `+1${digits}`;
+}
+
+/**
+ * Make an outbound call via VAPI API
+ */
+async function makeVAPICall(
+  phoneNumber: string,
+  assistantId: string,
+  message: string,
+  callerName?: string,
+  phoneNumberId?: string
+): Promise<{ callId: string; status: string }> {
+  const callPayload: any = {
+    customer: {
+      number: phoneNumber,
+    },
+    assistantId: assistantId,
+    metadata: {
+      message: message,
+      callerName: callerName || 'the owner',
+    },
+  };
+
+  // Add phoneNumberId if provided, otherwise VAPI will use assistant's default
+  if (phoneNumberId) {
+    callPayload.phoneNumberId = phoneNumberId;
+    console.log(`[MAKE-CALL] Using phoneNumberId: ${phoneNumberId}`);
+  } else {
+    console.log('[MAKE-CALL] No phoneNumberId provided, VAPI will use assistant default');
+  }
+
+  const response = await fetch(`${VAPI_API_URL}/call`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(callPayload),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`VAPI call failed: ${JSON.stringify(errorData)}`);
+  }
+
+  const result = await response.json();
+  return {
+    callId: result.id || result.callId || '',
+    status: result.status || 'initiated',
+  };
+}
+
+/**
+ * POST /api/make-call
+ * Makes an outbound call or schedules it for later
+ */
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { phone_number, message, scheduled_time, caller_name, owner_agent_id, caller_phone_number, recordId, threadId } = body;
+
+    // Validate required fields
+    if (!phone_number || !message) {
+      return NextResponse.json(
+        { success: false, error: 'phone_number and message are required' },
+        { status: 400 }
+      );
+    }
+
+    if (!owner_agent_id) {
+      return NextResponse.json(
+        { success: false, error: 'owner_agent_id is required' },
+        { status: 400 }
+      );
+    }
+
+    // Verify caller is owner (if caller_phone_number provided)
+    if (caller_phone_number) {
+      const { getOwnerByPhoneNumber } = await import('@/lib/airtable');
+      const ownerInfo = await getOwnerByPhoneNumber(caller_phone_number);
+      
+      if (!ownerInfo || ownerInfo.agentId !== owner_agent_id) {
+        console.warn('[MAKE-CALL] Unauthorized outbound call request:', {
+          callerPhone: caller_phone_number,
+          agentId: owner_agent_id,
+        });
+        return NextResponse.json(
+          { success: false, error: 'Only the owner can request outbound calls' },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Format phone number
+    const formattedPhone = formatPhoneNumberToE164(phone_number);
+    if (!formattedPhone) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid phone number format' },
+        { status: 400 }
+      );
+    }
+
+    // Parse scheduled time if provided
+    let scheduledTimeISO: string | null = null;
+    if (scheduled_time) {
+      scheduledTimeISO = parseTimeExpression(scheduled_time);
+      if (!scheduledTimeISO) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid scheduled_time format. Use natural language like "in 15 minutes" or "tomorrow at 8pm"' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Check if this should be scheduled
+    const shouldSchedule = scheduledTimeISO && isFutureTime(scheduledTimeISO);
+
+    if (shouldSchedule) {
+      // Schedule the call
+      try {
+        const task = await createScheduledCallTask({
+          phone_number: formattedPhone,
+          message: message,
+          scheduled_time: scheduledTimeISO,
+          owner_agent_id: owner_agent_id,
+          caller_name: caller_name,
+          status: 'pending',
+          recordId: recordId, // Pass recordId for chat relay (if available)
+          threadId: threadId, // Pass threadId for chat relay (if available)
+        });
+
+        return NextResponse.json({
+          success: true,
+          scheduled: true,
+          task_id: task?.id,
+          scheduled_time: scheduledTimeISO,
+          message: 'Call scheduled successfully',
+        });
+      } catch (error) {
+        console.error('[MAKE-CALL ERROR] Failed to schedule call:', error);
+        return NextResponse.json(
+          { success: false, error: 'Failed to schedule call', details: error instanceof Error ? error.message : 'Unknown error' },
+          { status: 500 }
+        );
+      }
+    } else {
+      // Make immediate call
+      try {
+        // Get user record to retrieve phoneNumberId
+        const { getUserRecord } = await import('@/lib/airtable');
+        
+        // Find user record by agent ID
+        const filterFormula = `{vapi_agent_id} = "${owner_agent_id}"`;
+        const airtableUrl = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_ID}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+        const userResponse = await fetch(airtableUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        let phoneNumberId: string | undefined = undefined;
+        if (userResponse.ok) {
+          const userData = await userResponse.json();
+          const records = userData.records || [];
+          if (records.length > 0) {
+            phoneNumberId = records[0].fields?.vapi_phone_number_id;
+            if (phoneNumberId) {
+              console.log(`[MAKE-CALL] Found phoneNumberId from user record: ${phoneNumberId}`);
+            }
+          }
+        }
+
+        const callResult = await makeVAPICall(
+          formattedPhone,
+          owner_agent_id,
+          message,
+          caller_name,
+          phoneNumberId
+        );
+
+        return NextResponse.json({
+          success: true,
+          scheduled: false,
+          call_id: callResult.callId,
+          status: callResult.status,
+          message: 'Call initiated successfully',
+        });
+      } catch (error) {
+        console.error('[MAKE-CALL ERROR] Failed to make call:', error);
+        return NextResponse.json(
+          { success: false, error: 'Failed to make call', details: error instanceof Error ? error.message : 'Unknown error' },
+          { status: 500 }
+        );
+      }
+    }
+  } catch (error) {
+    console.error('[MAKE-CALL ERROR] Exception:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
+

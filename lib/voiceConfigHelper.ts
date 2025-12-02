@@ -4,7 +4,7 @@
  */
 
 import { getElevenLabsMapping } from './voiceMapping';
-import { getCuratedVoiceById } from './voiceLibrary';
+import { getCuratedVoiceById, initializeVoiceLibrary, getAllCuratedVoices } from './voiceLibrary';
 
 export interface VoiceConfig {
   provider: '11labs' | 'vapi';
@@ -22,6 +22,12 @@ export async function getVoiceConfigForVAPI(voiceChoice: string): Promise<VoiceC
   }
 
   const trimmedChoice = voiceChoice.trim();
+  
+  // Ensure voice library is initialized before looking up voices
+  let curatedVoices = getAllCuratedVoices();
+  if (curatedVoices.length === 0) {
+    curatedVoices = await initializeVoiceLibrary();
+  }
   
   // Check if it's a curated voice ID
   const curatedVoice = getCuratedVoiceById(trimmedChoice);
@@ -51,19 +57,27 @@ export async function getVoiceConfigForVAPI(voiceChoice: string): Promise<VoiceC
     };
   }
   
-  // If no mapping found, assume it's a VAPI voice name
-  // VAPI voice names are simple strings like "Elliot", "Leah", etc.
-  if (trimmedChoice.length > 0 && !trimmedChoice.includes('-')) {
+  // IMPORTANT: Check for ElevenLabs ID BEFORE assuming it's a VAPI voice name
+  // ElevenLabs voice IDs are typically 17-20 characters, alphanumeric, no dashes
+  // VAPI voice names are short (usually < 15 chars) and may contain spaces/dashes
+  const isElevenLabsId = trimmedChoice.length >= 15 && 
+                         trimmedChoice.length <= 25 && 
+                         /^[a-zA-Z0-9]+$/.test(trimmedChoice) &&
+                         !trimmedChoice.includes('-') &&
+                         !trimmedChoice.includes(' ');
+                         
+  if (isElevenLabsId) {
     return {
-      provider: 'vapi',
+      provider: '11labs',
       voiceId: trimmedChoice,
     };
   }
   
-  // If it looks like an ElevenLabs ID (long alphanumeric string)
-  if (trimmedChoice.length > 10 && /^[a-zA-Z0-9]+$/.test(trimmedChoice)) {
+  // If no mapping found and not an ElevenLabs ID, assume it's a VAPI voice name
+  // VAPI voice names are simple strings like "Elliot", "Leah", etc.
+  if (trimmedChoice.length > 0 && !trimmedChoice.includes('-')) {
     return {
-      provider: '11labs',
+      provider: 'vapi',
       voiceId: trimmedChoice,
     };
   }

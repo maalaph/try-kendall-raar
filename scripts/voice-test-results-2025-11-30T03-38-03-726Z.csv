@@ -1,0 +1,176 @@
+Voice ID,Voice Name,ElevenLabs Voice ID,Status,Error,Error Message
+"KM-CWHRBW","Roger","CwhRBWXzGAHq8TQ4Fs17",SUCCESS,"",
+"KM-EXAVIT","Sarah","EXAVITQu4vr4xnSDxMaL",SUCCESS,"",
+"KM-FGY2WH","Laura","FGY2WhTYpPnrIDTdsKH5",SUCCESS,"",
+"KM-IKNE3M","Charlie","IKne3meq5aSn9XLyUdCD",SUCCESS,"",
+"KM-JBFQNC","George","JBFqnCBsd6RMkjVDRZzb",SUCCESS,"",
+"KM-N2LVS1","Callum","N2lVS1w4EtoT3dr4eOWO",SUCCESS,"",
+"KM-SAZ9YH","River","SAz9YHcvj6GT2YYXdXww",SUCCESS,"",
+"KM-SOYHLR","Harry","SOYHLrjzK2X1ezoPC6cr",SUCCESS,"",
+"KM-TX3LPA","Liam","TX3LPaxmHKxFdv7VOQHJ",SUCCESS,"",
+"KM-XB7HH8","Alice","Xb7hH8MSUJpSbSDYk0k2",SUCCESS,"",
+"KM-XREXE9","Matilda","XrExE9yKIg1WjnnlVkGX",SUCCESS,"",
+"KM-BIHBV2","Will","bIHbv24MWmeRgasZH58o",SUCCESS,"",
+"KM-CGSGSP","Jessica","cgSgspJ2msm6clMCkdW9",SUCCESS,"",
+"KM-CJVIGY","Eric","cjVigY5qzO86Huf0OWal",SUCCESS,"",
+"KM-IP95P4","Chris","iP95p4xoKVk53GoZ742B",SUCCESS,"",
+"KM-NPCZCJ","Brian","nPczCjzI2devNBz1zQrb",SUCCESS,"",
+"KM-ONWK4E","Daniel","onwK4e9ZLuTAKqWW03F9",SUCCESS,"",
+"KM-PFZP5J","Lily","pFZP5JQG7iQjIQuC4Bku",SUCCESS,"",
+"KM-PNINZ6","Adam","pNInz6obpgDQGcFmaJgB",SUCCESS,"",
+"KM-PQHFZK","Bill","pqHfZKP75CvOlQylNhV4",SUCCESS,"",
+"KM-03VEUR","Sassy Aerisita","03vEurziQfq3V8WZhQvn",SUCCESS,"",
+"KM-0FLXGJ","TM","0FLxgjNYHJnHnNQ3nwk8",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-0DPQNX","Grandpa Storyteller Oxley","0dPqNXnhg2bmxQv1WKDp",SUCCESS,"",
+"KM-0LP4RI","Grandfather Joe -  Gentle, warm & wise","0lp4RIz96WD1RUtvEu3Q",SUCCESS,"",
+"KM-0MDYZ2","Rudra - Professional & Natural Conversational Hindi Voice","0mDYz2rpzUksQMbNcdCc",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-19STYY","Samara X","19STyYD15bswVz51nqLf",SUCCESS,"",
+"KM-1BFRKU","Declan – horror narrator","1BfrkuYXmEwp8AWqSLWk",SUCCESS,"",
+"KM-1RVPBI","Cody McAvoy","1RVpBInY9YUYMLSUQReV",SUCCESS,"",
+"KM-1A0NAY","Ziyu Professional","1a0nAYA3FcNQcMMfbddY",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-248NVF","Murph – Commercial Ad Voice – Confident & Polished","248nvfaZe8BXhKntjmpp",SUCCESS,"",
+"KM-2BJW5C","Edward","2BJW5coyhAzSr8STdHbE",SUCCESS,"",
+"KM-2BSEFC","Manav – Textured, Friendly Indian Voice for Conversations","2BsEFcU7jUhLaUwV4h7l",SUCCESS,"",
+"KM-2WM58L","Ate Jane - Neutral Filipino accent with slight American influence","2WM58lWaTXuuBkN1puHx",SUCCESS,"",
+"KM-2GPFXX","Oxley - Evil Character","2gPFXx8pN3Avh27Dw5Ma",SUCCESS,"",
+"KM-2QFP6Z","Trinity – Soulful & Soothing Guided Meditation ","2qfp6zPuviqeCOZIE9RZ",SUCCESS,"",
+"KM-3XDPHJ","Pandu - Your Innocent Friend","3xDpHJYZLpyrp8I8ILUO",SUCCESS,"",
+"KM-4O1SYU","Maya J - Friendly and Cheerful Voice","4O1sYUnmtThcBoSBrri7",SUCCESS,"",
+"KM-4TRN1L","Serafina - Flirty Sensual Temptress","4tRn1lSkEn13EVTuqb0g",SUCCESS,"",
+"KM-6F5ZHI","Hank - A natural voice great for commercials, video games, and narration","6F5Zhi321D3Oq7v1oNT4",SUCCESS,"",
+"KM-6MOEUZ","Manav - Charming, Husky Indian Male Voice","6MoEUz34rbRrmmyxgRm4",SUCCESS,"",
+"KM-6O8E1U","CarterMotivational","6O8E1UOlJbvkhJDpV0aB",SUCCESS,"",
+"KM-6OZRBC","Young Jamal","6OzrBCQf8cjERkYgzSg8",SUCCESS,"",
+"KM-6ADN1K","Tiffany - Realistic Conversations","6aDn1KB0hjpdcocrUkmq",SUCCESS,"",
+"KM-77AEIU","Ayinde - young British Nigerian","77aEIu0qStu8Jwv1EdhX",SUCCESS,"",
+"KM-8WRFTP","Mihai R","8WRfTpaUoqZSfTerOXzI",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-8SNEBE","Gaurav - Young Energetic Hindi Voice","8sNEbeluclbr4u71MPb0",SUCCESS,"",
+"KM-90IPBR","Anika - Customer Care Agent","90ipbRoKi4CpHXvKVtl0",SUCCESS,"",
+"KM-BIVP0G","Ellen","BIvP0GN1cAtSRTxNHnWS",SUCCESS,"",
+"KM-BJ9UQZ","Austin - Good ol' Texas boy","Bj9UqZbhQsanLzgalpEG",SUCCESS,"",
+"KM-DMYRGZ","Donovan","DMyrgzQFny3JI1Y1paM5",SUCCESS,"",
+"KM-DQLHOR","Prakash – Confident & Senior Customer Care Agent","DQLhorDHb2d4HkZj4kFd",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-DXX4Q5","Misha - Podcast Host & Storytelling","DXX4Q5Bh1vqK8CciYVPf",SUCCESS,"",
+"KM-DYKRAH","Tom - Conversations & Books","DYkrAHD8iwork3YSUBbs",SUCCESS,"",
+"KM-EOVAUW","Aidan - Social Media Influencer","EOVAuWqgSZN2Oel78Psj",SUCCESS,"",
+"KM-EQU48N","Lucy - News Reporter","EQu48Nbp4OqDxsnYh27f",SUCCESS,"",
+"KM-EVHFIM","Juan Dela Cruz: Authentic Tagalog and Filipino Call Center Agent","EVHfImLeQUjQG40OZl3q",SUCCESS,"",
+"KM-EABS7G","Monika Sogam - Natural Conversations","EaBs7G1VibMrNAuz2Na7",SUCCESS,"",
+"KM-EINLNI","John Doe - Deep","EiNlNiXeDU1pqqOPrYMO",SUCCESS,"",
+"KM-GPAQQP","Victor Realistic","GPAQQPp9dazaB2bl4zg9",SUCCESS,"",
+"KM-GOGUCA","Emo - YA Audiobooks Narrator","GoGUcAZovo4MFeLxJdZd",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-GSFUR3","Cooper","GsfuR3Wo2BACoxELWyEF",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-GSNDH0","Adam - Classic English Narrator","Gsndh0O5AnuI2Hj3YUlA",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-H2CGNI","Clifford: Western Cowboy ","H2CgnIux8C0XLWQ97uPA",SUCCESS,"",
+"KM-IPCCRC","Cristiano","IpCcRCVYm2nsZJjBFn4H",SUCCESS,"",
+"KM-KEVRA7","Richie O'Neill","KEVRa7mtDwmBo6pi4ItL",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-KLEDBQ","Ruhani - Soft, Calm Female Voice for Mental Wellness Reels & Content","KleDBQ7etYG6NMjnQ9Jw",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-KZ0DA4","Herbie - Lisp and whistle S sounds","Kz0DA4tCctbPjLay2QT1",SUCCESS,"",
+"KM-L5ZW3P","Dr Samuel Rosso","L5zW3PqYZoWAeS4J1qMV",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-LEVD0Y","Joe - African Professional Accent","LEvd0YiWkwZ6hTZOmdVE",SUCCESS,"",
+"KM-LEKJR2","Farmer John - Philly Dox","LeKjR2H906hH45YTS8O5",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-LYSUCV","Marshal - Grumpy Sourpuss","LysucvtFmzi1NVAE0rKp",SUCCESS,"",
+"KM-M5T072","Miffy Mice Maple ","M5t0724ORuAGCh3p3DUR",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-MDLAMJ","Jerry B. - Santa Claus, Father Christmas, St. Nicholas","MDLAMJ0jxkpYkjXbmG4t",SUCCESS,"",
+"KM-MKLLQC","Grampa Werthers - Cartoon Old Man","MKlLqCItoCkvdhrxgtLv",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-NFFZBO","Global Artist - Articulate and natural narration","NFFZBoF6tNodi008z7VH",SUCCESS,"",
+"KM-NOPBLN","Grandpa Spuds Oxley","NOpBlnGInO9m6vDvFkFC",SUCCESS,"",
+"KM-NVP9WQ","Toluwalope - Energetic African Male","NVp9wQor3NDIWcxYoZiW",SUCCESS,"",
+"KM-OHISAD","Pablo Marshal","OhisAd2u8Q6qSA4xXAAT",SUCCESS,"",
+"KM-OS2FRC","Mahmoud – Natural Conversational","Os2frcqCuUz8b9F93RuI",SUCCESS,"",
+"KM-PIGSLT","Jonathan Livingston - Authentic, Calming & Pleasing","PIGsltMj3gFMR34aFDI3",SUCCESS,"",
+"KM-PPZYPI","Pirate Marshal","PPzYpIqttlTYA83688JI",SUCCESS,"",
+"KM-QF9HJC","Joseff Sweet - Calm and Warm Male ASMR Voice","QF9HJC7XWnue5c9W3LkY",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-QZTKUB","Jerry B. - New York Italian","QzTKubutNn9TjrB7Xb2Q",SUCCESS,"",
+"KM-RO2BVJ","Sable - Whisper & ASMR","RO2BvjCY3XHTRsIYByXn",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-SV61H9","Amit Gupta - Soothing Conversational Voice","SV61h9yhBg4i91KIBwdz",SUCCESS,"",
+"KM-SGG3X7","Egypt","SgG3x729SgH346SJc0ck",SUCCESS,"",
+"KM-SQ93GQ","Felix - Warm, positive & contemporary RP","Sq93GQT4X1lKDXsQcixO",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-TC0ZP7","Aria - Sexy Female Villain Voice","TC0Zp7WVFzhA8zpTlRqV",SUCCESS,"",
+"KM-TJ9L48","Matthew Schmitz - Nosferatu Ancient Vampire Lord","Tj9l48J9AJbry5yCP5eW",SUCCESS,"",
+"KM-U0W3ED","Freddie Flip - Excited Frog ","U0W3edavfdI8ibPeeteQ",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-UZVBFQ","Jerry B. - Conversational Boston Accent","UZvBfqEdvCFLqsBOo9Zr",SUCCESS,"",
+"KM-UGBBYS","Mark - Natural Conversations","UgBBYS2sOqTuMpoF3BR0",SUCCESS,"",
+"KM-UZNIBK","Taro- Young Japanese Accented Guy","UznIBkKIQe3ZG2tGydre",SUCCESS,"",
+"KM-VEWZVL","Kiwi - Holistic Educator","VEWZvLXUrFL3O7dUnBSW",SUCCESS,"",
+"KM-WKTSIW","Old Cowboy - Narrator ","WKtSiwnucIJgM5cTHARA",SUCCESS,"",
+"KM-WZ5VYM","Edsard","Wz5VyMwarjxJoceKovDZ",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-XJ2FW4","Cherry Twinkle – Adorable Cartoon Girl","XJ2fW4ybq7HouelYYGcL",SUCCESS,"",
+"KM-XAGEPZ","Rivan K - Deep, Caring & Relatable","XagEPz76kWQQ0RWKvQAf",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-XJDMLV","Vlad - Mysterious man","XjdmlV0OFXfXE6Mg2Sb7",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-XSMRVB","Marshal - Dandy Brit","XsmrVB66q3D4TaXVaWNF",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-YEKUDC","Bubba Marshal","YEkUdc7PezGaXaRslSHB",SUCCESS,"",
+"KM-YOQ2Y2","Gaming – Unreal Tonemanagement 2003","YOq2y2Up4RgXP2HyXjE5",SUCCESS,"",
+"KM-YXPFCV","Wyatt- Wise Rustic Cowboy","YXpFCvM1S3JbWEJhoskW",SUCCESS,"",
+"KM-AAZJB4","Tarini - Expressive & Cheerful Narrator","aAzJB4KWAzCZrJSxdt5x",SUCCESS,"",
+"KM-AEO01A","Arabella","aEO01A4wXwd1O8GPgGlF",SUCCESS,"",
+"KM-AOCS60","Cowboy","aOcS60CY8CoaVaZfqqb5",SUCCESS,"",
+"KM-B7OWSP","Ryan - Strong Dramatic British Storyteller","b7OWsPurC81KeahWq9j7",SUCCESS,"",
+"KM-CPOQAV","Kallixis - Monster & Deep ","cPoqAvGWCPfCfyPMwe4z",SUCCESS,"",
+"KM-CGLPYG","Knox - V3 - Bro-Dude + Gym Feels","cgLpYGyXZhkyalKZ0xeZ",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-DDPKZ6","Alex - Vibrant, Engaging and Lively","dDpKZ6xv1gpboV4okVbc",SUCCESS,"",
+"KM-DOZWTV","Tony D.","dOZwtV72qwiKnZGSlLsC",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-DODGRI","James P - Scared Australian ","dOdGri2hgsKdUEaU09Ct",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-DHWAFD","Denzel - Authentic Jamaican Gangster","dhwafD61uVd8h85wAZSE",SUCCESS,"",
+"KM-E2ODXV","Simon -  Deep voice","e2odxVHlmLJ5GY1yuWNl",SUCCESS,"",
+"KM-EOHSVE","Olabisi – Warm & Relatable African Female","eOHsvebhdtt0XFeHVMQY",SUCCESS,"",
+"KM-ERCSJD","Kevin","eRcsJdPMOM0mtGC03ul7",SUCCESS,"",
+"KM-EVITLK","Sexy Female Villain Voice","eVItLK1UvXctxuaRV2Oq",SUCCESS,"",
+"KM-EXPIBV","Siren - Natural realistic podcast voice","eXpIbVcVbLo8ZJQDlDnl",SUCCESS,"",
+"KM-EZM9VD","Noah – Chill Conversationalist","eZm9vdjYgL9PZKtf7XMM",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-ECP3DW","Anika - Sweet & Lively Social Media Voice","ecp3DWciuUyW7BYM7II1",SUCCESS,"",
+"KM-EE2PDO","Rocco Robot","ee2pDOfqzj2pBerZvUCH",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-EFGTHF","Zadok - Good for character","efGTHf4ukBiG4n8lptfp",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-EWXUVN","Mike Rashid","ewxUvnyvvOehYjKjUVKC",SUCCESS,"",
+"KM-GAMZPH","Keith's Voice - Nonchalant Talker","gAMZphRyrWJnLMDnom6H",SUCCESS,"",
+"KM-GE0OWC","Ivanna - Spoiled Woman","gE0owC0H9C8SzfDyIUtB",SUCCESS,"",
+"KM-GU0LND","British Football Announcer","gU0LNdkMOQCOrPrwtbee",SUCCESS,"",
+"KM-GUBIDU","Lewis - Calm Scottish Male","gUbIduqGzBP438teh4ZA",SUCCESS,"",
+"KM-GWADC0"," Snap – Viral Content & Sales Voice","gWaDC0oXAheKoZfljzuI",SUCCESS,"",
+"KM-HMMWXC","Rory - Irish Male","hmMWXCj9K7N5mCPcRkfC",SUCCESS,"",
+"KM-HTFFPS","Antonio – Confident Conversational Latino","htFfPSZGJwjBv1CL0aMD",SUCCESS,"",
+"KM-IIKOP8","Anuj - Empathetic Customer Care Voice","iiKOP8gRLNAprBH8tPm2",SUCCESS,"",
+"KM-IIIDTQ","Bill L. Oxley","iiidtqDt9FBdT1vfBluA",SUCCESS,"",
+"KM-JRAAK6","Ollie - Natural & Relaxed British Voice","jRAAK67SEFE9m7ci5DhD",SUCCESS,"",
+"KM-LE5ZJB","Marshal - Toon Character","lE5ZJB6jGeeuvSNxOvs2",SUCCESS,"",
+"KM-LCMYYD","Lucy - Fresh & Casual","lcMyyd2HUfFzxdCaC4Ta",SUCCESS,"",
+"KM-LJO9GA","Bjorn The Viking","ljo9gAlSqKOvF6D8sOsX",SUCCESS,"",
+"KM-LYPBHF","Shaurya - Expressive Conversational/Casual Male (Indian English)","lyPbHf3pO5t4kYZYenaY",SUCCESS,"",
+"KM-M3YAHY","Ash - Conversation","m3yAHyFEFKtbCIM5n7GF",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-MEHUKD","Jet Du – ASMR & Whisper ","mEHuKdn0uRQSMynXjRNO",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-NTMUXL","Grandpa Alder","nTMUXLFSfbWmdKKy7nDC",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-NLYULS","Indrajeet M – Senior Customer Care Voice for Escalations","nlyULslzTRhqlyv46oPj",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-NZEAAC","Marshal - German Prof.","nzeAacJi50IvxcyDnMXa",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-O3VPIA","Cowboy Chris - Thick Southern Accent","o3VpiaQ9JcGIFpOrkHHf",SUCCESS,"",
+"KM-OR4URY","Myrddin - Magical Narrator & Wise Mentor","oR4uRy4fHDUGGISL0Rev",SUCCESS,"",
+"KM-OCZQ26","Lulu Lollipop – Sweet & Bubbly Girl","ocZQ262SsZb9RIxcQBOj",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-OGSJ7J","Aakash - Indian Accent English","ogSj7jM4rppgY9TgZMqW",SUCCESS,"",
+"KM-QVPGLZ","Berto Jolliffe - African American Urban Voice","qVpGLzi5EhjW3WGVhOa9",SUCCESS,"",
+"KM-RHWSYO","Jerry B. - California Surfer Dude","rHWSYoq8UlV0YIBKMryp",SUCCESS,"",
+"KM-RGLTZV","Kumaran – South Indian, Confident & Conversational","rgltZvTfiMmgWweZhh7n",SUCCESS,"",
+"KM-S0XGIC","Lucas - Warm, Casual, Neutral American Voice","s0XGIcqmceN2l7kjsqoZ",SUCCESS,"",
+"KM-S2WVUS","Antonio - Grumpy Grandpa","s2wvuS7SwITYg8dqsJdn",SUCCESS,"",
+"KM-S3TPKV","Adam - Authentic & Engaging Storyteller","s3TPKV1kjDlVtZbl4Ksh",SUCCESS,"",
+"KM-SIW1N9","Ruhaan - Clean narration voice","siw1N9V8LmYeEWKyWBxv",SUCCESS,"",
+"KM-SLA02G","Gabriel - Calm and Gentle","sla02gCKN0hNfNn9ORJN",SUCCESS,"",
+"KM-TTZ0TV","Rudra - Suspense and Horror Storyteller","tTZ0TVc9Q1bbWngiduLK",SUCCESS,"",
+"KM-TVKOO4","Jack the Pirate","tVkOo4DLgZb89qB0x4qP",SUCCESS,"",
+"KM-TLETAN","Mohammed","tlETan7Okc4pzjD0z62P",SUCCESS,"",
+"KM-U0RENI"," Ms. Harris – Warm & Caring Southern Mom","u0REnIJvUgcGQYW2Ux8K",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-VAXDFY","Miguel","vAxdfYVShGAQEwKYqDZR",SUCCESS,"",
+"KM-VBKC2F","Finn","vBKc2FfBKJfcZNyEt1n6",SUCCESS,"",
+"KM-VFLQXA","Grandma Muffin","vFLqXa8bgbofGarf6fZh",SUCCESS,"",
+"KM-VO7HJE","Amrut Deshmukh - Booklet Guy","vO7hjeAjmsdlGgUdvPpe",SUCCESS,"",
+"KM-WBXNQK","Adam","wBXNqKUATyqu0RtYt25i",SUCCESS,"",
+"KM-WFOTYW","Kamau - African ","wFOtYWBAKv6z33WjceQa",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-WNL2YB","Kuya Kaf - Gamer and General Dubbing","wNl2YBRc8v5uIcq6gOxd",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-X86DTP","Yomi - Young African Nigerian Youruba Accent","x86DtpnPPuq2BpEiKPRy",SUCCESS,"",
+"KM-XYWUVK","Matthew Schmitz - Reptilian Argonian Monster","xYWUvKNK6zWCgsdAK7Wi",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-YP4MMT","Timi - Male African Voice of God (VOG) Actor, Storytelling, Narration, Product, Event Announcements","yp4MmTRKvE7VXY3hUJRY",SUCCESS,"",
+"KM-ZYCJLY","Cocky Male Villain Voice","zYcjlYFOd3taleS0gkk3",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-ZZEQ6F","Maty - Storyteller ","zZeq6FndupLBP33ngh9e",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-ZHQWEJ","The Irish Story Teller","zhqwEJnIn9nJv0L8nUkS",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-ZRXPGZ","Bala - Soft Spoken Conversational South Indian Voice","zrXpgZCPDu2t9STPqxVL",SUCCESS,"",
+"KM-ZTNPYZ","Bravefart","ztnpYzQJyWffPj1VC5Uw",FAILED,"VOICE_NOT_FOUND","Couldn't Find 11labs Voice. If you're using your credentials, check the voice exists in your 11labs account. If not, check the voice exists in the provided list. Hot tip, remove your credential if you're trying to use a Vapi provided voice."
+"KM-ZWBF3I","Dayo","zwbf3iHXH6YGoTCPStfx",SUCCESS,"",
+"KM-USCY1B","Antonio Farina - Italian PRO Talent - Audiobook, Narration","uScy1bXtKz8vPzfdFsFw",SUCCESS,"",

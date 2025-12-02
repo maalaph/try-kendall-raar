@@ -222,7 +222,7 @@ function PersonalSetupPageContent() {
       <div className="w-full max-w-[1400px] flex flex-col items-center justify-center" style={{ position: 'relative', zIndex: 10, minHeight: 'calc(100vh - 200px)' }}>
         {/* Edit MyKendall Header - Between navbar and wizard (only in edit mode) */}
         {isEditMode && !isLoadingData && (
-          <div className="w-full text-center" style={{ marginTop: 'clamp(2rem, 5vw, 4rem)', marginBottom: 'clamp(2rem, 5vw, 4rem)' }}>
+          <div className="w-full text-center" style={{ marginTop: 'clamp(1rem, 3vw, 2rem)', marginBottom: 'clamp(2rem, 5vw, 4rem)' }}>
             <h1 
               style={{
                 fontFamily: 'var(--font-league-spartan), sans-serif',
