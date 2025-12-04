@@ -446,6 +446,53 @@ export async function getOwnerInfoByAgentId(agentId: string): Promise<{
 }
 
 /**
+ * Get full user record by VAPI agent ID
+ * Queries the main user table by vapi_agent_id field and returns the complete record
+ */
+export async function getUserRecordByAgentId(agentId: string): Promise<any | null> {
+  try {
+    if (!agentId) {
+      console.warn('[AIRTABLE WARNING] getUserRecordByAgentId called with empty agentId');
+      return null;
+    }
+
+    // Build filter formula to find record by vapi_agent_id
+    const filterFormula = `{vapi_agent_id} = "${agentId}"`;
+    const url = `${AIRTABLE_API_URL}?filterByFormula=${encodeURIComponent(filterFormula)}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[AIRTABLE ERROR] getUserRecordByAgentId failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        agentId,
+      });
+      return null;
+    }
+
+    const result = await response.json();
+    const records = result.records || [];
+    
+    if (records.length === 0) {
+      console.warn('[AIRTABLE WARNING] No record found with agentId:', agentId);
+      return null;
+    }
+
+    // Return the full record (includes id and fields)
+    return records[0];
+  } catch (error) {
+    console.error('[AIRTABLE ERROR] getUserRecordByAgentId failed:', error);
+    return null;
+  }
+}
+
+/**
  * Get owner's phone number by VAPI phone number
  * Queries the main user table by vapi_number field
  */
@@ -643,6 +690,7 @@ export async function createCallNote(data: {
   smsSent?: boolean;
   callDuration?: number; // Duration in seconds
   read?: boolean; // Whether owner has read this message
+  callType?: 'inbound' | 'outbound'; // Type of call: inbound (owner-assistant) or outbound (assistant-to-recipient)
 }) {
   try {
     if (!process.env.AIRTABLE_BASE_ID || !process.env.AIRTABLE_CALL_NOTES_TABLE_ID) {
@@ -681,6 +729,9 @@ export async function createCallNote(data: {
     }
     if (data.read !== undefined) {
       fields.read = data.read;
+    }
+    if (data.callType) {
+      fields.callType = data.callType;
     }
 
     const response = await fetch(CALL_NOTES_API_URL, {
@@ -1932,6 +1983,49 @@ export async function getRecentCallNotes(agentId: string, limit: number = 10): P
     }));
   } catch (error) {
     console.error('[AIRTABLE ERROR] getRecentCallNotes failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get call notes filtered by call type (inbound or outbound)
+ */
+export async function getCallNotesByType(agentId: string, callType: 'inbound' | 'outbound', limit: number = 10): Promise<any[]> {
+  try {
+    if (!CALL_NOTES_API_URL) {
+      throw new Error('Call Notes Airtable URL is not configured');
+    }
+
+    const filterFormula = `AND({agentId} = "${agentId}", {callType} = "${callType}")`;
+    const url = `${CALL_NOTES_API_URL}?filterByFormula=${encodeURIComponent(filterFormula)}&sort[0][field]=timestamp&sort[0][direction]=desc&maxRecords=${limit}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[AIRTABLE ERROR] getCallNotesByType failed:', {
+        status: response.status,
+        errorData,
+      });
+      throw new Error(`Failed to get call notes by type: ${JSON.stringify(errorData)}`);
+    }
+
+    const result = await response.json();
+    return (result.records || []).map(record => ({
+      id: record.id,
+      callId: record.fields?.callId,
+      callerPhone: record.fields?.callerPhone || '',
+      note: record.fields?.Notes || '',
+      timestamp: record.fields?.timestamp || '',
+      callDuration: record.fields?.callDuration,
+      read: record.fields?.read || false,
+      callType: record.fields?.callType || callType, // Use provided callType as fallback
+    }));
+  } catch (error) {
+    console.error('[AIRTABLE ERROR] getCallNotesByType failed:', error);
     throw error;
   }
 }

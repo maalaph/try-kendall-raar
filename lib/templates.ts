@@ -95,3 +95,5 @@ export function extractVariables(content: string): string[] {
   return [...new Set(matches.map(m => m.replace(/\{\{|\}\}/g, '')))];
 }
 
+
+

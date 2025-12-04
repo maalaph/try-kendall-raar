@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerPhoneByAgentId, createCallNote, getOwnerByPhoneNumber, createScheduledCallTask, getAgentByCanadianNumber, getCanadianNumberByAgentId, getUserRecord, getOutboundCallRequestByCallId, updateOutboundCallRequest, createChatMessage, getAllUserRecords } from '@/lib/airtable';
+import { upsertContact } from '@/lib/contacts';
+import { formatPhoneNumberToE164 } from '@/lib/vapi';
 import { sendSMS } from '@/lib/sms';
 import { parseTimeExpression } from '@/lib/timeParser';
 import { buildSystemPrompt } from '@/lib/promptBlocks';
@@ -2882,13 +2884,35 @@ export async function POST(request: NextRequest) {
                         payload.error ||
                         (payload.call && (payload.call.status === 'failed' || payload.call.status === 'ended-abnormally'));
         
-        // Generate summary message for chat
+        // Generate summary message for chat with full transcript if available
         let chatMessage: string;
         if (isFailed) {
           const errorMessage = payload.error?.message || payload.message || 'The call failed to complete.';
           chatMessage = `Call to ${phoneDisplay} ended.\n\n${errorMessage}`;
         } else {
-          chatMessage = `Call summary for ${phoneDisplay}:\n\n${assistantSummary}`;
+          // Try to extract full transcript from messages array
+          const messagesArray = actualPayload.messages || payload.messages || payload.message?.messages || payload.message?.artifact?.messages;
+          let fullTranscript = '';
+          
+          if (messagesArray && Array.isArray(messagesArray)) {
+            // Build transcript from messages (filter out system messages and function calls)
+            const transcriptMessages = messagesArray
+              .filter((msg: any) => 
+                msg.role === 'user' || 
+                (msg.role === 'assistant' && msg.content && !msg.toolCalls && !msg.tool_calls)
+              )
+              .map((msg: any) => {
+                const role = msg.role === 'user' ? 'Caller' : 'Assistant';
+                const content = msg.content || '';
+                return `${role}: ${content}`;
+              });
+            
+            if (transcriptMessages.length > 0) {
+              fullTranscript = `\n\n=== Full Call Transcript ===\n${transcriptMessages.join('\n\n')}`;
+            }
+          }
+          
+          chatMessage = `Call summary for ${phoneDisplay}:\n\n${assistantSummary}${fullTranscript}`;
         }
         
         // Post to chat
@@ -2950,6 +2974,52 @@ export async function POST(request: NextRequest) {
           } catch (noteError) {
             console.error('[VAPI WEBHOOK ERROR] Failed to save outbound call transcript to Call Notes:', noteError);
             // Continue processing - don't fail the webhook
+          }
+        }
+        
+        // Update/create contact after outbound call ends
+        // Check if this is an outbound call from metadata
+        const isOutboundCall = actualPayload.metadata?.isOutboundCall || 
+                               payload.metadata?.isOutboundCall ||
+                               actualPayload.variableValues?.isOutboundCall === 'true' ||
+                               actualPayload.variableValues?.isOutboundCall === true ||
+                               false;
+        
+        if (isOutboundCall && !isFailed && ownerRecordId && callerPhoneNumber) {
+          try {
+            // Extract contact info from metadata
+            const recipientName = actualPayload.metadata?.recipientName || 
+                                  payload.metadata?.recipientName ||
+                                  actualPayload.variableValues?.recipientName ||
+                                  '';
+            
+            // Normalize phone number
+            const normalizedPhone = formatPhoneNumberToE164(callerPhoneNumber);
+            
+            if (normalizedPhone) {
+              // Format call summary as notes
+              const callDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+              const callNotes = `Called on ${callDate}: ${assistantSummary}`;
+              
+              // Update/create contact
+              await upsertContact({
+                recordId: ownerRecordId,
+                name: recipientName || 'Unknown',
+                phone: normalizedPhone,
+                notes: callNotes,
+                lastContacted: new Date().toISOString(),
+                contactCount: 1, // Will be incremented in upsertContact if contact exists
+              });
+              
+              console.log('[VAPI WEBHOOK] Updated contact after outbound call:', {
+                name: recipientName || 'Unknown',
+                phone: normalizedPhone,
+                recordId: ownerRecordId,
+              });
+            }
+          } catch (contactError) {
+            // Log but don't fail - contact update is non-critical
+            console.warn('[VAPI WEBHOOK WARNING] Failed to update contact after outbound call:', contactError);
           }
         }
       } catch (chatError) {

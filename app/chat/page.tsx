@@ -71,12 +71,18 @@ function ChatPageContent() {
       className="min-h-screen flex flex-col"
       style={{
         backgroundColor: colors.primary,
-        paddingTop: '100px', // Increased space for fixed navbar
+        paddingTop: 0, // No padding - navbar is fixed
       }}
     >
       <ChatNavbar recordId={recordId} />
       
-      <div className="flex-1 flex overflow-hidden" style={{ height: 'calc(100vh - 100px)' }}>
+      <div 
+        className="flex-1 flex overflow-hidden" 
+        style={{ 
+          height: 'calc(100vh - 120px)', // Account for navbar height with extra space
+          marginTop: '120px', // Start below the fixed navbar with extra clearance
+        }}
+      >
         {/* Chat Threads Sidebar */}
         <div className="flex-shrink-0">
           <ChatListSidebar recordId={recordId} currentThreadId={threadId} />

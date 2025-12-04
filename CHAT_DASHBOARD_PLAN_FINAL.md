@@ -322,3 +322,5 @@ Create new Airtable table for user-to-agent chat messages with this schema:
 - Fixed navbar for clear navigation
 - Active link highlighting for user orientation
 
+
+

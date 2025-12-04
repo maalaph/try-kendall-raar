@@ -269,3 +269,5 @@ All code is production-ready, error-handled, and will gracefully degrade if tabl
 
 The system logs warnings if tables are missing - check your server console.
 
+
+

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScheduledCallTasks, updateScheduledCallTask } from '@/lib/airtable';
+import { getScheduledCallTasks, updateScheduledCallTask, getOwnerInfoByAgentId, getUserRecord } from '@/lib/airtable';
+import { buildOutboundCallPrompt } from '@/lib/promptBlocks';
+import { getContactByPhone } from '@/lib/contacts';
 // Import background executor to start it automatically
 import '@/lib/backgroundCallExecutor';
 
@@ -61,6 +63,34 @@ function formatPhoneNumberToE164(phone: string): string | null {
 }
 
 /**
+ * Extract recipient name from message or context
+ * Looks for patterns like "Call [Name]", "call [Name]", "[Name]", etc.
+ */
+function extractRecipientName(message: string, callerName?: string): string | undefined {
+  if (!message || typeof message !== 'string') return undefined;
+  
+  // Common patterns to extract names
+  const patterns = [
+    /(?:call|Call|CALL)\s+(?:my\s+)?(?:friend\s+)?([A-Z][a-z]+)/, // "Call Ali", "call my friend Ali"
+    /(?:to|To|TO)\s+([A-Z][a-z]+)/, // "to Ali"
+    /^([A-Z][a-z]+)(?:\s|,|\.|$)/, // Name at start of message
+  ];
+  
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      const name = match[1].trim();
+      // Basic validation: name should be 2-20 characters and start with capital letter
+      if (name.length >= 2 && name.length <= 20 && /^[A-Z]/.test(name)) {
+        return name;
+      }
+    }
+  }
+  
+  return undefined;
+}
+
+/**
  * Make an outbound call via VAPI API
  */
 async function makeVAPICall(
@@ -68,16 +98,71 @@ async function makeVAPICall(
   assistantId: string,
   message: string,
   callerName?: string,
-  phoneNumberId?: string
+  phoneNumberId?: string,
+  ownerInfo?: { fullName: string; kendallName: string } | null,
+  recipientNameOverride?: string
 ): Promise<{ callId: string; status: string }> {
+  const apiKey = process.env.VAPI_PRIVATE_KEY;
+  if (!apiKey) {
+    throw new Error('VAPI_PRIVATE_KEY environment variable is not configured');
+  }
+
+  // Get owner info if not provided
+  let owner = ownerInfo;
+  if (!owner) {
+    owner = await getOwnerInfoByAgentId(assistantId);
+    if (!owner) {
+      console.warn('[EXECUTE-SCHEDULED-CALLS] Could not fetch owner info, using defaults');
+      owner = { fullName: callerName || 'the owner', kendallName: 'Kendall' };
+    }
+  }
+
+  // Use recipient name from override if provided, otherwise extract from message
+  const recipientName = recipientNameOverride || extractRecipientName(message, callerName);
+  
+  // Construct greeting for metadata
+  // Format: "Hi [RecipientName], I'm [KendallName], [OwnerName]'s assistant. How are you?"
+  const greeting = recipientName
+    ? `Hi ${recipientName}, I'm ${owner.kendallName}, ${owner.fullName}'s assistant. How are you?`
+    : `Hi there, I'm ${owner.kendallName}, ${owner.fullName}'s assistant. How are you?`;
+
+  // Build minimal outbound call prompt
+  const outboundPrompt = buildOutboundCallPrompt({
+    kendallName: owner.kendallName,
+    ownerName: owner.fullName,
+  });
+
+  // Log the prompt to verify it's the outbound prompt (first 200 chars)
+  console.log('[EXECUTE-SCHEDULED-CALLS] Outbound prompt preview:', outboundPrompt.substring(0, 200) + '...');
+  console.log('[EXECUTE-SCHEDULED-CALLS] Outbound prompt length:', outboundPrompt.length);
+  console.log('[EXECUTE-SCHEDULED-CALLS] Outbound prompt contains "OUTBOUND CALL":', outboundPrompt.includes('OUTBOUND CALL'));
+
   const callPayload: any = {
     customer: {
       number: phoneNumber,
     },
     assistantId: assistantId,
+    assistantOverrides: {
+      // Note: systemPrompt is not supported in assistantOverrides - relying on variableValues and firstMessage
+      firstMessage: greeting,
+      firstMessageMode: 'assistant-speaks-first',
+      variableValues: {
+        isOutboundCall: 'true',
+        greeting: greeting,
+        recipientName: recipientName || '',
+        message: message,
+        ownerName: owner.fullName,
+        kendallName: owner.kendallName,
+      },
+    },
     metadata: {
       message: message,
-      callerName: callerName || 'the owner',
+      callerName: callerName || owner.fullName,
+      isOutboundCall: true,
+      ownerName: owner.fullName,
+      kendallName: owner.kendallName,
+      greeting: greeting, // Greeting stored in metadata for the assistant to use
+      recipientName: recipientName, // Recipient name if extracted
     },
   };
 
@@ -89,6 +174,38 @@ async function makeVAPICall(
     console.warn('[EXECUTE-SCHEDULED-CALLS] No phoneNumberId provided, VAPI will use assistant default');
   }
 
+  console.log('[EXECUTE-SCHEDULED-CALLS] Outbound call payload:', {
+    phoneNumber,
+    greeting,
+    recipientName: recipientName || '(not extracted)',
+    message: message.substring(0, 50) + '...',
+    ownerName: owner.fullName,
+    kendallName: owner.kendallName,
+    isOutboundCall: 'true',
+    hasFirstMessage: !!greeting,
+    firstMessageMode: 'assistant-speaks-first',
+  });
+  
+  console.log('[EXECUTE-SCHEDULED-CALLS] Full call payload:', JSON.stringify(callPayload, null, 2));
+  
+  // Add detailed payload verification logging
+  console.log('[EXECUTE-SCHEDULED-CALLS] VERIFYING PAYLOAD STRUCTURE:', {
+    hasSystemPrompt: !!callPayload.assistantOverrides?.systemPrompt,
+    systemPromptLength: callPayload.assistantOverrides?.systemPrompt?.length || 0,
+    systemPromptPreview: callPayload.assistantOverrides?.systemPrompt?.substring(0, 100) || 'MISSING',
+    hasFirstMessage: !!callPayload.assistantOverrides?.firstMessage,
+    firstMessage: callPayload.assistantOverrides?.firstMessage,
+    firstMessageMode: callPayload.assistantOverrides?.firstMessageMode,
+    hasVariableValues: !!callPayload.assistantOverrides?.variableValues,
+    variableValuesMessage: callPayload.assistantOverrides?.variableValues?.message?.substring(0, 50) || 'MISSING',
+    variableValuesRecipientName: callPayload.assistantOverrides?.variableValues?.recipientName || 'MISSING',
+    variableValuesIsOutboundCall: callPayload.assistantOverrides?.variableValues?.isOutboundCall,
+    hasMetadata: !!callPayload.metadata,
+    metadataMessage: callPayload.metadata?.message?.substring(0, 50) || 'MISSING',
+    metadataIsOutboundCall: callPayload.metadata?.isOutboundCall,
+    metadataRecipientName: callPayload.metadata?.recipientName || 'MISSING',
+  });
+
   const response = await fetch(`${VAPI_API_URL}/call`, {
     method: 'POST',
     headers: getHeaders(),
@@ -97,10 +214,21 @@ async function makeVAPICall(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    console.error('[EXECUTE-SCHEDULED-CALLS] VAPI call failed:', errorData);
     throw new Error(`VAPI call failed: ${JSON.stringify(errorData)}`);
   }
 
   const result = await response.json();
+  
+  // Log the response to verify the call was created with correct settings
+  console.log('[EXECUTE-SCHEDULED-CALLS] VAPI call created successfully:', {
+    callId: result.id || result.callId,
+    status: result.status,
+    assistantId: result.assistantId || assistantId,
+    // Check if response includes any prompt info (VAPI might echo back what it's using)
+    hasAssistantOverrides: !!result.assistantOverrides,
+  });
+  
   return {
     callId: result.id || result.callId || '',
     status: result.status || 'initiated',
@@ -140,6 +268,7 @@ export async function GET(request: NextRequest) {
       const ownerAgentId = fields.owner_agent_id;
       const callerName = fields.caller_name;
       const phoneNumberId = fields.phone_number_id; // Get stored phoneNumberId from Airtable
+      const recipientName = fields.recipient_name; // Get recipient name if stored in task
       
       if (!phoneNumber || !message || !ownerAgentId) {
         console.warn('[EXECUTE-SCHEDULED-CALLS] Task missing required fields:', taskId);
@@ -163,13 +292,41 @@ export async function GET(request: NextRequest) {
           throw new Error('Invalid phone number format');
         }
         
-        // Make the call with stored phoneNumberId
+        // Fetch owner info for the greeting
+        const ownerInfo = await getOwnerInfoByAgentId(ownerAgentId);
+        
+        // If recipient name not stored, try to look it up by phone number
+        let finalRecipientName = recipientName;
+        if (!finalRecipientName && formattedPhone) {
+          try {
+            // Get user record by agentId (not recordId) - ownerAgentId is a VAPI agent ID
+            const { getUserRecordByAgentId } = await import('@/lib/airtable');
+            const userRecord = await getUserRecordByAgentId(ownerAgentId);
+            if (userRecord && userRecord.id) {
+              const contact = await getContactByPhone(userRecord.id, formattedPhone);
+              if (contact && contact.name) {
+                finalRecipientName = contact.name;
+                console.log('[EXECUTE-SCHEDULED-CALLS] Found contact name via fallback lookup:', finalRecipientName);
+              }
+            } else {
+              console.warn('[EXECUTE-SCHEDULED-CALLS] User record not found for ownerAgentId:', ownerAgentId);
+            }
+          } catch (error) {
+            console.error('[EXECUTE-SCHEDULED-CALLS] Error in fallback contact lookup:', error);
+            // Continue without recipient name - will extract from message
+          }
+        }
+        
+        // Make the call with stored phoneNumberId and owner info
+        // Use recipient_name from task if available, otherwise from fallback lookup, otherwise extract from message
         const callResult = await makeVAPICall(
           formattedPhone,
           ownerAgentId,
           message,
           callerName,
-          phoneNumberId // Pass the stored phoneNumberId
+          phoneNumberId, // Pass the stored phoneNumberId
+          ownerInfo, // Pass owner info for greeting construction
+          finalRecipientName // Pass recipient name if available from task or fallback lookup
         );
         
         // Update task as completed

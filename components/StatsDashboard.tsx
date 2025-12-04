@@ -17,6 +17,22 @@ interface Stats {
     callDuration?: number;
     read: boolean;
   }>;
+  inboundCalls: Array<{
+    id: string;
+    callerPhone: string;
+    note: string;
+    timestamp: string;
+    callDuration?: number;
+    read: boolean;
+  }>;
+  outboundCalls: Array<{
+    id: string;
+    callerPhone: string;
+    note: string;
+    timestamp: string;
+    callDuration?: number;
+    read: boolean;
+  }>;
 }
 
 interface StatsDashboardProps {
@@ -201,7 +217,161 @@ export default function StatsDashboard({ recordId }: StatsDashboardProps) {
           </div>
         )}
       </div>
+
+      {/* Call Logs */}
+      <div
+        className="rounded-xl p-6 mt-8"
+        style={{
+          backgroundColor: `${colors.accent}15`,
+          border: `1px solid ${colors.accent}40`,
+        }}
+      >
+        <h2
+          className="mb-4"
+          style={{
+            fontFamily: 'var(--font-inter), sans-serif',
+            fontSize: '1.25rem',
+            fontWeight: 600,
+            color: colors.text,
+          }}
+        >
+          Call Logs
+        </h2>
+
+        {/* Inbound Section */}
+        <div className="mb-6">
+          <h3
+            className="mb-3 text-sm font-semibold"
+            style={{
+              fontFamily: 'var(--font-inter), sans-serif',
+              color: colors.accent,
+            }}
+          >
+            Inbound (Owner-Assistant)
+          </h3>
+          {!stats.inboundCalls || stats.inboundCalls.length === 0 ? (
+            <div className="text-center py-4" style={{ color: colors.text, opacity: 0.6 }}>
+              No inbound calls yet
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {stats.inboundCalls.map((call) => (
+                <div
+                  key={call.id}
+                  className="p-4 rounded-lg"
+                  style={{
+                    backgroundColor: colors.primary,
+                    border: `1px solid ${colors.accent}30`,
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <span
+                        className="text-sm font-medium"
+                        style={{ color: colors.accent }}
+                      >
+                        You
+                      </span>
+                      <span
+                        className="text-xs ml-3"
+                        style={{ color: colors.text, opacity: 0.6 }}
+                      >
+                        {formatTimestamp(call.timestamp)}
+                      </span>
+                    </div>
+                    {call.callDuration && (
+                      <span
+                        className="text-xs"
+                        style={{ color: colors.text, opacity: 0.6 }}
+                      >
+                        {formatDuration(call.callDuration)}
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: colors.text,
+                      opacity: 0.9,
+                      fontFamily: 'var(--font-inter), sans-serif',
+                    }}
+                  >
+                    {call.note}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Outbound Section */}
+        <div>
+          <h3
+            className="mb-3 text-sm font-semibold"
+            style={{
+              fontFamily: 'var(--font-inter), sans-serif',
+              color: colors.accent,
+            }}
+          >
+            Outbound (Assistant-to-Recipient)
+          </h3>
+          {!stats.outboundCalls || stats.outboundCalls.length === 0 ? (
+            <div className="text-center py-4" style={{ color: colors.text, opacity: 0.6 }}>
+              No outbound calls yet
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {stats.outboundCalls.map((call) => (
+                <div
+                  key={call.id}
+                  className="p-4 rounded-lg"
+                  style={{
+                    backgroundColor: colors.primary,
+                    border: `1px solid ${colors.accent}30`,
+                  }}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <span
+                        className="text-sm font-medium"
+                        style={{ color: colors.accent }}
+                      >
+                        {formatPhone(call.callerPhone)}
+                      </span>
+                      <span
+                        className="text-xs ml-3"
+                        style={{ color: colors.text, opacity: 0.6 }}
+                      >
+                        {formatTimestamp(call.timestamp)}
+                      </span>
+                    </div>
+                    {call.callDuration && (
+                      <span
+                        className="text-xs"
+                        style={{ color: colors.text, opacity: 0.6 }}
+                      >
+                        {formatDuration(call.callDuration)}
+                      </span>
+                    )}
+                  </div>
+                  <p
+                    className="text-sm"
+                    style={{
+                      color: colors.text,
+                      opacity: 0.9,
+                      fontFamily: 'var(--font-inter), sans-serif',
+                    }}
+                  >
+                    {call.note}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
+
 

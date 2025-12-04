@@ -5,6 +5,7 @@
  */
 
 import { getScheduledCallTasks, updateScheduledCallTask, getOwnerInfoByAgentId, updateScheduledCallTaskAtomically, createOutboundCallRequest } from '@/lib/airtable';
+import { buildOutboundCallPrompt } from '@/lib/promptBlocks';
 
 const VAPI_API_URL = 'https://api.vapi.ai';
 
@@ -97,12 +98,25 @@ async function makeVAPICall(
     ? `Hi ${recipientName}, I'm ${owner.kendallName}, ${owner.fullName}'s assistant. How are you?`
     : `Hi there, I'm ${owner.kendallName}, ${owner.fullName}'s assistant. How are you?`;
 
+  // Build minimal outbound call prompt
+  const outboundPrompt = buildOutboundCallPrompt({
+    kendallName: owner.kendallName,
+    ownerName: owner.fullName,
+  });
+
+  // Log the prompt to verify it's the outbound prompt (first 200 chars)
+  console.log('[BACKGROUND EXECUTOR] Outbound prompt preview:', outboundPrompt.substring(0, 200) + '...');
+  console.log('[BACKGROUND EXECUTOR] Outbound prompt length:', outboundPrompt.length);
+  console.log('[BACKGROUND EXECUTOR] Outbound prompt contains "OUTBOUND CALL":', outboundPrompt.includes('OUTBOUND CALL'));
+  console.log('[BACKGROUND EXECUTOR] Outbound prompt contains "check_if_owner":', outboundPrompt.includes('check_if_owner'));
+
   const callPayload: any = {
     customer: {
       number: phoneNumber,
     },
     assistantId: assistantId,
     assistantOverrides: {
+      // Note: systemPrompt is not supported in assistantOverrides - relying on variableValues and firstMessage
       firstMessage: greeting,
       firstMessageMode: 'assistant-speaks-first',
       variableValues: {
@@ -151,12 +165,15 @@ async function makeVAPICall(
   console.log('[BACKGROUND EXECUTOR] VERIFYING PAYLOAD STRUCTURE:', {
     hasFirstMessage: !!callPayload.assistantOverrides?.firstMessage,
     firstMessage: callPayload.assistantOverrides?.firstMessage,
+    firstMessageMode: callPayload.assistantOverrides?.firstMessageMode,
     hasVariableValues: !!callPayload.assistantOverrides?.variableValues,
-    variableValuesMessage: callPayload.assistantOverrides?.variableValues?.message,
+    variableValuesMessage: callPayload.assistantOverrides?.variableValues?.message?.substring(0, 50) || 'MISSING',
+    variableValuesRecipientName: callPayload.assistantOverrides?.variableValues?.recipientName || 'MISSING',
     variableValuesIsOutboundCall: callPayload.assistantOverrides?.variableValues?.isOutboundCall,
     hasMetadata: !!callPayload.metadata,
-    metadataMessage: callPayload.metadata?.message,
+    metadataMessage: callPayload.metadata?.message?.substring(0, 50) || 'MISSING',
     metadataIsOutboundCall: callPayload.metadata?.isOutboundCall,
+    metadataRecipientName: callPayload.metadata?.recipientName || 'MISSING',
   });
 
   const response = await fetch(`${VAPI_API_URL}/call`, {
@@ -170,10 +187,21 @@ async function makeVAPICall(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    console.error('[BACKGROUND EXECUTOR] VAPI call failed:', errorData);
     throw new Error(`VAPI call failed: ${JSON.stringify(errorData)}`);
   }
 
   const result = await response.json();
+  
+  // Log the response to verify the call was created with correct settings
+  console.log('[BACKGROUND EXECUTOR] VAPI call created successfully:', {
+    callId: result.id || result.callId,
+    status: result.status,
+    assistantId: result.assistantId || assistantId,
+    // Check if response includes any prompt info (VAPI might echo back what it's using)
+    hasAssistantOverrides: !!result.assistantOverrides,
+  });
+  
   return {
     callId: result.id || result.callId || '',
     status: result.status || 'initiated',

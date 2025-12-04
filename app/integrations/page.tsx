@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ChatNavbar from '@/components/ChatNavbar';
 import GoogleAccountConnection from '@/components/GoogleAccountConnection';
+import SpotifyConnection from '@/components/SpotifyConnection';
 import { colors } from '@/lib/config';
 
 function IntegrationsPageContent() {
@@ -84,6 +85,8 @@ function IntegrationsPageContent() {
           </p>
           
           <GoogleAccountConnection recordId={recordId} />
+          
+          <SpotifyConnection recordId={recordId} />
         </div>
       </div>
     </main>

@@ -4,6 +4,8 @@
  */
 
 import { MASTER_SYSTEM_PROMPT_TEMPLATE } from './promptTemplate';
+import { CHAT_SYSTEM_PROMPT_TEMPLATE } from './chatPromptTemplate';
+import { OUTBOUND_CALL_PROMPT_TEMPLATE } from './outboundPromptTemplate';
 
 // Personality trait descriptions - AMPLIFIED for stronger, more distinct personalities
 const TRAIT_DESCRIPTIONS: Record<string, string> = {
@@ -83,7 +85,12 @@ const DEFAULT_DEFLECTION = 'If anyone asks about restricted topics, politely def
  */
 export function buildToneBlock(selectedTraits: string[]): string {
   if (!selectedTraits || selectedTraits.length === 0) {
-    return 'Kendall should speak with a warm, professional, and helpful tone.';
+    return `Kendall should speak with a warm, professional, and helpful tone.
+
+🚨 CRITICAL: NEVER mention your personality traits explicitly.
+- Demonstrate your traits through your behavior, tone, and word choice - never state them
+- If asked about your personality, deflect naturally - don't list your traits
+- Show your personality through how you speak, not by describing it`;
   }
 
   const descriptions = selectedTraits
@@ -95,7 +102,12 @@ export function buildToneBlock(selectedTraits: string[]): string {
   }
 
   if (descriptions.length === 1) {
-    return `Kendall should speak with the following tone and personality traits:\n${descriptions[0]}`;
+    return `Kendall should speak with the following tone and personality traits:\n${descriptions[0]}
+
+🚨 CRITICAL: NEVER mention your personality traits explicitly (e.g., "I'm sassy and witty", "I'm your [trait] assistant").
+- Demonstrate your traits through your behavior, tone, and word choice - never state them
+- If asked about your personality, deflect naturally - don't list your traits
+- Show your personality through how you speak, not by describing it`;
   }
 
   // Combine multiple traits
@@ -105,7 +117,12 @@ export function buildToneBlock(selectedTraits: string[]): string {
     combined += `${index + 1}. ${desc}\n\n`;
   });
 
-  combined += `Balance these ${descriptions.length} personality aspects naturally in conversation. Don't force them - let them flow together organically.`;
+  combined += `Balance these ${descriptions.length} personality aspects naturally in conversation. Don't force them - let them flow together organically.
+
+🚨 CRITICAL: NEVER mention your personality traits explicitly (e.g., "I'm sassy and witty", "I'm your [trait] assistant").
+- Demonstrate your traits through your behavior, tone, and word choice - never state them
+- If asked about your personality, deflect naturally - don't list your traits
+- Show your personality through how you speak, not by describing it`;
 
   return combined;
 }
@@ -329,5 +346,124 @@ export function buildLeanSystemPrompt(data: {
   const prompt = `You are ${assistantName}, assistant for ${nicknameOrFullName}. Keep responses short, one sentence at a time. Never pause more than 1 second. ${personality} You can make calls, take notes, read calendar, search contacts, get user context. Always call get_user_contacts when user asks to call someone. Always call get_user_context before making claims about user's background. At call start, call check_if_owner() immediately. If owner: greet by name, allow outbound calls. If not owner: greet normally. Only owner can request calls. Gather phone, message, when to call. Use make_outbound_call for immediate, schedule_outbound_call for future. ${boundaries} Never give medical, legal, or financial advice.`;
 
   return prompt.trim();
+}
+
+/**
+ * Build complete chat system prompt from user data
+ * This is specifically for text-based chat interactions, not phone calls
+ */
+export function buildChatSystemPrompt(data: {
+  kendallName: string;
+  fullName: string;
+  nickname?: string;
+  selectedTraits: string[];
+  useCaseChoice: string;
+  boundaryChoices: string[];
+  userContextAndRules: string;
+  analyzedFileContent?: string;
+  fileUsageInstructions?: string;
+  ownerPhoneNumber?: string;
+}): string {
+  const { userContext, additionalInstructions } = parseUserContext(data.userContextAndRules);
+  const nicknameOrFullName = data.nickname && data.nickname.trim() 
+    ? data.nickname.trim() 
+    : data.fullName;
+
+  const toneBlock = buildToneBlock(data.selectedTraits);
+  const useCaseBlock = buildUseCaseBlock(data.useCaseChoice);
+  const boundariesBlock = buildBoundariesBlock(data.boundaryChoices);
+
+  // Handle file content section with explicit instructions to use specific details
+  const fileContentSection = data.analyzedFileContent && data.analyzedFileContent.trim()
+    ? `=== DETAILED INFORMATION ABOUT ${data.fullName} ===
+The following information comes from ${data.fullName}'s professional documents (resume, CV, portfolio). This is your PRIMARY source of specific information about ${data.fullName}.
+
+${data.analyzedFileContent}
+${data.fileUsageInstructions && data.fileUsageInstructions.trim() ? `\n📝 USER INSTRUCTIONS FOR USING THIS INFORMATION:\n${data.fileUsageInstructions.trim()}\n` : ''}
+⚠️ MANDATORY INSTRUCTIONS FOR USING THIS INFORMATION:
+
+1. When asked ANY question about ${data.fullName}'s experience, background, achievements, or skills, you MUST reference the specific information from the sections above.
+
+2. CRITICAL: Use ALL information from the sections, not just a subset:
+   - From "WORK EXPERIENCE": Mention ALL companies and roles listed (e.g., if there are 3 companies, mention all 3)
+   - From "KEY ACHIEVEMENTS": Reference multiple achievements, not just one
+   - From "EDUCATION": Use exact institution, degree, and graduation year
+   - From "LEADERSHIP & ACTIVITIES": Mention all leadership roles and activities listed
+
+3. Use EXACT details from the sections:
+   - Use exact company names, job titles, dates, and achievements with numbers
+   - Cite specific achievements with exact numbers/percentages
+   - Reference specific roles and achievements
+
+4. SPEAK NATURALLY using the information:
+   - GOOD FORMAT: "At [Company Name] as [Job Title], ${data.fullName} [specific achievement with numbers]. At [Another Company], they [another achievement]."
+   - BAD: "They have consulting experience" or mentioning only one company
+   - CRITICAL: Only use company names, institutions, and organizations that are explicitly listed in the sections above
+
+5. When asked general questions like "What does ${data.fullName} do?" or "Tell me about ${data.fullName}":
+   - Start with information from "WHO THEY ARE"
+   - Then share ALL work experiences from "WORK EXPERIENCE" section - list each company, role, and key achievements
+   - Include multiple specific achievements with numbers from "KEY ACHIEVEMENTS"
+   - Mention leadership roles and activities from "LEADERSHIP & ACTIVITIES"
+   - CRITICAL: Do not mention only one experience - you MUST share ALL experiences, companies, and achievements listed
+
+6. NEVER say "I don't have that information" - the sections above contain your information source.
+
+7. ALWAYS cite specific company names, job titles, dates, and numbers when available.
+
+🚫 ABSOLUTELY FORBIDDEN:
+- NEVER make up, invent, or guess information that is not in the sections above
+- NEVER use generic or placeholder information (e.g., "graduated from a university", "worked at various companies")
+- NEVER say information that contradicts what's in the file content section
+- NEVER mention universities, schools, organizations, or activities that are NOT explicitly listed in the "EDUCATION" or "LEADERSHIP & ACTIVITIES" sections
+- If information is NOT in the file content section, deflect naturally and professionally without mentioning files or documents (e.g., "I'm not sure about that specific detail" or redirect to what you DO know)
+- ONLY use information that is explicitly stated in the sections above
+- For EDUCATION: ONLY mention the exact institution, degree, and year from the "EDUCATION" section - do NOT mention any other schools or universities
+- For LEADERSHIP & ACTIVITIES: ONLY mention roles and activities explicitly listed in the "LEADERSHIP & ACTIVITIES" section - do NOT invent or add any organizations or roles
+
+`
+    : '';
+
+  // Format owner phone number for display (use provided or default message)
+  const ownerPhoneNumber = data.ownerPhoneNumber || 'NOT PROVIDED - Owner recognition will not work until phone number is configured';
+
+  let prompt = CHAT_SYSTEM_PROMPT_TEMPLATE
+    .replace(/\{\{kendall_name\}\}/g, data.kendallName || 'Kendall')
+    .replace(/\{\{full_name\}\}/g, data.fullName)
+    .replace(/\{\{nickname_or_full_name\}\}/g, nicknameOrFullName)
+    .replace(/\{\{tone_block\}\}/g, toneBlock)
+    .replace(/\{\{use_case_block\}\}/g, useCaseBlock)
+    .replace(/\{\{user_context\}\}/g, userContext)
+    .replace(/\{\{file_content_section\}\}/g, fileContentSection)
+    .replace(/\{\{boundaries_block\}\}/g, boundariesBlock)
+    .replace(/\{\{owner_phone_number\}\}/g, ownerPhoneNumber);
+
+  // Handle additional instructions section
+  const additionalInstructionsSection = additionalInstructions
+    ? `\n=== ADDITIONAL INSTRUCTIONS ===\n${additionalInstructions}\n`
+    : '';
+
+  prompt = prompt.replace(/\{\{additional_instructions_section\}\}/g, additionalInstructionsSection);
+
+  return prompt;
+}
+
+/**
+ * Build minimal outbound call prompt
+ * This is a lean prompt specifically for outbound calls - no conditional logic needed
+ * All context (who, what, message) comes from variableValues/metadata
+ */
+export function buildOutboundCallPrompt(data: {
+  kendallName: string;
+  ownerName: string;
+}): string {
+  const kendallName = data.kendallName || 'Kendall';
+  const ownerName = data.ownerName || 'the owner';
+
+  let prompt = OUTBOUND_CALL_PROMPT_TEMPLATE
+    .replace(/\{\{kendall_name\}\}/g, kendallName)
+    .replace(/\{\{owner_name\}\}/g, ownerName);
+
+  return prompt;
 }
 

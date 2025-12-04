@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { colors } from '@/lib/config';
 import { Search, Command, Phone, Calendar, MessageSquare, File, Clock } from 'lucide-react';
 
@@ -35,9 +35,9 @@ export default function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Build command items
-  const buildCommands = useCallback((): CommandItem[] => {
-    const commands: CommandItem[] = [
+  // Build command items - use useMemo to prevent infinite loops
+  const commands = useMemo((): CommandItem[] => {
+    const commandList: CommandItem[] = [
       // Quick Actions
       {
         id: 'make-call',
@@ -103,7 +103,7 @@ export default function CommandPalette({
 
     // Add contacts
     contacts.forEach((contact) => {
-      commands.push({
+      commandList.push({
         id: `contact-${contact.id}`,
         label: contact.name,
         description: contact.phone ? `Call ${contact.phone}` : 'Contact',
@@ -119,7 +119,7 @@ export default function CommandPalette({
 
     // Add recent conversations
     conversations.slice(0, 5).forEach((conv) => {
-      commands.push({
+      commandList.push({
         id: `conv-${conv.id}`,
         label: conv.preview.substring(0, 50),
         description: `Conversation from ${new Date(conv.timestamp).toLocaleDateString()}`,
@@ -133,14 +133,8 @@ export default function CommandPalette({
       });
     });
 
-    return commands;
+    return commandList;
   }, [onActionSelect, contacts, conversations]);
-
-  const [commands, setCommands] = useState<CommandItem[]>([]);
-
-  useEffect(() => {
-    setCommands(buildCommands());
-  }, [buildCommands]);
 
   // Filter commands based on search
   const filteredCommands = commands.filter((cmd) => {
@@ -357,4 +351,5 @@ export default function CommandPalette({
     </div>
   );
 }
+
 

@@ -55,11 +55,31 @@ export async function getUserContext(
       }
 
       const fields = userRecord.fields;
+      
+      // NEW: Check for topic-specific fields first
+      if (topic && topic.trim()) {
+        const topicLower = topic.toLowerCase();
+        
+        // Check for examples field
+        if (topicLower === 'examples' && fields.examples) {
+          return formatContextAsBullets(fields.examples, 5);
+        }
+        
+        // Check for instructions field
+        if (topicLower === 'instructions' && fields.instructions) {
+          return formatContextAsBullets(fields.instructions, 5);
+        }
+        
+        // Check for edgeCases field
+        if ((topicLower === 'edgecases' || topicLower === 'edge_cases' || topicLower === 'edge cases') && fields.edgeCases) {
+          return formatContextAsBullets(fields.edgeCases, 5);
+        }
+      }
+      
+      // Fallback to userContextAndRules (existing behavior)
       const userContextAndRules = fields.userContextAndRules || '';
-
-      // Note: analyzedFileContent is now stored in User Documents table
-      // Use get_user_documents function instead for document-related queries
       let combinedContext = '';
+      
       if (userContextAndRules.trim()) {
         combinedContext += userContextAndRules.trim();
       }
@@ -68,7 +88,7 @@ export async function getUserContext(
         return 'No user context available.';
       }
 
-      // If topic provided, try to filter (simple keyword matching for now)
+      // If topic provided, try to filter within userContextAndRules
       if (topic && topic.trim()) {
         const topicLower = topic.toLowerCase();
         const lines = combinedContext.split('\n');

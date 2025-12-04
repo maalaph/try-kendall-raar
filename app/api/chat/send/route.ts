@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserRecord, getOrCreateThreadId, createChatMessage, getChatMessages, createOutboundCallRequest } from '@/lib/airtable';
-import { buildSystemPrompt } from '@/lib/promptBlocks';
+import { buildChatSystemPrompt } from '@/lib/promptBlocks';
 import { formatPhoneNumberToE164 } from '@/lib/vapi';
 import { extractPatternsFromMessage } from '@/lib/patternExtractor';
 import { extractContactFromMessage } from '@/lib/contactExtractor';
+import { getContactByName, upsertContact } from '@/lib/contacts';
 import { analyzeSentiment, getResponseTone } from '@/lib/sentiment';
 import { selectModel } from '@/lib/modelSelector';
 import { checkRateLimit } from '@/lib/rateLimiter';
@@ -106,6 +107,50 @@ const CHAT_FUNCTIONS = [
       required: ['recordId'],
     },
   },
+  {
+    name: 'send_gmail',
+    description: 'Send an email via Gmail. Use this when the user requests to send an email. You MUST have the recipient\'s email address before calling this function. If the user only provides a name, ask for their email address first.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: {
+          type: 'string',
+          description: 'The user\'s recordId (required to identify which user\'s Gmail to use)',
+        },
+        to: {
+          type: 'string',
+          description: 'The recipient\'s email address (REQUIRED). Must be a valid email address format.',
+        },
+        subject: {
+          type: 'string',
+          description: 'The email subject line',
+        },
+        body: {
+          type: 'string',
+          description: 'The email body content (can be plain text or HTML)',
+        },
+      },
+      required: ['recordId', 'to', 'subject', 'body'],
+    },
+  },
+  {
+    name: 'get_contact_by_name',
+    description: 'Look up a contact by name in the user\'s contact list. Use this when the user mentions a name (e.g., "call Ali", "email Ryan") but doesn\'t provide a phone number or email address. This function searches the user\'s Airtable contacts to find matching contact information. ALWAYS call this function BEFORE asking the user for contact information - the contact may already exist in their database. IMPORTANT: After finding a contact with a phone number, IMMEDIATELY use that phone number to call make_outbound_call. After finding a contact with an email, use that email to send the email.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: {
+          type: 'string',
+          description: 'OPTIONAL: The user\'s recordId. If not provided, the system will automatically use the correct recordId from the conversation context. You do NOT need to provide this - it is handled automatically.',
+        },
+        name: {
+          type: 'string',
+          description: 'The name of the contact to look up. Extract ONLY the first name (or first and last name) from the user\'s message. Examples: "Ali", "Ryan", "John Smith". Do NOT include action words or the rest of the sentence (e.g., use "Ali" not "Ali ask him if he can come").',
+        },
+      },
+      required: ['name'],
+    },
+  },
 ];
 
 /**
@@ -136,8 +181,13 @@ async function generateChatResponse(
     const fileUsageInstructions = fields.fileUsageInstructions || '';
     const mobileNumber = fields.mobileNumber;
     
-    // Build system prompt
-    const systemPrompt = buildSystemPrompt({
+    // Use isFirstMessage passed as parameter (determined in POST handler)
+    const fullNameStr = fullName ? String(fullName) : 'there';
+    const nicknameStr = nickname && String(nickname).trim() ? String(nickname).trim() : null;
+    const nicknameOrFullName = nicknameStr || fullNameStr;
+    
+    // Build chat system prompt (separate from phone call prompt)
+    let chatSystemPrompt = buildChatSystemPrompt({
       kendallName: String(kendallName),
       fullName: String(fullName),
       nickname: nickname ? String(nickname) : undefined,
@@ -150,25 +200,11 @@ async function generateChatResponse(
       ownerPhoneNumber: mobileNumber ? String(mobileNumber) : undefined,
     });
     
-    // Use isFirstMessage passed as parameter (determined in POST handler)
-    const fullNameStr = fullName ? String(fullName) : 'there';
-    const nicknameStr = nickname && String(nickname).trim() ? String(nickname).trim() : null;
-    const nicknameOrFullName = nicknameStr || fullNameStr;
-    
-    // Add chat-specific instructions
-    const chatSystemPrompt = `${systemPrompt}
+    // Add first message greeting instructions if this is the first message
+    if (isFirstMessage) {
+      chatSystemPrompt += `
 
-=== CHAT INTERFACE INSTRUCTIONS ===
-🚨 CRITICAL: This is a CHAT interface, NOT a phone call. Do NOT use phone call scripts or ask phone call questions.
-
-CHAT-SPECIFIC BEHAVIOR:
-- Speak naturally and casually - like you're texting with the owner, not a formal phone call
-- This is a text conversation, NOT a phone call script
-- Be concise but friendly - chat allows for quick back-and-forth
-- Use natural language patterns - "What's up?" is fine, you don't need to say "How may I assist you?"
-- When the owner gives instructions, acknowledge naturally without over-explaining
-
-${isFirstMessage ? `FIRST MESSAGE ONLY - CASUAL GREETING (MANDATORY):
+=== FIRST MESSAGE ONLY - CASUAL GREETING (MANDATORY) ===
 🚨🚨🚨 YOU MUST ALWAYS USE CASUAL GREETING FORMAT - THIS IS ABSOLUTELY REQUIRED 🚨🚨🚨
 - This is the FIRST message in the conversation - you MUST greet ${nicknameOrFullName} by name using CASUAL format
 - Use their nickname if available (${nicknameStr ? `"${nicknameStr}"` : 'not available'}), otherwise use their full name ("${fullNameStr}")
@@ -185,112 +221,8 @@ ${isFirstMessage ? `FIRST MESSAGE ONLY - CASUAL GREETING (MANDATORY):
 - Generic greetings without their name ❌
 
 ✅ REQUIRED: Use casual, friendly greeting with their name - think texting a friend, not a business call
-- After this first greeting, don't repeatedly use their name - be conversational (e.g., "Got it!" not "Got it, ${nicknameOrFullName}!")` : `- DON'T repeatedly use the owner's name - just be conversational (e.g., "Got it!" not "Got it, ${nicknameOrFullName}!")`}
-
-PHONE NUMBER RECOGNITION AND VALIDATION:
-- When the owner provides a phone number (in any format: 8149969612, (814) 996-9612, 814-996-9612, +18149969612), extract it immediately
-- VALIDATE phone number format before calling function:
-  * Valid: 10 digits (8149969612), 11 digits starting with 1 (18149969612), formatted (814) 996-9612
-  * Invalid: More than 11 digits, less than 10 digits, clearly wrong format
-- If phone number format looks invalid or unclear, ask: "I need a valid phone number format. Can you provide it as 10 digits (like 8149969612) or formatted (like (814) 996-9612)?"
-- Don't call the function if phone number format is clearly wrong - ask user to clarify first
-
-CALL FUNCTIONALITY - CRITICAL RULES:
-🚨 THIS IS CHAT - EXECUTE IMMEDIATELY, DO NOT ASK UNNECESSARY QUESTIONS:
-- NEVER ask "Would you like me to make the call immediately or schedule it for a specific time?" - this is a phone call script, NOT for chat
-- NEVER ask "Should I call them now or later?" - just execute based on what the user says
-- NEVER ask for information you already have - if the user provided phone number and message, EXECUTE IMMEDIATELY
-- If the user says "call X" or "make a call" without a time → use make_outbound_call immediately
-- If the user specifies a time (e.g., "call at 3pm" or "schedule a call for Friday") → use schedule_outbound_call
-- When owner requests a call, extract: phone number, message to deliver, recipient name (if mentioned)
-- EXECUTE THE FUNCTION IMMEDIATELY after extracting information - do NOT ask for confirmation or additional details
-- Be direct and action-oriented - execute the function call, then say "I'll call them now" or similar
-- If you have phone number AND message, you MUST execute the call - do NOT ask for anything else
-
-OUTBOUND CALL SUMMARIES - CRITICAL KNOWLEDGE:
-🚨 IMPORTANT: When you make outbound calls, you AUTOMATICALLY receive a summary/transcript when the call ends.
-- The system automatically posts call summaries to this chat when calls complete
-- You DO receive call transcripts and summaries - you don't need to ask for them
-- When a user asks "what did they say?" or "what happened on the call?", you should respond: "I'll share the call summary once it completes" or "The call summary will appear here automatically when the call ends"
-- NEVER say "I can't get responses" or "I'm only set up to deliver messages, not receive them" - this is INCORRECT
-- You WILL receive and can share call summaries automatically
-- If a call just completed, check the conversation history - the summary may already be posted
-
-RECIPIENT NAME HANDLING - OPTIONAL BUT PREFERRED:
-- PREFER to have recipient name, but DO NOT block execution if name is missing
-- Extract name from context if possible: "Ali" from "call Ali", "tell John", "message Sarah"
-- If name is clearly stated in the message, use it in the caller_name parameter
-- If name is NOT provided, you can still execute the call - just omit caller_name or use a generic value
-- ONLY ask for name if it's truly unclear AND you think it's critical - but prioritize execution over asking
-- CRITICAL: If you asked "What's their name?" and the user responds with a name (e.g., "Ali"), that IS the recipient name - extract it and execute the call IMMEDIATELY
-- Use conversation history - if the user provided phone number and message in previous messages, combine that with the name from current message and execute
-- NEVER ask for information you already have from the conversation history
-
-TONE ADJUSTMENT:
-- Less formal than phone calls - this is a text conversation
-- More casual, friendly, and efficient
-- Skip unnecessary pleasantries after the first message
-- Get to the point quickly while staying helpful
-- Remember: Chat interface, not phone call - no phone call scripts!
-
-=== RESPONSE FORMATTING & READABILITY ===
-🚨 CRITICAL: When you respond, ALWAYS use clear structure and formatting like ChatGPT, but DO NOT restrict how much you write. You are allowed to be detailed, expressive, and show personality. You are a personal assistant who can help with anything — product work, coding, planning, business tasks, research, homework, or random life questions.
-
-Follow these formatting rules for EVERY response unless explicitly told otherwise:
-
-1. USE CLEAR HEADINGS (H2/H3)
-   - Break your answer into helpful sections using markdown headings
-   - Examples: ## Overview, ## What You Should Know, ## Step-by-Step Instructions, ## Issues Found, ## Improvements, ## Final Notes
-   - Headings should mimic ChatGPT's structured, clean communication style
-   - Use ## for main sections, ### for subsections
-
-2. USE SHORT SECTIONS, NOT SHORT PARAGRAPHS
-   - You are NOT limited in length - write as much as needed
-   - You can write long explanations, use multiple paragraphs, add details when helpful
-   - The only rule: break content into readable sections instead of one giant block
-   - Each section should focus on one main idea
-
-3. USE BULLETS AND NUMBERED LISTS LIBERALLY
-   - Use them for: steps, options, pros/cons, key points, instructions
-   - This increases readability the same way ChatGPT does
-   - Lists help break up dense information
-
-4. CODE BLOCKS ONLY FOR CODE
-   - When showing code, schemas, or API examples, use code blocks with language tags:
-     \`\`\`typescript
-     // example code
-     \`\`\`
-   - Never place explanations or descriptions inside code blocks
-
-5. MAINTAIN A WARM, HELPFUL PERSONALITY
-   - You are not robotic - be warm, friendly, supportive, helpful
-   - Be slightly conversational when appropriate
-   - But still structured and clear
-   - Maintain your personality traits (${selectedTraits.length > 0 ? selectedTraits.join(', ') : 'warm and professional'})
-
-6. NO CONTENT LIMITS
-   - Do NOT shorten yourself unnecessarily
-   - Do NOT be overly concise if detail helps
-   - Do NOT restrict detail - if a longer explanation helps, write it
-   - Your only responsibility is clarity, not brevity
-
-7. ALWAYS END WITH A "FINAL ANSWER" OR "SUMMARY"
-   - End every major response with:
-     ## Final Answer
-     [A 2-4 sentence high-level summary of the key output]
-   - This helps users quickly understand the takeaway
-
-8. ASK CLARIFYING QUESTIONS WHEN NEEDED
-   - If the request is unclear or you need more detail, ask before executing
-   - Use structured formatting even for questions
-
-9. FOCUS ON READABILITY
-   - Break down complex topics into digestible sections
-   - Use whitespace effectively
-   - Make it easy to scan and understand
-   - Structure helps even with casual, friendly tone
-
-Use this formatting style for ALL responses unless explicitly told otherwise.`;
+- After this first greeting, don't repeatedly use their name - be conversational (e.g., "Got it!" not "Got it, ${nicknameOrFullName}!")`;
+    }
     
     // Initialize OpenAI client
     if (!process.env.OPENAI_API_KEY) {
@@ -592,6 +524,43 @@ export async function POST(request: NextRequest) {
           console.warn('[CONTACT EXTRACTION] Failed to extract contact:', err);
         }),
       ]);
+      
+      // Special handling: If user message is just an email address, try to link it to recent contact
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const trimmedMessage = message.trim();
+      if (emailRegex.test(trimmedMessage)) {
+        // User provided just an email - look for recent contact mention
+        try {
+          const recentMessages = await getChatMessages({
+            threadId,
+            limit: 10,
+          });
+          
+          // Look backwards through messages to find the most recent contact that was asked about
+          for (const msg of recentMessages.messages.slice().reverse()) {
+            if (msg.role === 'assistant' && msg.message.includes("don't have their email address")) {
+              // Extract contact name from message like "I found Ali in your contacts, but I don't have their email address"
+              const nameMatch = msg.message.match(/I found (\w+) in your contacts/);
+              if (nameMatch && nameMatch[1]) {
+                const contactName = nameMatch[1];
+                console.log('[CHAT] Found contact name from email-only message context:', contactName);
+                
+                // Update contact with email
+                await upsertContact({
+                  recordId,
+                  name: contactName,
+                  email: trimmedMessage,
+                });
+                console.log('[CHAT] ✅ Updated contact with email from email-only message:', { name: contactName, email: trimmedMessage });
+                break;
+              }
+            }
+          }
+        } catch (emailUpdateError) {
+          console.warn('[CHAT] Failed to update contact with email from email-only message:', emailUpdateError);
+          // Don't fail the request if this fails
+        }
+      }
     } catch (userMsgError) {
       // Log but don't fail - we still want to return the response
       const errorMessage = userMsgError instanceof Error ? userMsgError.message : String(userMsgError);
@@ -819,6 +788,411 @@ export async function POST(request: NextRequest) {
           continue;
         }
         
+        // Handle Gmail send requests
+        if (fc.name === 'send_gmail') {
+          try {
+            const { recordId: gmailRecordId, to, subject, body } = fc.arguments;
+            
+            // CRITICAL: Always use the recordId from request context, ignore what agent provides
+            // The agent may pass wrong values like '1', so we always use the correct one
+            const gmailSendRecordId = recordId; // Always use request context recordId
+            
+            if (!to || !to.includes('@')) {
+              agentResponse = "I need a valid email address to send the email. What's the recipient's email address?";
+              continue;
+            }
+            
+            // Extract email from message and update contact if needed
+            // If user just provided an email (like "alialfaras7@gmail.com"), try to link it to recent contact
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (emailRegex.test(message.trim()) && message.trim().toLowerCase() === to.toLowerCase()) {
+              // User just provided an email - try to find the most recently mentioned contact
+              try {
+                const recentMessages = await getChatMessages({
+                  threadId,
+                  limit: 5,
+                });
+                
+                // Look for contact name in recent messages
+                for (const msg of recentMessages.messages.slice().reverse()) {
+                  if (msg.role === 'assistant' && msg.message.includes("don't have their email address")) {
+                    // Extract contact name from message like "I found Ali in your contacts, but I don't have their email address"
+                    const nameMatch = msg.message.match(/I found (\w+) in your contacts/);
+                    if (nameMatch && nameMatch[1]) {
+                      const contactName = nameMatch[1];
+                      console.log('[CHAT] Found contact name from context:', contactName);
+                      
+                      // Update contact with email
+                      await upsertContact({
+                        recordId: gmailSendRecordId,
+                        name: contactName,
+                        email: to,
+                      });
+                      console.log('[CHAT] Updated contact with email:', { name: contactName, email: to });
+                      break;
+                    }
+                  }
+                }
+              } catch (contactUpdateError) {
+                console.warn('[CHAT] Failed to update contact with email:', contactUpdateError);
+                // Don't fail the email send if contact update fails
+              }
+            }
+            
+            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+            
+            // Try with retry logic for transient errors
+            let gmailSendResponse;
+            let gmailSendData;
+            let retryCount = 0;
+            const maxRetries = 1;
+            
+            while (retryCount <= maxRetries) {
+              try {
+                gmailSendResponse = await fetch(`${baseUrl}/api/google/gmail/send`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    recordId: gmailSendRecordId, // Always use request context recordId
+                    to,
+                    subject: subject || '',
+                    body: body || '',
+                  }),
+                });
+                gmailSendData = await gmailSendResponse.json();
+                
+                // If successful, break out of retry loop
+                if (gmailSendResponse.ok && gmailSendData.success) {
+                  break;
+                }
+                
+                // If it's a 401 "not connected" error, don't retry
+                if (gmailSendResponse.status === 401 && gmailSendData.error === 'Google account not connected') {
+                  break;
+                }
+                
+                // For other errors, retry once if we haven't already
+                if (retryCount < maxRetries) {
+                  console.log(`[CHAT] Gmail send API error, retrying... (attempt ${retryCount + 1}/${maxRetries + 1})`);
+                  retryCount++;
+                  await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
+                  continue;
+                }
+                
+                break;
+              } catch (fetchError) {
+                console.error(`[CHAT] Gmail send fetch error (attempt ${retryCount + 1}):`, fetchError);
+                if (retryCount < maxRetries) {
+                  retryCount++;
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  continue;
+                }
+                throw fetchError;
+              }
+            }
+            
+            if (gmailSendResponse.ok && gmailSendData.success) {
+              functionResults.push({
+                name: 'send_gmail',
+                result: gmailSendData,
+              });
+              
+              agentResponse = `Email sent successfully to ${to}!`;
+            } else {
+              // Only show "not connected" message for actual 401 errors
+              if (gmailSendResponse.status === 401 && gmailSendData.error === 'Google account not connected') {
+                agentResponse = `I couldn't send the email. ${gmailSendData.message || 'Please connect your Google account in the Integrations page.'}`;
+              } else {
+                // For other errors, show generic retry message
+                console.error('[CHAT] Gmail send API error:', {
+                  status: gmailSendResponse.status,
+                  error: gmailSendData.error,
+                  message: gmailSendData.message,
+                });
+                agentResponse = "I'm having trouble sending the email right now. Please try again in a moment.";
+              }
+            }
+          } catch (error) {
+            console.error('[CHAT] Error sending Gmail:', error);
+            agentResponse = "I encountered an error while trying to send the email. Please try again.";
+          }
+          continue;
+        }
+        
+        // Handle contact lookup requests
+        if (fc.name === 'get_contact_by_name') {
+          try {
+            const { recordId: contactRecordId, name } = fc.arguments;
+            // CRITICAL: Always use the recordId from request context, ignore what agent provides
+            // The agent may pass wrong values like 'malph' or '1', so we always use the correct one
+            const lookupRecordId = recordId; // Always use request context recordId
+            
+            if (!name || typeof name !== 'string' || !name.trim()) {
+              functionResults.push({
+                name: 'get_contact_by_name',
+                result: { success: false, error: 'Name is required' },
+              });
+              continue;
+            }
+            
+            // Extract only first 1-2 words from name (safety check in case agent passes full sentence)
+            const nameParts = name.trim().split(/\s+/);
+            const cleanName = nameParts.slice(0, 2).join(' '); // Only first 1-2 words
+            
+            console.log('[CHAT] Contact lookup requested:', { providedName: name.trim(), cleanName, recordId: lookupRecordId });
+            
+            const contact = await getContactByName(lookupRecordId, cleanName);
+            
+            if (contact) {
+              const result: any = {
+                success: true,
+                contact: {
+                  name: contact.name,
+                  phone: contact.phone || null,
+                  email: contact.email || null,
+                  relationship: contact.relationship || null,
+                  notes: contact.notes || null,
+                },
+              };
+              
+              // OPTION 2: Automatically trigger call if contact has phone number and user requested a call
+              // Check if the user's message contains call-related keywords
+              const userMessage = message.trim().toLowerCase();
+              const isCallRequest = userMessage.includes('call') || userMessage.includes('phone') || userMessage.includes('text');
+              const isEmailRequest = userMessage.includes('email') || userMessage.includes('send');
+              
+              if (contact.phone && isCallRequest) {
+                console.log('[CHAT] Auto-triggering call for contact:', { name: contact.name, phone: contact.phone });
+                
+                try {
+                  // Extract message from user's original message
+                  // Try to extract what they want to say/ask
+                  let callMessage = 'Hello, this is a call on behalf of the owner.';
+                  
+                  // Try to extract the message/request from the user's message
+                  const messagePatterns = [
+                    /(?:call|text|phone).*?(?:ask|tell|say|for|about|if|can|will|to)\s+(.+)/i,
+                    /(?:ask|tell|say)\s+(?:him|her|them)\s+(.+)/i,
+                    /(?:for|about)\s+(.+)/i,
+                  ];
+                  
+                  for (const pattern of messagePatterns) {
+                    const match = message.match(pattern);
+                    if (match && match[1]) {
+                      callMessage = match[1].trim();
+                      // Limit message length
+                      if (callMessage.length > 200) {
+                        callMessage = callMessage.substring(0, 200) + '...';
+                      }
+                      break;
+                    }
+                  }
+                  
+                  // If no specific message extracted, use a default based on context
+                  if (callMessage === 'Hello, this is a call on behalf of the owner.') {
+                    // Check if there's a specific request in the message
+                    if (userMessage.includes('dinner') || userMessage.includes('tomorrow') || userMessage.includes('tmr')) {
+                      callMessage = 'The owner would like to know if you can come for dinner tomorrow.';
+                    } else if (userMessage.includes('come') || userMessage.includes('available')) {
+                      callMessage = 'The owner would like to know if you are available.';
+                    } else {
+                      callMessage = 'The owner would like to speak with you.';
+                    }
+                  }
+                  
+                  // Normalize phone number
+                  const normalizedPhone = formatPhoneNumberToE164(contact.phone);
+                  
+                  if (normalizedPhone) {
+                    // Call the make-call API
+                    const makeCallResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/make-call`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        phone_number: normalizedPhone,
+                        message: callMessage,
+                        owner_agent_id: String(agentId),
+                        recordId: recordId,
+                        threadId: threadId,
+                      }),
+                    });
+                    
+                    if (makeCallResponse.ok) {
+                      const callResult = await makeCallResponse.json();
+                      const phoneDisplay = normalizedPhone.replace(/^\+1/, '').replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
+                      
+                      result.autoCallTriggered = true;
+                      result.callStatus = {
+                        success: true,
+                        callId: callRequestId,
+                        phoneNumber: phoneDisplay,
+                        message: `Call to ${contact.name} (${phoneDisplay}) has been initiated.`,
+                      };
+                      
+                      // Store call request context for chat integration
+                      if (callResult.call_id && !callResult.scheduled) {
+                        try {
+                          await createOutboundCallRequest({
+                            callId: callResult.call_id,
+                            recordId: recordId,
+                            threadId: threadId,
+                            status: 'pending',
+                            phoneNumber: normalizedPhone,
+                          });
+                          console.log('[CHAT] Stored outbound call request for chat integration');
+                        } catch (error) {
+                          console.warn('[CHAT WARNING] Failed to store outbound call request:', error);
+                        }
+                      }
+                      
+                      console.log('[CHAT] Auto-triggered call successful:', { contactName: contact.name, phone: phoneDisplay, callId: callRequestId });
+                      
+                      // Update agent response to reflect the call was made
+                      if (!agentResponse || agentResponse.trim() === '' || agentResponse.includes("I'll take care of that")) {
+                        agentResponse = `I found ${contact.name} in your contacts and called ${phoneDisplay}. The call summary will appear here once it completes.`;
+                      }
+                      
+                      // Set call status for response
+                      callStatus = {
+                        success: true,
+                        message: `Successfully called ${contact.name} at ${phoneDisplay}.`,
+                      };
+                      // Update callRequestId
+                      callRequestId = callResult.call_id || callResult.task_id;
+                    } else {
+                      const errorData = await makeCallResponse.json().catch(() => ({}));
+                      console.error('[CHAT] Auto-triggered call failed:', errorData);
+                      result.autoCallTriggered = false;
+                      result.callError = errorData.message || 'Failed to initiate call';
+                      
+                      // Update agent response to reflect the error
+                      if (!agentResponse || agentResponse.trim() === '') {
+                        agentResponse = `I found ${contact.name} in your contacts but couldn't make the call. ${errorData.message || 'Please try again.'}`;
+                      }
+                    }
+                  } else {
+                    console.error('[CHAT] Invalid phone number format for auto-call:', contact.phone);
+                    result.autoCallTriggered = false;
+                    result.callError = 'Invalid phone number format';
+                  }
+                } catch (error) {
+                  console.error('[CHAT] Error auto-triggering call:', error);
+                  result.autoCallTriggered = false;
+                  result.callError = 'Failed to initiate call automatically';
+                  
+                  // Update agent response to reflect the error
+                  if (!agentResponse || agentResponse.trim() === '') {
+                    agentResponse = `I found ${contact.name} in your contacts but encountered an error making the call. Please try again.`;
+                  }
+                }
+              } else if (contact.email && isEmailRequest) {
+                // OPTION 2: Automatically trigger email if contact has email and user requested email
+                console.log('[CHAT] Auto-triggering email for contact:', { name: contact.name, email: contact.email });
+                
+                // Extract email content from user's message
+                let emailSubject = 'Message from owner';
+                let emailBody = 'Hello, this is a message on behalf of the owner.';
+                
+                // Try to extract subject/body from user's message
+                const emailPatterns = [
+                  /(?:email|send).*?(?:about|regarding|re:)\s+(.+?)(?:\s+(?:that|to|saying|asking|tell|say))?/i,
+                  /(?:tell|say|ask)\s+(?:him|her|them)\s+(.+)/i,
+                  /(?:about|regarding)\s+(.+)/i,
+                ];
+                
+                for (const pattern of emailPatterns) {
+                  const match = message.match(pattern);
+                  if (match && match[1]) {
+                    const extracted = match[1].trim();
+                    if (extracted.length > 0 && extracted.length < 100) {
+                      emailSubject = extracted;
+                      emailBody = extracted;
+                    } else if (extracted.length >= 100) {
+                      emailBody = extracted;
+                    }
+                    break;
+                  }
+                }
+                
+                // Check for specific context
+                const userMessage = message.trim().toLowerCase();
+                if (userMessage.includes('dinner') || userMessage.includes('tomorrow') || userMessage.includes('tmr')) {
+                  emailSubject = 'Dinner invitation';
+                  emailBody = 'The owner would like to know if you can come for dinner tomorrow.';
+                }
+                
+                // Note: We don't auto-send emails because we need the user to provide the email content
+                // Instead, we provide the email address to the agent with clear instructions
+                result.instruction = `Contact found with email ${contact.email}. IMMEDIATELY use this email address to send the email using send_gmail function. Subject: "${emailSubject}", Body: "${emailBody}". Do NOT ask for the email address - use ${contact.email} directly.`;
+                result.emailReady = true;
+                result.suggestedSubject = emailSubject;
+                result.suggestedBody = emailBody;
+              } else if (contact.phone) {
+                // Contact has phone but user didn't request a call - just inform agent
+                result.instruction = `Contact found with phone number ${contact.phone}. Use this phone number if the user requests a call.`;
+              } else if (contact.email) {
+                // Contact has email but user didn't request email - just inform agent
+                result.instruction = `Contact found with email ${contact.email}. Use this email address if the user requests to send an email.`;
+              } else {
+                // Contact found but no phone or email - tell agent to ask
+                const isEmailRequestCheck = userMessage.includes('email') || userMessage.includes('send');
+                if (isEmailRequestCheck) {
+                  result.instruction = `Contact "${contact.name}" found but does not have an email address. You MUST ask the user: "What's ${contact.name}'s email address?"`;
+                  // Update agent response to ask for email - override generic responses
+                  const genericResponses = [
+                    "I'll take care of that",
+                    "Sounds good",
+                    "I'll make the call",
+                    "I'll send the email",
+                    "Do you need anything else"
+                  ];
+                  const isGenericResponse = !agentResponse || 
+                    agentResponse.trim() === '' || 
+                    genericResponses.some(phrase => agentResponse.toLowerCase().includes(phrase.toLowerCase()));
+                  
+                  if (isGenericResponse) {
+                    agentResponse = `I found ${contact.name} in your contacts, but I don't have their email address. What's ${contact.name}'s email address?`;
+                    console.log('[CHAT] Updated agent response to ask for email:', agentResponse);
+                  }
+                } else {
+                  result.instruction = `Contact "${contact.name}" found but does not have a phone number. You MUST ask the user for the phone number if they want to make a call.`;
+                }
+              }
+              
+              functionResults.push({
+                name: 'get_contact_by_name',
+                result,
+              });
+              console.log('[CHAT] Contact lookup successful:', { name: contact.name, hasPhone: !!contact.phone, hasEmail: !!contact.email, autoCallTriggered: result.autoCallTriggered || false });
+            } else {
+              functionResults.push({
+                name: 'get_contact_by_name',
+                result: {
+                  success: false,
+                  error: 'Contact not found',
+                  message: `I couldn't find a contact named "${cleanName}" in your contacts.`,
+                },
+              });
+              console.log('[CHAT] Contact lookup failed - contact not found:', cleanName);
+            }
+          } catch (error) {
+            console.error('[CHAT] Error looking up contact:', error);
+            functionResults.push({
+              name: 'get_contact_by_name',
+              result: {
+                success: false,
+                error: 'Failed to lookup contact',
+                message: 'I encountered an error while looking up the contact. Please try again.',
+              },
+            });
+          }
+          continue;
+        }
+        
         // Handle outbound call requests
         if (fc.name === 'make_outbound_call' || fc.name === 'schedule_outbound_call') {
           try {
@@ -896,6 +1270,30 @@ export async function POST(request: NextRequest) {
               // Override the response to ask for proper format
               agentResponse = `I need a valid phone number format. Can you provide it as 10 digits (like 8149969612) or formatted (like (814) 996-9612)?`;
               continue;
+            }
+
+            // Extract contact info from the message before making call
+            // Build a message string with all available info for extraction
+            const messageForExtraction = `${message || ''} ${fc.arguments.caller_name ? `call ${fc.arguments.caller_name}` : ''}`.trim();
+            if (messageForExtraction) {
+              try {
+                const timestamp = new Date().toISOString();
+                const extractedContact = await extractContactFromMessage(
+                  recordId,
+                  messageForExtraction,
+                  timestamp
+                );
+                if (extractedContact) {
+                  console.log('[CHAT] Extracted contact before outbound call:', {
+                    name: extractedContact.name,
+                    phone: extractedContact.phone,
+                    relationship: extractedContact.relationship,
+                  });
+                }
+              } catch (contactError) {
+                // Log but don't fail - contact extraction is non-critical
+                console.warn('[CHAT WARNING] Failed to extract contact before call:', contactError);
+              }
             }
 
             // Call the make-call API
@@ -981,6 +1379,72 @@ export async function POST(request: NextRequest) {
             };
           }
         }
+      }
+    }
+
+    // ✅ Post-process: Override agent response based on function results
+    // This ensures we ask for missing information even if agent gave generic response
+    console.log('[CHAT] Post-process check:', { 
+      functionResultsCount: functionResults?.length || 0,
+      agentResponse: agentResponse?.substring(0, 50),
+      userMessage: message.trim().substring(0, 50)
+    });
+    
+    if (functionResults && functionResults.length > 0) {
+      for (const fr of functionResults) {
+        if (fr.name === 'get_contact_by_name') {
+          console.log('[CHAT] Found get_contact_by_name result:', { 
+            success: fr.result?.success, 
+            hasContact: !!fr.result?.contact,
+            contactName: fr.result?.contact?.name,
+            hasEmail: !!fr.result?.contact?.email 
+          });
+          
+          if (fr.result && fr.result.success) {
+            const contact = fr.result.contact;
+            const userMessage = message.trim().toLowerCase();
+            const isEmailRequest = userMessage.includes('email') || userMessage.includes('send');
+            
+            console.log('[CHAT] Checking if should ask for email:', { 
+              isEmailRequest, 
+              hasEmail: !!contact?.email,
+              contactName: contact?.name 
+            });
+            
+            // If user requested email but contact doesn't have email, override response
+            if (isEmailRequest && contact && !contact.email) {
+              const genericResponses = [
+                "I'll take care of that",
+                "Sounds good",
+                "I'll make the call",
+                "I'll send the email",
+                "Do you need anything else"
+              ];
+              const isGenericResponse = !agentResponse || 
+                agentResponse.trim() === '' || 
+                genericResponses.some(phrase => agentResponse.toLowerCase().includes(phrase.toLowerCase()));
+              
+              console.log('[CHAT] Should override response?', { 
+                isGenericResponse, 
+                currentResponse: agentResponse?.substring(0, 100) 
+              });
+              
+              if (isGenericResponse) {
+                agentResponse = `I found ${contact.name} in your contacts, but I don't have their email address. What's ${contact.name}'s email address?`;
+                console.log('[CHAT] ✅ Post-process: Overrode agent response to ask for email:', agentResponse);
+              }
+            }
+          }
+        }
+      }
+    } else {
+      // Agent didn't call get_contact_by_name - check if it should have
+      const userMessage = message.trim().toLowerCase();
+      const isEmailRequest = userMessage.includes('email') || userMessage.includes('send');
+      const isCallRequest = userMessage.includes('call') || userMessage.includes('phone') || userMessage.includes('text');
+      
+      if ((isEmailRequest || isCallRequest) && (!functionCalls || !functionCalls.some(fc => fc.name === 'get_contact_by_name'))) {
+        console.log('[CHAT] ⚠️ Agent should have called get_contact_by_name but didn\'t. User message:', userMessage);
       }
     }
 

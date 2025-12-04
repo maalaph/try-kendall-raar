@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord, getCallStats, getRecentCallNotes, getUnreadCallNotes } from '@/lib/airtable';
+import { getUserRecord, getCallStats, getRecentCallNotes, getUnreadCallNotes, getCallNotesByType } from '@/lib/airtable';
 
 /**
  * GET /api/stats
@@ -40,8 +40,29 @@ export async function GET(request: NextRequest) {
     // Get unread messages count
     const unreadNotes = await getUnreadCallNotes(String(agentId));
 
-    // Get recent activity (last 10 call notes)
+    // Get recent activity (last 10 call notes) - these are customer calls
     const recentActivity = await getRecentCallNotes(String(agentId), 10);
+
+    // Get inbound calls (owner-assistant) and outbound calls (assistant-to-recipient)
+    // Wrap in try-catch to handle cases where callType field doesn't exist or no calls yet
+    let inboundCalls: any[] = [];
+    let outboundCalls: any[] = [];
+    
+    try {
+      inboundCalls = await getCallNotesByType(String(agentId), 'inbound', 20);
+    } catch (error) {
+      console.warn('[API ERROR] Failed to get inbound calls:', error);
+      // Return empty array if callType field doesn't exist or other error
+      inboundCalls = [];
+    }
+    
+    try {
+      outboundCalls = await getCallNotesByType(String(agentId), 'outbound', 20);
+    } catch (error) {
+      console.warn('[API ERROR] Failed to get outbound calls:', error);
+      // Return empty array if callType field doesn't exist or other error
+      outboundCalls = [];
+    }
 
     return NextResponse.json({
       success: true,
@@ -50,6 +71,22 @@ export async function GET(request: NextRequest) {
       averageCallDuration: stats.averageCallDuration, // in seconds
       unreadMessages: unreadNotes.length,
       recentActivity: recentActivity.map(note => ({
+        id: note.id,
+        callerPhone: note.callerPhone,
+        note: note.note,
+        timestamp: note.timestamp,
+        callDuration: note.callDuration,
+        read: note.read,
+      })),
+      inboundCalls: inboundCalls.map(note => ({
+        id: note.id,
+        callerPhone: note.callerPhone,
+        note: note.note,
+        timestamp: note.timestamp,
+        callDuration: note.callDuration,
+        read: note.read,
+      })),
+      outboundCalls: outboundCalls.map(note => ({
         id: note.id,
         callerPhone: note.callerPhone,
         note: note.note,
@@ -69,4 +106,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 

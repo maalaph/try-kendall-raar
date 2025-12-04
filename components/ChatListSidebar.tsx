@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { colors } from '@/lib/config';
-import { Plus, MessageSquare, X, GripVertical } from 'lucide-react';
+import { Plus, MessageSquare, X, GripVertical, Search } from 'lucide-react';
 
 interface ChatThread {
   threadId: string;
@@ -34,6 +35,7 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
   const [hoveredThreadId, setHoveredThreadId] = useState<string | null>(null);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const sidebarRef = useRef<HTMLDivElement>(null);
   const fetchingRef = useRef(false);
   const router = useRouter();
@@ -241,7 +243,22 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
   };
 
   const handleThreadClick = (threadId: string) => {
-    router.push(`/chat?recordId=${encodeURIComponent(recordId)}&threadId=${encodeURIComponent(threadId)}`);
+    if (!threadId || !recordId) {
+      console.error('[ChatListSidebar] Cannot navigate: missing threadId or recordId', { threadId, recordId });
+      return;
+    }
+
+    const url = `/chat?recordId=${encodeURIComponent(recordId)}&threadId=${encodeURIComponent(threadId)}`;
+    console.log('[ChatListSidebar] Navigating to thread:', url);
+
+    try {
+      // Use router.push for navigation (faster, no page reload)
+      router.push(url);
+    } catch (error) {
+      console.error('[ChatListSidebar] Error navigating with router.push, using window.location fallback:', error);
+      // Fallback to window.location if router.push fails
+      window.location.href = url;
+    }
   };
 
   const handleDeleteClick = (e: React.MouseEvent, threadId: string) => {
@@ -302,6 +319,16 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
     return date.toLocaleDateString();
   };
 
+  // Filter threads based on search query
+  const filteredThreads = threads.filter((thread) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      thread.title.toLowerCase().includes(query) ||
+      thread.preview.toLowerCase().includes(query)
+    );
+  });
+
   const currentWidth = isOpen ? sidebarWidth : COLLAPSED_WIDTH;
 
   return (
@@ -310,14 +337,33 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
         ref={sidebarRef}
         className="h-full flex flex-col flex-shrink-0 relative" 
         style={{ 
-          backgroundColor: colors.secondary, 
-          borderRight: `1px solid ${colors.accent}30`,
+          background: `linear-gradient(180deg, ${colors.secondary} 0%, ${colors.secondary}dd 50%, ${colors.secondary} 100%)`,
+          borderRight: `1px solid ${colors.accent}40`,
           width: `${currentWidth}px`,
           minWidth: `${currentWidth}px`,
+          height: '100%', // Explicitly set height to fill container
+          maxHeight: '100%', // Prevent overflow
           transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          boxShadow: isOpen ? `0 0 20px ${colors.accent}10` : 'none',
+          boxShadow: isOpen 
+            ? `0 0 30px ${colors.accent}15, inset 0 0 60px ${colors.accent}05` 
+            : 'none',
+          overflow: 'hidden', // Prevent sidebar from overflowing
+          position: 'relative',
         }}
       >
+        {/* Subtle gradient overlay for depth - REMOVED TEMPORARILY TO TEST CLICKS */}
+        {/* <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: `linear-gradient(135deg, ${colors.accent}08 0%, transparent 50%, ${colors.accent}05 100%)`,
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        /> */}
         {/* Resize Handle - Only on the rightmost edge */}
         {isOpen && (
           <div
@@ -325,18 +371,23 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
               // Only start resizing if clicking very close to the right edge
               const rect = e.currentTarget.getBoundingClientRect();
               const clickX = e.clientX - rect.left;
-              if (clickX >= rect.width - 4) { // Only if within 4px of right edge
+              // Only activate if within 4px of right edge
+              if (clickX >= rect.width - 4) {
                 handleMouseDown(e);
               }
             }}
-            className="absolute right-0 top-0 bottom-0 w-4 cursor-col-resize transition-all group"
+            className="absolute right-0 top-0 bottom-0 transition-all group"
             style={{
               backgroundColor: 'transparent',
+              // Only allow pointer events on the rightmost 4px to avoid blocking thread clicks
+              width: '4px',
               pointerEvents: 'auto',
-              zIndex: 2,
+              zIndex: 0, // Below threads list - threads have zIndex 50-101 so they're above
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = `${colors.accent}20`;
+              if (!isResizing) {
+                e.currentTarget.style.backgroundColor = `${colors.accent}20`;
+              }
             }}
             onMouseLeave={(e) => {
               if (!isResizing) {
@@ -355,34 +406,64 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
 
         {/* Header */}
         <div 
-          className="flex items-center justify-between p-4 border-b relative" 
+          className="flex items-center justify-between p-4 border-b flex-shrink-0 relative" 
           style={{ 
-            borderColor: `${colors.accent}30`,
-            background: `linear-gradient(135deg, ${colors.secondary} 0%, ${colors.secondary}dd 100%)`,
+            borderColor: `${colors.accent}40`,
+            background: `linear-gradient(135deg, ${colors.secondary}ee 0%, ${colors.secondary}cc 50%, ${colors.secondary}dd 100%)`,
             zIndex: 10,
             position: 'relative',
+            minHeight: '64px', // Ensure header has minimum height
+            boxShadow: `0 2px 20px ${colors.accent}10, inset 0 1px 0 ${colors.accent}15`,
           }}
         >
+          {/* Header glow effect */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: '1px',
+              background: `linear-gradient(90deg, transparent 0%, ${colors.accent}60 50%, transparent 100%)`,
+              opacity: 0.6,
+            }}
+          />
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 transition-all group"
-            style={{ color: colors.text }}
+            className="flex items-center gap-2 transition-all group relative z-10"
+            style={{ 
+              color: colors.text,
+              padding: '4px 8px',
+              borderRadius: '8px',
+            }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.8';
+              e.currentTarget.style.opacity = '0.9';
               e.currentTarget.style.transform = 'scale(1.05)';
+              e.currentTarget.style.backgroundColor = `${colors.accent}15`;
+              e.currentTarget.style.boxShadow = `0 0 12px ${colors.accent}30`;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.opacity = '1';
               e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.boxShadow = 'none';
             }}
           >
-            <MessageSquare size={18} style={{ filter: isOpen ? `drop-shadow(0 0 4px ${colors.accent}60)` : 'none' }} />
+            <MessageSquare 
+              size={18} 
+              style={{ 
+                filter: isOpen ? `drop-shadow(0 0 6px ${colors.accent}80)` : 'none',
+                transition: 'filter 0.2s ease',
+              }} 
+            />
             {isOpen && (
               <span style={{ 
                 fontFamily: 'var(--font-inter), sans-serif', 
                 fontWeight: 600, 
                 fontSize: '0.9375rem',
                 letterSpacing: '-0.01em',
+                textShadow: `0 0 8px ${colors.accent}40`,
+                transition: 'text-shadow 0.2s ease',
               }}>
                 Chats
               </span>
@@ -392,7 +473,7 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
             <button
               onClick={(e) => handleNewChat(e)}
               disabled={creatingThread}
-              className="p-2 rounded-lg transition-all relative group"
+              className="p-2 rounded-lg transition-all relative group z-10"
               style={{
                 color: colors.accent,
                 backgroundColor: 'transparent',
@@ -400,23 +481,110 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                 pointerEvents: creatingThread ? 'none' : 'auto',
                 zIndex: 20,
                 opacity: creatingThread ? 0.5 : 1,
+                border: `1px solid ${colors.accent}30`,
               }}
               onMouseEnter={(e) => {
                 if (!creatingThread) {
-                  e.currentTarget.style.backgroundColor = `${colors.accent}20`;
-                  e.currentTarget.style.boxShadow = `0 0 12px ${colors.accent}40`;
+                  e.currentTarget.style.backgroundColor = `${colors.accent}25`;
+                  e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}50, 0 0 40px ${colors.accent}30`;
+                  e.currentTarget.style.borderColor = colors.accent;
+                  e.currentTarget.style.transform = 'scale(1.1)';
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.boxShadow = 'none';
+                e.currentTarget.style.borderColor = `${colors.accent}30`;
+                e.currentTarget.style.transform = 'scale(1)';
               }}
               title={creatingThread ? 'Creating new chat...' : 'New Chat'}
             >
-              <Plus size={18} />
+              <Plus 
+                size={18} 
+                style={{ 
+                  filter: `drop-shadow(0 0 4px ${colors.accent}60)`,
+                  transition: 'filter 0.2s ease',
+                }} 
+              />
             </button>
           )}
         </div>
+
+        {/* Search Input */}
+        {isOpen && (
+          <div 
+            className="px-4 py-3 border-b flex-shrink-0 relative"
+            style={{
+              borderColor: `${colors.accent}30`,
+              backgroundColor: `${colors.secondary}dd`,
+              zIndex: 10,
+            }}
+          >
+            <div className="relative">
+              <Search 
+                size={16} 
+                style={{ 
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: colors.text,
+                  opacity: 0.5,
+                  pointerEvents: 'none',
+                  zIndex: 1,
+                }} 
+              />
+              <input
+                type="text"
+                placeholder="Search chats..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-10 py-2 rounded-lg transition-all"
+                style={{
+                  backgroundColor: `${colors.primary}80`,
+                  border: `1px solid ${colors.accent}30`,
+                  color: colors.text,
+                  fontFamily: 'var(--font-inter), sans-serif',
+                  fontSize: '0.875rem',
+                  outline: 'none',
+                  paddingLeft: '36px', // More space for icon
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = colors.accent;
+                  e.currentTarget.style.boxShadow = `0 0 12px ${colors.accent}30`;
+                  e.currentTarget.style.backgroundColor = `${colors.primary}90`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = `${colors.accent}30`;
+                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.backgroundColor = `${colors.primary}80`;
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded transition-all"
+                  style={{
+                    color: colors.text,
+                    opacity: 0.6,
+                    zIndex: 2,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                    e.currentTarget.style.backgroundColor = `${colors.accent}20`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '0.6';
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Threads List */}
         {isOpen && (
@@ -425,13 +593,24 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
             style={{
               width: '100%',
               position: 'relative',
-              zIndex: 5,
+              zIndex: 50,
               pointerEvents: 'auto',
+              minHeight: 0,
+              paddingTop: '4px',
+              paddingBottom: '8px',
             }}
           >
             {loading ? (
               <div className="text-center py-12" style={{ color: colors.text, opacity: 0.6 }}>
-                <div className="animate-pulse">Loading...</div>
+                <div 
+                  className="animate-pulse"
+                  style={{
+                    fontFamily: 'var(--font-inter), sans-serif',
+                    textShadow: `0 0 8px ${colors.accent}30`,
+                  }}
+                >
+                  Loading...
+                </div>
               </div>
             ) : threads.length === 0 ? (
               <div 
@@ -444,7 +623,15 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                   pointerEvents: 'auto',
                 }}
               >
-                <p className="text-sm mb-4" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>No chats yet</p>
+                <p 
+                  className="text-sm mb-4" 
+                  style={{ 
+                    fontFamily: 'var(--font-inter), sans-serif',
+                    opacity: 0.7,
+                  }}
+                >
+                  No chats yet
+                </p>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -459,7 +646,7 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                   }}
                   className="px-5 py-2.5 rounded-lg transition-all"
                   style={{
-                    backgroundColor: `${colors.accent}20`,
+                    background: `linear-gradient(135deg, ${colors.accent}25 0%, ${colors.accent}15 100%)`,
                     border: `1px solid ${colors.accent}50`,
                     color: colors.accent,
                     fontFamily: 'var(--font-inter), sans-serif',
@@ -469,26 +656,40 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                     zIndex: 100,
                     pointerEvents: creatingThread ? 'none' : 'auto',
                     opacity: creatingThread ? 0.6 : 1,
+                    boxShadow: `0 0 20px ${colors.accent}20`,
                   }}
                   onMouseEnter={(e) => {
                     if (!creatingThread) {
-                      e.currentTarget.style.backgroundColor = `${colors.accent}30`;
-                      e.currentTarget.style.boxShadow = `0 0 16px ${colors.accent}40`;
-                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.background = `linear-gradient(135deg, ${colors.accent}35 0%, ${colors.accent}25 100%)`;
+                      e.currentTarget.style.boxShadow = `0 0 30px ${colors.accent}40, 0 0 60px ${colors.accent}20`;
+                      e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                      e.currentTarget.style.borderColor = colors.accent;
                     }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = `${colors.accent}20`;
-                    e.currentTarget.style.boxShadow = 'none';
-                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.background = `linear-gradient(135deg, ${colors.accent}25 0%, ${colors.accent}15 100%)`;
+                    e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}20`;
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                    e.currentTarget.style.borderColor = `${colors.accent}50`;
                   }}
                 >
                   {creatingThread ? 'Creating...' : 'Start New Chat'}
                 </button>
               </div>
+            ) : filteredThreads.length === 0 && searchQuery ? (
+              <div className="text-center py-12 px-4" style={{ color: colors.text, opacity: 0.6 }}>
+                <p className="text-sm" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+                  No chats found matching "{searchQuery}"
+                </p>
+              </div>
             ) : (
-              <div className="py-2">
-                {threads.map((thread) => {
+              <div 
+                className="py-1"
+                style={{
+                  pointerEvents: 'auto',
+                }}
+              >
+                {filteredThreads.map((thread) => {
                   const isActive = currentThreadId === thread.threadId;
                   const isHovered = hoveredThreadId === thread.threadId;
                   const isDeleting = deletingThreadId === thread.threadId;
@@ -500,90 +701,98 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                       className="relative group"
                       onMouseEnter={() => setHoveredThreadId(thread.threadId)}
                       onMouseLeave={() => setHoveredThreadId(null)}
+                      style={{
+                        position: 'relative',
+                        zIndex: 100,
+                      }}
                     >
-                      {showDelete && (
-                        <div
-                          className="absolute inset-0 z-20 flex items-center justify-center gap-2 p-3 rounded-lg"
-                          style={{
-                            backgroundColor: `${colors.accent}20`,
-                            border: `1px solid ${colors.accent}50`,
-                            backdropFilter: 'blur(4px)',
-                          }}
-                        >
-                          <span className="text-xs" style={{ color: colors.text, fontFamily: 'var(--font-inter), sans-serif' }}>
-                            Delete?
-                          </span>
-                          <button
-                            onClick={() => handleDeleteConfirm(thread.threadId)}
-                            className="px-2 py-1 rounded text-xs transition-all"
-                            style={{
-                              backgroundColor: colors.accent,
-                              color: colors.text,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.opacity = '0.9';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.opacity = '1';
-                            }}
-                          >
-                            Yes
-                          </button>
-                          <button
-                            onClick={handleDeleteCancel}
-                            className="px-2 py-1 rounded text-xs transition-all"
-                            style={{
-                              backgroundColor: 'transparent',
-                              color: colors.text,
-                              border: `1px solid ${colors.accent}50`,
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = `${colors.accent}20`;
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                          >
-                            No
-                          </button>
-                        </div>
-                      )}
-                      <button
-                        onClick={() => !showDelete && handleThreadClick(thread.threadId)}
-                        disabled={isDeleting || showDelete}
-                        className="w-full text-left p-3.5 transition-all border-l-2 relative"
+                      <Link
+                        href={`/chat?recordId=${encodeURIComponent(recordId)}&threadId=${encodeURIComponent(thread.threadId)}`}
+                        className="w-full text-left p-3.5 transition-all border-l-2 relative block"
                         style={{
-                          backgroundColor: isActive 
-                            ? `${colors.accent}20` 
+                          background: isActive 
+                            ? `linear-gradient(90deg, ${colors.accent}25 0%, ${colors.accent}15 100%)`
                             : isHovered 
-                            ? `${colors.accent}10` 
+                            ? `linear-gradient(90deg, ${colors.accent}15 0%, ${colors.accent}08 100%)`
                             : 'transparent',
                           borderLeftColor: isActive ? colors.accent : 'transparent',
                           borderLeftWidth: isActive ? '3px' : '0px',
                           color: colors.text,
                           opacity: isDeleting ? 0.5 : 1,
-                          cursor: showDelete ? 'default' : 'pointer',
+                          cursor: showDelete || isDeleting ? 'default' : 'pointer',
+                          pointerEvents: showDelete || isDeleting ? 'none' : 'auto',
+                          zIndex: 101,
+                          position: 'relative',
+                          borderRadius: '0 8px 8px 0',
+                          margin: '2px 8px',
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: isActive 
+                            ? `0 0 20px ${colors.accent}20, inset 0 0 20px ${colors.accent}10`
+                            : isHovered
+                            ? `0 0 15px ${colors.accent}15`
+                            : 'none',
+                          transform: isHovered && !isActive ? 'translateX(2px)' : 'translateX(0)',
+                          textDecoration: 'none',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive && !showDelete && !isDeleting) {
+                            e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}20, inset 0 0 20px ${colors.accent}08`;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.boxShadow = 'none';
+                          }
+                        }}
+                        onClick={(e) => {
+                          if (showDelete || isDeleting) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            return;
+                          }
+                          // Fallback navigation if Link doesn't work
+                          const link = e.currentTarget;
+                          setTimeout(() => {
+                            if (window.location.pathname === '/chat' && !window.location.search.includes(`threadId=${encodeURIComponent(thread.threadId)}`)) {
+                              handleThreadClick(thread.threadId);
+                            }
+                          }, 100);
                         }}
                       >
-                        <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="flex items-start justify-between gap-2 mb-1.5 relative">
                           <span
                             className="text-sm font-medium truncate flex-1"
                             style={{ 
                               color: isActive ? colors.accent : colors.text,
                               fontFamily: 'var(--font-inter), sans-serif',
                               fontWeight: isActive ? 600 : 500,
-                              textShadow: isActive ? `0 0 8px ${colors.accent}40` : 'none',
+                              textShadow: isActive 
+                                ? `0 0 10px ${colors.accent}50, 0 0 20px ${colors.accent}30`
+                                : isHovered
+                                ? `0 0 6px ${colors.accent}30`
+                                : 'none',
+                              transition: 'all 0.2s ease',
                             }}
                           >
                             {thread.title}
                           </span>
                           {isHovered && !showDelete && (
                             <button
-                              onClick={(e) => handleDeleteClick(e, thread.threadId)}
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleDeleteClick(e, thread.threadId);
+                              }}
                               className="p-1 rounded transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
                               style={{
                                 color: colors.text,
                                 backgroundColor: 'transparent',
+                                pointerEvents: 'auto',
+                                zIndex: 200,
+                                position: 'absolute',
+                                right: 0,
+                                top: 0,
                               }}
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor = `${colors.accent}30`;
@@ -603,9 +812,10 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                             className="text-xs line-clamp-2 mt-1.5"
                             style={{
                               color: colors.text,
-                              opacity: isActive ? 0.8 : 0.6,
+                              opacity: isActive ? 0.85 : isHovered ? 0.7 : 0.6,
                               fontFamily: 'var(--font-inter), sans-serif',
-                              lineHeight: '1.4',
+                              lineHeight: '1.5',
+                              transition: 'opacity 0.2s ease',
                             }}
                           >
                             {thread.preview}
@@ -616,14 +826,74 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                             className="text-xs"
                             style={{ 
                               color: colors.text, 
-                              opacity: 0.4,
+                              opacity: isActive ? 0.5 : 0.4,
                               fontFamily: 'var(--font-inter), sans-serif',
+                              transition: 'opacity 0.2s ease',
                             }}
                           >
                             {formatTimestamp(thread.lastMessageAt)}
                           </span>
                         </div>
-                      </button>
+                      </Link>
+                      {showDelete && (
+                        <div
+                          className="absolute inset-0 z-200 flex items-center justify-center gap-2 p-3 rounded-lg"
+                          style={{
+                            backgroundColor: `${colors.accent}20`,
+                            border: `1px solid ${colors.accent}50`,
+                            backdropFilter: 'blur(4px)',
+                            zIndex: 200,
+                            pointerEvents: 'auto',
+                          }}
+                        >
+                          <span className="text-xs" style={{ color: colors.text, fontFamily: 'var(--font-inter), sans-serif' }}>
+                            Delete?
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDeleteConfirm(thread.threadId);
+                            }}
+                            className="px-2 py-1 rounded text-xs transition-all"
+                            style={{
+                              backgroundColor: colors.accent,
+                              color: colors.text,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.opacity = '0.9';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.opacity = '1';
+                            }}
+                          >
+                            Yes
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleDeleteCancel();
+                            }}
+                            className="px-2 py-1 rounded text-xs transition-all"
+                            style={{
+                              backgroundColor: 'transparent',
+                              color: colors.text,
+                              border: `1px solid ${colors.accent}50`,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = `${colors.accent}20`;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                          >
+                            No
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

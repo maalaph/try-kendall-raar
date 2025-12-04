@@ -661,13 +661,18 @@ export async function createAgentFromTemplate({
     // Format owner phone number for prompt (use E.164 format for consistency)
     const ownerPhoneNumber = mobileNumber ? (formatPhoneNumberToE164(mobileNumber) || mobileNumber) : undefined;
     
-    // Build lean voice-first system prompt (100-180 tokens)
-    const systemPrompt = buildLeanSystemPrompt({
+    // Build full detailed system prompt (~300 lines)
+    const systemPrompt = buildSystemPrompt({
       kendallName: assistantName,
       fullName,
       nickname,
       selectedTraits,
+      useCaseChoice,
       boundaryChoices,
+      userContextAndRules,
+      analyzedFileContent,
+      fileUsageInstructions,
+      ownerPhoneNumber,
     });
 
     // Build voice configuration - handle both ElevenLabs and VAPI voices
@@ -894,13 +899,18 @@ export async function updateAgentFromTemplate({
     // Format owner phone number for prompt (use E.164 format for consistency)
     const ownerPhoneNumber = mobileNumber ? (formatPhoneNumberToE164(mobileNumber) || mobileNumber) : undefined;
     
-    // Build lean voice-first system prompt (100-180 tokens)
-    const systemPrompt = buildLeanSystemPrompt({
+    // Build full detailed system prompt (~300 lines)
+    const systemPrompt = buildSystemPrompt({
       kendallName: assistantName,
       fullName,
       nickname,
       selectedTraits,
+      useCaseChoice,
       boundaryChoices,
+      userContextAndRules,
+      analyzedFileContent,
+      fileUsageInstructions,
+      ownerPhoneNumber,
     });
     
     console.log('[VAPI DEBUG] Lean system prompt built:');

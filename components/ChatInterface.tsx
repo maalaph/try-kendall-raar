@@ -7,6 +7,7 @@ import SmartSuggestions from './SmartSuggestions';
 import QuickActions from './QuickActions';
 import CommandPalette from './CommandPalette';
 import SearchBar from './SearchBar';
+import TypingIndicator from './TypingIndicator';
 import { colors } from '@/lib/config';
 import { Search } from 'lucide-react';
 
@@ -34,6 +35,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
   const [showSearch, setShowSearch] = useState(false);
   const [assistantName, setAssistantName] = useState<string>('Kendall'); // Default, will be updated from API
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -172,6 +174,13 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
                 const merged = [...updatedPrev, ...newMsgs].sort((a, b) => 
                   new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
                 );
+                
+                // Only update if messages actually changed to prevent infinite loops
+                if (merged.length === prev.length && 
+                    merged.every((m, i) => m.id === prev[i]?.id && m.message === prev[i]?.message)) {
+                  return prev; // No change, return previous to prevent re-render
+                }
+                
                 hasInitialMessagesRef.current = true;
                 return merged;
               });
@@ -179,6 +188,10 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
               // Normal replace mode (initial load or explicit refresh)
               setMessages(data.messages);
               hasInitialMessagesRef.current = true;
+              // Clear new message IDs on initial load - these are not new messages
+              if (!sinceLastId) {
+                setNewMessageIds(new Set());
+              }
             }
             // Scroll to bottom only if not loading older messages
             if (!sinceLastId && data.messages.length > 0) {
@@ -328,6 +341,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
         // Remove temp message and add real messages from API response
         setMessages(prev => {
           const filtered = prev.filter(m => !m.id.startsWith('temp-'));
+          const assistantId = `assistant-${Date.now()}`;
           const newMessages = [
             ...filtered,
             {
@@ -337,7 +351,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
               timestamp: new Date().toISOString(),
             },
             {
-              id: `assistant-${Date.now()}`,
+              id: assistantId,
               message: data.response || '',
               role: 'assistant',
               timestamp: new Date().toISOString(),
@@ -345,14 +359,26 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
           ];
           
           // Add call status message if available
+          let callStatusId: string | null = null;
           if (data.callStatus) {
+            callStatusId = `call-status-${Date.now()}`;
             newMessages.push({
-              id: `call-status-${Date.now()}`,
+              id: callStatusId,
               message: data.callStatus.message,
               role: 'assistant',
               timestamp: new Date().toISOString(),
             });
           }
+          
+          // Mark assistant messages as new for typewriter effect
+          setNewMessageIds(prev => {
+            const updated = new Set(prev);
+            updated.add(assistantId);
+            if (callStatusId) {
+              updated.add(callStatusId);
+            }
+            return updated;
+          });
           
           // Mark that we have messages now
           if (newMessages.length > 0) {
@@ -544,6 +570,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
       {/* Messages Container */}
       <div
         ref={messagesContainerRef}
+        data-messages-container
         className="flex-1 overflow-y-auto pb-4 lg:pb-6 pt-8"
         style={{
           backgroundColor: colors.primary,
@@ -597,34 +624,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
               />
             )}
             {sending && (
-              <div
-                className="flex w-full mb-6 animate-in fade-in duration-300"
-                style={{
-                  justifyContent: 'flex-start',
-                  alignItems: 'flex-end',
-                }}
-              >
-                <div
-                  className="max-w-[80%] sm:max-w-[70%] rounded-2xl px-5 py-3.5"
-                  style={{
-                    backgroundColor: '#1a1a1a',
-                    color: colors.text,
-                    border: `1px solid ${colors.accent}25`,
-                    opacity: 0.7,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontFamily: 'var(--font-inter), sans-serif',
-                      fontSize: '15px',
-                      lineHeight: '1.6',
-                      fontStyle: 'italic',
-                    }}
-                  >
-                    {assistantName} is thinking...
-                  </div>
-                </div>
-              </div>
+              <TypingIndicator assistantName={assistantName} showWaveform={false} />
             )}
             {hasMore && (
               <div className="flex justify-center mb-4">
@@ -653,15 +653,25 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
               </div>
             )}
             
-            {messages.map((msg) => (
-              <ChatMessage
-                key={msg.id}
-                message={msg.message}
-                role={msg.role}
-                timestamp={msg.timestamp}
-                attachments={msg.attachments}
-              />
-            ))}
+            {messages.map((msg, index) => {
+              const previousMessage = index > 0 ? messages[index - 1] : null;
+              const isConsecutive = previousMessage?.role === msg.role;
+              const isNewMessage = newMessageIds.has(msg.id);
+              const isTyping = sending && index === messages.length - 1 && msg.role === 'assistant';
+              
+              return (
+                <ChatMessage
+                  key={msg.id}
+                  message={msg.message}
+                  role={msg.role}
+                  timestamp={msg.timestamp}
+                  attachments={msg.attachments}
+                  isNewMessage={isNewMessage}
+                  isConsecutive={isConsecutive}
+                  isTyping={isTyping}
+                />
+              );
+            })}
             
             <div ref={messagesEndRef} />
           </>
