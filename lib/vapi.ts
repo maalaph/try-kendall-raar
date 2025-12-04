@@ -1978,6 +1978,50 @@ export async function purchaseNumber(assistantId: string, existingPhoneNumber?: 
 }
 
 /**
+ * Cancel/end an active VAPI call
+ * @param callId - The VAPI call ID to cancel
+ * @returns Success/error status
+ */
+export async function cancelCall(callId: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const apiKey = process.env.VAPI_PRIVATE_KEY;
+    if (!apiKey) {
+      throw new Error('VAPI_PRIVATE_KEY environment variable is not configured');
+    }
+
+    // CORRECT ENDPOINT: POST /call/{callId}/actions/end (NOT PATCH)
+    const response = await fetch(`${VAPI_API_URL}/call/${callId}/actions/end`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage = errorData.message || errorData.error || `Failed to cancel call: ${response.status} ${response.statusText}`;
+      console.error('[VAPI ERROR] Failed to cancel call:', errorData);
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    console.log('[VAPI] Call cancelled successfully:', callId);
+    
+    return {
+      success: true,
+      message: 'Call cancelled successfully',
+    };
+  } catch (error) {
+    console.error('[VAPI ERROR] Failed to cancel call:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
  * Verify owner's phone number in Twilio (for trial accounts)
  * This initiates a verification call to the owner's number
  */

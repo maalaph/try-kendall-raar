@@ -8,6 +8,7 @@ import QuickActions from './QuickActions';
 import CommandPalette from './CommandPalette';
 import SearchBar from './SearchBar';
 import TypingIndicator from './TypingIndicator';
+import ActiveCallBanner from './ActiveCallBanner';
 import { colors } from '@/lib/config';
 import { Search } from 'lucide-react';
 
@@ -36,9 +37,17 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
   const [assistantName, setAssistantName] = useState<string>('Kendall'); // Default, will be updated from API
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set());
+  const [activeCall, setActiveCall] = useState<{
+    callId: string;
+    status: 'ringing' | 'in-progress' | 'ended' | 'cancelled' | 'failed';
+    startTime: string;
+    phoneNumber: string;
+    contactName?: string;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const callStatusPollingRef = useRef<NodeJS.Timeout | null>(null);
   const isTabVisibleRef = useRef(true);
   const isUserScrollingRef = useRef(false);
   const hasInitialMessagesRef = useRef(false);
@@ -80,6 +89,129 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
+
+  // Check for active calls on mount (state restoration)
+  useEffect(() => {
+    const checkActiveCall = async () => {
+      try {
+        const params = new URLSearchParams({ recordId });
+        if (threadId) {
+          params.append('threadId', threadId);
+        }
+        const response = await fetch(`/api/call/active?${params.toString()}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.activeCall) {
+            setActiveCall({
+              callId: data.activeCall.callId,
+              status: data.activeCall.status,
+              startTime: data.activeCall.startTime,
+              phoneNumber: data.activeCall.phoneNumber,
+              contactName: data.activeCall.contactName,
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('[ChatInterface] Failed to check for active calls:', error);
+      }
+    };
+
+    checkActiveCall();
+  }, [recordId, threadId]);
+
+  // Polling for call status (during ringing or queued)
+  useEffect(() => {
+    if (!activeCall || (activeCall.status !== 'ringing' && activeCall.status !== 'queued')) {
+      // Stop polling if no active call or call is not ringing/queued
+      if (callStatusPollingRef.current) {
+        clearInterval(callStatusPollingRef.current);
+        callStatusPollingRef.current = null;
+      }
+      return;
+    }
+
+    // Poll every 1 second during ringing
+    const pollStatus = async () => {
+      try {
+        const response = await fetch(`/api/call/status?callId=${activeCall.callId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            const newStatus = data.status;
+            
+            // Update status if it changed
+            if (newStatus !== activeCall.status) {
+              setActiveCall(prev => prev ? { ...prev, status: newStatus } : null);
+              
+              // Stop polling if call is no longer ringing or queued
+              if (newStatus !== 'ringing' && newStatus !== 'queued') {
+                if (callStatusPollingRef.current) {
+                  clearInterval(callStatusPollingRef.current);
+                  callStatusPollingRef.current = null;
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[ChatInterface] Error polling call status:', error);
+        // Exponential backoff on errors
+        if (callStatusPollingRef.current) {
+          clearInterval(callStatusPollingRef.current);
+          // Retry with longer interval
+          callStatusPollingRef.current = setTimeout(() => {
+            pollStatus();
+          }, 2000);
+        }
+      }
+    };
+
+    // Start polling immediately, then every 1 second
+    pollStatus();
+    callStatusPollingRef.current = setInterval(pollStatus, 1000);
+
+    return () => {
+      if (callStatusPollingRef.current) {
+        clearInterval(callStatusPollingRef.current);
+        callStatusPollingRef.current = null;
+      }
+    };
+  }, [activeCall?.callId, activeCall?.status]);
+
+  // Handle cancel call
+  const handleCancelCall = async () => {
+    if (!activeCall) return;
+
+    try {
+      const response = await fetch('/api/call/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callId: activeCall.callId }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Update status immediately
+          setActiveCall(prev => prev ? { ...prev, status: 'cancelled' } : null);
+          console.log('[ChatInterface] Call cancelled successfully');
+        } else {
+          console.error('[ChatInterface] Cancel failed:', data.error || data.message);
+          // Still update UI to show cancellation attempt
+          setActiveCall(prev => prev ? { ...prev, status: 'cancelled' } : null);
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[ChatInterface] Cancel request failed:', errorData);
+        // Update UI anyway to provide feedback
+        setActiveCall(prev => prev ? { ...prev, status: 'cancelled' } : null);
+      }
+    } catch (error) {
+      console.error('[ChatInterface] Failed to cancel call:', error);
+      // Update UI to show cancellation attempt even on error
+      setActiveCall(prev => prev ? { ...prev, status: 'cancelled' } : null);
+    }
+  };
 
   // Fetch messages
   const fetchMessages = useCallback(async (sinceLastId?: string, append = false, mergeMode = false) => {
@@ -338,7 +470,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
           setAssistantName(data.kendallName);
         }
         
-        // Remove temp message and add real messages from API response
+          // Remove temp message and add real messages from API response
         setMessages(prev => {
           const filtered = prev.filter(m => !m.id.startsWith('temp-'));
           const assistantId = `assistant-${Date.now()}`;
@@ -389,6 +521,62 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
           
           return newMessages;
         });
+
+        // Set active call state if call was initiated (outside setMessages callback)
+        if (data.callStatus && data.callStatus.success && data.callStatus.callId) {
+          // Extract contact name from message if available
+          const contactNameMatch = data.callStatus.message?.match(/called?\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+          const contactName = contactNameMatch ? contactNameMatch[1] : undefined;
+          
+          // Get phone number from callStatus
+          // phoneNumber might be formatted like "(814) 563-0232" or E.164 like "+18145630232"
+          let phoneNumber = data.callStatus.phoneNumber || '';
+          
+          // If formatted, convert to E.164 for consistency
+          if (phoneNumber && !phoneNumber.startsWith('+')) {
+            const digits = phoneNumber.replace(/\D/g, '');
+            if (digits.length === 10) {
+              phoneNumber = `+1${digits}`;
+            } else if (digits.length === 11 && digits.startsWith('1')) {
+              phoneNumber = `+${digits}`;
+            }
+          }
+          
+          // If still no phone number, try to extract from message
+          if (!phoneNumber) {
+            const phoneMatch = data.callStatus.message?.match(/\((\d{3})\)\s*(\d{3})-(\d{4})/);
+            if (phoneMatch) {
+              phoneNumber = `+1${phoneMatch[1]}${phoneMatch[2]}${phoneMatch[3]}`;
+            }
+          }
+          
+          if (phoneNumber) {
+            setActiveCall({
+              callId: data.callStatus.callId,
+              status: 'ringing', // Initial status
+              startTime: new Date().toISOString(),
+              phoneNumber: phoneNumber,
+              contactName: contactName,
+            });
+
+            // Write to in-memory cache (optional, for state restoration) - fire and forget
+            fetch('/api/call/active', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                callId: data.callStatus.callId,
+                recordId: recordId,
+                threadId: threadId,
+                status: 'ringing',
+                phoneNumber: phoneNumber,
+                contactName: contactName,
+              }),
+            }).catch(error => {
+              console.warn('[ChatInterface] Failed to cache active call:', error);
+            });
+          }
+        }
+        
         scrollToBottom();
         
         // Refresh messages after a delay to get proper IDs from Airtable
@@ -578,6 +766,18 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
           paddingRight: 'clamp(1rem, 4vw, 2rem)',
         }}
       >
+        {/* Active Call Banner */}
+        {activeCall && (
+          <ActiveCallBanner
+            callId={activeCall.callId}
+            status={activeCall.status}
+            phoneNumber={activeCall.phoneNumber}
+            contactName={activeCall.contactName}
+            startTime={activeCall.startTime}
+            onCancel={handleCancelCall}
+            onDismiss={() => setActiveCall(null)}
+          />
+        )}
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div style={{ color: colors.text, opacity: 0.6 }}>Loading messages...</div>

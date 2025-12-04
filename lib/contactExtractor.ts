@@ -11,13 +11,14 @@ const EXCLUDED_WORDS = new Set([
   'for', 'my', 'call', 'text', 'message', 'tell', 'contact', 'reach', 'out', 'to',
   'the', 'a', 'an', 'his', 'her', 'their', 'number', 'phone', 'at', 'on', 'is',
   'me', 'you', 'him', 'she', 'they', 'this', 'that', 'with', 'from', 'and', 'or',
-  'need', 'want', 'can', 'will', 'should', 'would', 'could', 'please', 'ask', 'give'
+  'need', 'want', 'can', 'will', 'should', 'would', 'could', 'please', 'ask', 'give',
+  'it', 'he' // Add pronouns to prevent extraction as names
 ]);
 
 // Action words that might appear before names but shouldn't be part of the name
 const ACTION_WORDS = new Set([
   'call', 'text', 'message', 'tell', 'contact', 'reach', 'email', 'send', 'give',
-  'ask', 'need', 'want', 'can', 'will', 'should', 'would', 'could'
+  'ask', 'need', 'want', 'can', 'will', 'should', 'would', 'could', 'it', 'he'
 ]);
 
 /**
@@ -189,9 +190,10 @@ export async function extractContactFromMessage(
     contact.notes = notes;
   }
 
-  // Only create contact if we have at least a name or phone
-  // Don't create contacts with "Unknown" name - skip instead
-  if (contact && (contact.name || contact.phone)) {
+  // Only create contact if we have BOTH name AND contact method (phone/email)
+  // This prevents creating incomplete contacts - only extract when we have high confidence
+  // Exception: If this function is called explicitly (not automatic), we can be more lenient
+  if (contact && contact.name) {
     // Don't create contact if name is "Unknown" - this means extraction failed
     if (contact.name === 'Unknown' || !contact.name) {
       console.log('[CONTACT EXTRACTION] Skipping contact creation - no valid name extracted');
@@ -200,6 +202,15 @@ export async function extractContactFromMessage(
         return contact as Contact;
       }
       return null;
+    }
+    
+    // CRITICAL: Only create contact if we have both name AND phone/email
+    // This ensures we only extract contacts when user provides complete info
+    // Prevents creating bad contacts like "It" or incomplete contacts
+    if (!contact.phone && !contact.email) {
+      console.log('[CONTACT EXTRACTION] Skipping contact creation - missing phone/email. Name:', contact.name);
+      // Return the contact object for potential later use, but don't save it
+      return contact as Contact;
     }
     
     try {

@@ -73,3 +73,4 @@ Go to your Airtable base and add these fields to your User Records table (`tblEX
 After adding these fields, the Spotify connection will work perfectly!
 
 
+

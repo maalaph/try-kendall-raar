@@ -1629,26 +1629,45 @@ export async function getAllChatThreads(recordId: string): Promise<Array<{
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
       
-      // Filter out system messages for display purposes
-      const nonSystemMessages = sortedMessages.filter(m => {
-        // Exclude system messages like "Chat started"
-        return m.message !== 'Chat started' && !m.message.toLowerCase().startsWith('chat started');
-      });
+      // Check for custom title message (stored as system message with special prefix)
+      const titleMessage = sortedMessages.find(m => 
+        m.role === 'assistant' && 
+        m.message.startsWith('__THREAD_TITLE__:')
+      );
+      let title: string;
       
-      // Generate title from first user message (first 50 chars)
-      let title = 'New Chat';
-      const firstUserMessage = nonSystemMessages.find(m => m.role === 'user');
-      if (firstUserMessage) {
-        const preview = firstUserMessage.message.substring(0, 50).trim();
-        if (preview) {
-          title = preview.length < 50 ? preview : preview + '...';
+      if (titleMessage) {
+        // Extract custom title from special message
+        title = titleMessage.message.replace('__THREAD_TITLE__:', '').trim();
+      } else {
+        // Filter out system messages for display purposes
+        const nonSystemMessages = sortedMessages.filter(m => {
+          // Exclude system messages like "Chat started" and title messages
+          return m.message !== 'Chat started' && 
+                 !m.message.toLowerCase().startsWith('chat started') &&
+                 !m.message.startsWith('__THREAD_TITLE__:');
+        });
+        
+        // Generate title from first user message (first 50 chars)
+        title = 'New Chat';
+        const firstUserMessage = nonSystemMessages.find(m => m.role === 'user');
+        if (firstUserMessage) {
+          const preview = firstUserMessage.message.substring(0, 50).trim();
+          if (preview) {
+            title = preview.length < 50 ? preview : preview + '...';
+          }
         }
       }
       
-      // Get preview from last non-system message
-      const lastNonSystemMessage = nonSystemMessages.length > 0 
-        ? nonSystemMessages[nonSystemMessages.length - 1]
-        : sortedMessages[sortedMessages.length - 1]; // Fallback to last message if all are system
+      // Get preview from last non-system message (excluding title messages)
+      const messagesForPreview = sortedMessages.filter(m => 
+        m.message !== 'Chat started' && 
+        !m.message.toLowerCase().startsWith('chat started') &&
+        !m.message.startsWith('__THREAD_TITLE__:')
+      );
+      const lastNonSystemMessage = messagesForPreview.length > 0 
+        ? messagesForPreview[messagesForPreview.length - 1]
+        : sortedMessages.find(m => !m.message.startsWith('__THREAD_TITLE__:')) || sortedMessages[sortedMessages.length - 1]; // Fallback
       const preview = lastNonSystemMessage ? lastNonSystemMessage.message.substring(0, 100) : '';
       
       return {
@@ -1819,6 +1838,70 @@ export async function getChatMessages(params: {
     };
   } catch (error) {
     console.error('[AIRTABLE ERROR] getChatMessages failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update thread title by creating or updating a special title message
+ */
+export async function updateThreadTitle(params: {
+  recordId: string;
+  threadId: string;
+  agentId: string;
+  title: string;
+}): Promise<void> {
+  try {
+    if (!CHAT_MESSAGES_API_URL) {
+      throw new Error('Chat Messages Airtable URL is not configured');
+    }
+
+    // First, check if a title message already exists
+    const filterFormula = `AND({threadId} = "${params.threadId}", STARTS_WITH({message}, "__THREAD_TITLE__:"))`;
+    const searchUrl = `${CHAT_MESSAGES_API_URL}?filterByFormula=${encodeURIComponent(filterFormula)}&maxRecords=1`;
+    
+    const searchResponse = await fetch(searchUrl, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+
+    if (searchResponse.ok) {
+      const searchResult = await searchResponse.json();
+      const existingTitleRecord = searchResult.records?.[0];
+      
+      if (existingTitleRecord) {
+        // Update existing title message
+        const updateUrl = `${CHAT_MESSAGES_API_URL}/${existingTitleRecord.id}`;
+        const updateResponse = await fetch(updateUrl, {
+          method: 'PATCH',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            fields: {
+              message: `__THREAD_TITLE__:${params.title}`,
+            },
+          }),
+        });
+
+        if (!updateResponse.ok) {
+          const errorData = await updateResponse.json().catch(() => ({}));
+          throw new Error(`Failed to update thread title: ${JSON.stringify(errorData)}`);
+        }
+        return;
+      }
+    }
+
+    // No existing title message found, create a new one
+    await createChatMessage({
+      recordId: params.recordId,
+      agentId: params.agentId,
+      threadId: params.threadId,
+      message: `__THREAD_TITLE__:${params.title}`,
+      role: 'assistant',
+      messageType: 'system',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[AIRTABLE ERROR] updateThreadTitle failed:', error);
     throw error;
   }
 }
@@ -2026,6 +2109,78 @@ export async function getCallNotesByType(agentId: string, callType: 'inbound' | 
     }));
   } catch (error) {
     console.error('[AIRTABLE ERROR] getCallNotesByType failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all call notes for an agent (without filtering by callType)
+ */
+export async function getAllCallNotes(agentId: string, limit: number = 100): Promise<any[]> {
+  try {
+    if (!CALL_NOTES_API_URL) {
+      throw new Error('Call Notes Airtable URL is not configured');
+    }
+
+    const filterFormula = `{agentId} = "${agentId}"`;
+    const url = `${CALL_NOTES_API_URL}?filterByFormula=${encodeURIComponent(filterFormula)}&sort[0][field]=timestamp&sort[0][direction]=desc&maxRecords=${limit}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[AIRTABLE ERROR] getAllCallNotes failed:', {
+        status: response.status,
+        errorData,
+      });
+      throw new Error(`Failed to get all call notes: ${JSON.stringify(errorData)}`);
+    }
+
+    const result = await response.json();
+    return (result.records || []).map(record => ({
+      id: record.id,
+      callId: record.fields?.callId,
+      callerPhone: record.fields?.callerPhone || '',
+      note: record.fields?.Notes || '',
+      timestamp: record.fields?.timestamp || '',
+      callDuration: record.fields?.callDuration,
+      read: record.fields?.read || false,
+      callType: record.fields?.callType,
+    }));
+  } catch (error) {
+    console.error('[AIRTABLE ERROR] getAllCallNotes failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a call note by ID
+ */
+export async function deleteCallNote(callNoteId: string): Promise<void> {
+  try {
+    if (!CALL_NOTES_API_URL) {
+      throw new Error('Call Notes Airtable URL is not configured');
+    }
+
+    const url = `${CALL_NOTES_API_URL}/${callNoteId}`;
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[AIRTABLE ERROR] deleteCallNote failed:', {
+        status: response.status,
+        errorData,
+      });
+      throw new Error(`Failed to delete call note: ${JSON.stringify(errorData)}`);
+    }
+  } catch (error) {
+    console.error('[AIRTABLE ERROR] deleteCallNote failed:', error);
     throw error;
   }
 }

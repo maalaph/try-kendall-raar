@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord } from '@/lib/airtable';
+import { getUserRecord, updateThreadTitle } from '@/lib/airtable';
 
 const CHAT_MESSAGES_API_URL = process.env.AIRTABLE_BASE_ID && process.env.AIRTABLE_CHAT_MESSAGES_TABLE_ID
   ? `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_CHAT_MESSAGES_TABLE_ID}`
@@ -152,6 +152,84 @@ export async function DELETE(
       {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to delete thread',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * PATCH /api/chat/threads/[threadId]
+ * Update a chat thread title
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ threadId: string }> }
+) {
+  try {
+    const { threadId } = await params;
+    const searchParams = request.nextUrl.searchParams;
+    const recordId = searchParams.get('recordId');
+    const body = await request.json();
+    const { title } = body;
+
+    if (!threadId) {
+      return NextResponse.json(
+        { success: false, error: 'threadId is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!recordId) {
+      return NextResponse.json(
+        { success: false, error: 'recordId parameter is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'title is required and must be a non-empty string' },
+        { status: 400 }
+      );
+    }
+
+    // Verify user record exists
+    const userRecord = await getUserRecord(recordId);
+    if (!userRecord || !userRecord.fields) {
+      return NextResponse.json(
+        { success: false, error: 'User record not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get agentId from user record
+    const agentId = userRecord.fields.vapi_agent_id as string | undefined;
+    if (!agentId) {
+      return NextResponse.json(
+        { success: false, error: 'Agent ID not found for user' },
+        { status: 400 }
+      );
+    }
+
+    // Update thread title
+    await updateThreadTitle({
+      recordId,
+      threadId,
+      agentId: String(agentId),
+      title: title.trim(),
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Thread title updated successfully',
+    });
+  } catch (error) {
+    console.error('[API ERROR] PATCH /api/chat/threads/[threadId] failed:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update thread title',
       },
       { status: 500 }
     );

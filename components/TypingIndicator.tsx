@@ -84,3 +84,4 @@ export default function TypingIndicator({ assistantName = 'Kendall', showWavefor
 }
 
 
+

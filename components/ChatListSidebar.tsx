@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { colors } from '@/lib/config';
-import { Plus, MessageSquare, X, GripVertical, Search } from 'lucide-react';
+import { Plus, MessageSquare, X, GripVertical, Search, Pencil, Check } from 'lucide-react';
 
 interface ChatThread {
   threadId: string;
@@ -36,6 +36,9 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState<string>('');
+  const [updatingTitle, setUpdatingTitle] = useState<string | null>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const fetchingRef = useRef(false);
   const router = useRouter();
@@ -302,6 +305,53 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
 
   const handleDeleteCancel = () => {
     setShowDeleteConfirm(null);
+  };
+
+  const handleEditTitle = (e: React.MouseEvent, threadId: string, currentTitle: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditingThreadId(threadId);
+    setEditingTitle(currentTitle);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingThreadId(null);
+    setEditingTitle('');
+  };
+
+  const handleSaveTitle = async (threadId: string) => {
+    if (!editingTitle.trim() || updatingTitle === threadId) return;
+    
+    setUpdatingTitle(threadId);
+    
+    try {
+      const response = await fetch(`/api/chat/threads/${encodeURIComponent(threadId)}?recordId=${encodeURIComponent(recordId)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: editingTitle.trim() }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setThreads(prev => prev.map(t => 
+          t.threadId === threadId 
+            ? { ...t, title: editingTitle.trim() }
+            : t
+        ));
+        setEditingThreadId(null);
+        setEditingTitle('');
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to update chat name');
+      }
+    } catch (error) {
+      console.error('Failed to update thread title:', error);
+      alert('Failed to update chat name. Please try again.');
+    } finally {
+      setUpdatingTitle(null);
+    }
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -760,51 +810,162 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                         }}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1.5 relative">
-                          <span
-                            className="text-sm font-medium truncate flex-1"
-                            style={{ 
-                              color: isActive ? colors.accent : colors.text,
-                              fontFamily: 'var(--font-inter), sans-serif',
-                              fontWeight: isActive ? 600 : 500,
-                              textShadow: isActive 
-                                ? `0 0 10px ${colors.accent}50, 0 0 20px ${colors.accent}30`
-                                : isHovered
-                                ? `0 0 6px ${colors.accent}30`
-                                : 'none',
-                              transition: 'all 0.2s ease',
-                            }}
-                          >
-                            {thread.title}
-                          </span>
-                          {isHovered && !showDelete && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleDeleteClick(e, thread.threadId);
-                              }}
-                              className="p-1 rounded transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
-                              style={{
-                                color: colors.text,
-                                backgroundColor: 'transparent',
-                                pointerEvents: 'auto',
-                                zIndex: 200,
-                                position: 'absolute',
-                                right: 0,
-                                top: 0,
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = `${colors.accent}30`;
-                                e.currentTarget.style.color = '#ef4444';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                                e.currentTarget.style.color = colors.text;
-                              }}
-                            >
-                              <X size={14} />
-                            </button>
+                          {editingThreadId === thread.threadId ? (
+                            <div className="flex items-center gap-1 flex-1">
+                              <input
+                                type="text"
+                                value={editingTitle}
+                                onChange={(e) => setEditingTitle(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleSaveTitle(thread.threadId);
+                                  } else if (e.key === 'Escape') {
+                                    handleCancelEdit();
+                                  }
+                                }}
+                                autoFocus
+                                className="text-sm font-medium flex-1 px-2 py-1 rounded"
+                                style={{
+                                  backgroundColor: `${colors.primary}90`,
+                                  border: `1px solid ${colors.accent}50`,
+                                  color: colors.text,
+                                  fontFamily: 'var(--font-inter), sans-serif',
+                                  outline: 'none',
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                onFocus={(e) => {
+                                  e.currentTarget.style.borderColor = colors.accent;
+                                  e.currentTarget.style.boxShadow = `0 0 8px ${colors.accent}30`;
+                                }}
+                                onBlur={(e) => {
+                                  e.currentTarget.style.borderColor = `${colors.accent}50`;
+                                  e.currentTarget.style.boxShadow = 'none';
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleSaveTitle(thread.threadId);
+                                }}
+                                disabled={updatingTitle === thread.threadId}
+                                className="p-1 rounded transition-all flex-shrink-0"
+                                style={{
+                                  color: colors.accent,
+                                  backgroundColor: 'transparent',
+                                  pointerEvents: 'auto',
+                                  opacity: updatingTitle === thread.threadId ? 0.5 : 1,
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (updatingTitle !== thread.threadId) {
+                                    e.currentTarget.style.backgroundColor = `${colors.accent}20`;
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <Check size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleCancelEdit();
+                                }}
+                                className="p-1 rounded transition-all flex-shrink-0"
+                                style={{
+                                  color: colors.text,
+                                  backgroundColor: 'transparent',
+                                  pointerEvents: 'auto',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = `${colors.accent}20`;
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <span
+                                className="text-sm font-medium truncate flex-1"
+                                style={{ 
+                                  color: isActive ? colors.accent : colors.text,
+                                  fontFamily: 'var(--font-inter), sans-serif',
+                                  fontWeight: isActive ? 600 : 500,
+                                  textShadow: isActive 
+                                    ? `0 0 10px ${colors.accent}50, 0 0 20px ${colors.accent}30`
+                                    : isHovered
+                                    ? `0 0 6px ${colors.accent}30`
+                                    : 'none',
+                                  transition: 'all 0.2s ease',
+                                }}
+                              >
+                                {thread.title}
+                              </span>
+                              {isHovered && !showDelete && (
+                                <div className="flex items-center gap-1 flex-shrink-0" style={{ position: 'absolute', right: 0, top: 0 }}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleEditTitle(e, thread.threadId, thread.title);
+                                    }}
+                                    className="p-1 rounded transition-all opacity-0 group-hover:opacity-100"
+                                    style={{
+                                      color: colors.text,
+                                      backgroundColor: 'transparent',
+                                      pointerEvents: 'auto',
+                                      zIndex: 200,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = `${colors.accent}30`;
+                                      e.currentTarget.style.color = colors.accent;
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'transparent';
+                                      e.currentTarget.style.color = colors.text;
+                                    }}
+                                    title="Rename chat"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      handleDeleteClick(e, thread.threadId);
+                                    }}
+                                    className="p-1 rounded transition-all opacity-0 group-hover:opacity-100"
+                                    style={{
+                                      color: colors.text,
+                                      backgroundColor: 'transparent',
+                                      pointerEvents: 'auto',
+                                      zIndex: 200,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.backgroundColor = `${colors.accent}30`;
+                                      e.currentTarget.style.color = '#ef4444';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.backgroundColor = 'transparent';
+                                      e.currentTarget.style.color = colors.text;
+                                    }}
+                                    title="Delete chat"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                         {thread.preview && (

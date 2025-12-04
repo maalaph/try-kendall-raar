@@ -6,28 +6,37 @@ import { extractPatternsFromMessage } from '@/lib/patternExtractor';
 import { extractContactFromMessage } from '@/lib/contactExtractor';
 import { getContactByName, upsertContact } from '@/lib/contacts';
 import { analyzeSentiment, getResponseTone } from '@/lib/sentiment';
-import { selectModel } from '@/lib/modelSelector';
 import { checkRateLimit } from '@/lib/rateLimiter';
+import {
+  fetchCalendarEvents,
+  fetchGmailMessages,
+  sendGmailMessage,
+  GoogleIntegrationError,
+} from '@/lib/integrations/google';
+import {
+  fetchSpotifyInsights,
+  SpotifyIntegrationError,
+} from '@/lib/integrations/spotify';
 import OpenAI from 'openai';
 
 const CHAT_FUNCTIONS = [
   {
     name: 'make_outbound_call',
-    description: 'Make an outbound call to a specified phone number and deliver a message on behalf of the owner. Use this when the owner requests an immediate call. EXECUTE IMMEDIATELY when you have phone_number and message - do not ask for additional information.',
+    description: 'Make an immediate outbound phone call and deliver a message on behalf of the owner. ONLY call this after you already have the person’s name, their phone number, and the exact message to deliver.',
     parameters: {
       type: 'object',
       properties: {
         phone_number: {
           type: 'string',
-          description: 'The phone number to call. Can be in any format (10 digits: 8149969612, formatted: (814) 996-9612, with country code: +18149969612, etc.). The system will normalize it automatically. Extract the phone number directly from the user\'s message if provided.',
+          description: 'The phone number to call. Can be in any user format (10 digits, formatted, or with country code). The system will normalize it automatically.',
         },
         message: {
           type: 'string',
-          description: 'The message to deliver during the call',
+          description: 'Exactly what you will say during the call, in natural language.',
         },
         caller_name: {
           type: 'string',
-          description: 'Optional: The name of the recipient being called (e.g., "Ali", "John"). Extract this from the user\'s message if mentioned (e.g., "call Ali", "tell John"). If not provided, the call will still proceed.',
+          description: 'Optional: The recipient’s name (e.g., "mo money"). Use the same name you looked up or saved in contacts.',
         },
       },
       required: ['phone_number', 'message'],
@@ -35,17 +44,17 @@ const CHAT_FUNCTIONS = [
   },
   {
     name: 'schedule_outbound_call',
-    description: 'Schedule an outbound call to a specified phone number for a future date/time. Use this when the owner requests a call to be made at a specific time.',
+    description: 'Schedule an outbound call for a future time. ONLY call this after you have the person’s name, their phone number, the message to deliver, and a clear scheduled time.',
     parameters: {
       type: 'object',
       properties: {
         phone_number: {
           type: 'string',
-          description: 'The phone number to call. Can be in any format (10 digits: 8149969612, formatted: (814) 996-9612, with country code: +18149969612, etc.). The system will normalize it automatically. Extract the phone number directly from the user\'s message if provided.',
+          description: 'The phone number to call. Can be in any user format. The system will normalize it automatically.',
         },
         message: {
           type: 'string',
-          description: 'The message to deliver during the call',
+          description: 'Exactly what you will say during the call.',
         },
         scheduled_time: {
           type: 'string',
@@ -53,7 +62,7 @@ const CHAT_FUNCTIONS = [
         },
         caller_name: {
           type: 'string',
-          description: 'Optional: The name of the recipient being called (e.g., "Ali", "John"). Extract this from the user\'s message if mentioned. If not provided, the call will still proceed.',
+          description: 'Optional: The recipient’s name.',
         },
       },
       required: ['phone_number', 'message', 'scheduled_time'],
@@ -109,17 +118,17 @@ const CHAT_FUNCTIONS = [
   },
   {
     name: 'send_gmail',
-    description: 'Send an email via Gmail. Use this when the user requests to send an email. You MUST have the recipient\'s email address before calling this function. If the user only provides a name, ask for their email address first.',
+    description: 'Send an email via Gmail on behalf of the owner. ONLY call this when you already know the recipient’s email address, subject, and full body text.',
     parameters: {
       type: 'object',
       properties: {
         recordId: {
           type: 'string',
-          description: 'The user\'s recordId (required to identify which user\'s Gmail to use)',
+          description: 'The user\'s recordId (required to identify which user\'s Gmail to use). Always use the recordId from the chat context, not a guessed value.',
         },
         to: {
           type: 'string',
-          description: 'The recipient\'s email address (REQUIRED). Must be a valid email address format.',
+          description: 'The recipient\'s email address (REQUIRED). If the user only gives a name, look up the contact first and, if needed, ask for the email before calling this.',
         },
         subject: {
           type: 'string',
@@ -135,7 +144,7 @@ const CHAT_FUNCTIONS = [
   },
   {
     name: 'get_contact_by_name',
-    description: 'Look up a contact by name in the user\'s contact list. Use this when the user mentions a name (e.g., "call Ali", "email Ryan") but doesn\'t provide a phone number or email address. This function searches the user\'s Airtable contacts to find matching contact information. ALWAYS call this function BEFORE asking the user for contact information - the contact may already exist in their database. IMPORTANT: After finding a contact with a phone number, IMMEDIATELY use that phone number to call make_outbound_call. After finding a contact with an email, use that email to send the email.',
+    description: 'Look up a contact by name in the user\'s contact list. ALWAYS call this first when the user asks you to call, text, or email someone by name, before asking the user for any phone number or email address.',
     parameters: {
       type: 'object',
       properties: {
@@ -145,10 +154,28 @@ const CHAT_FUNCTIONS = [
         },
         name: {
           type: 'string',
-          description: 'The name of the contact to look up. Extract ONLY the first name (or first and last name) from the user\'s message. Examples: "Ali", "Ryan", "John Smith". Do NOT include action words or the rest of the sentence (e.g., use "Ali" not "Ali ask him if he can come").',
+          description: 'The exact full name of the contact to look up, EXACTLY as the user said it. Examples: "mo money", "Big Mike barber", "John Smith". Do NOT shorten, truncate, or modify it, and do NOT include action words or the rest of the sentence.',
         },
       },
       required: ['name'],
+    },
+  },
+  {
+    name: 'get_spotify_insights',
+    description: 'Fetch Spotify analytics (top artists, top tracks, and current mood) for the user. Use this when the user asks about their Spotify Wrapped, vibe, listening habits, or music analytics. Requires the user to have connected Spotify.',
+    parameters: {
+      type: 'object',
+      properties: {
+        timeRange: {
+          type: 'string',
+          enum: ['short_term', 'medium_term', 'long_term'],
+          description: 'Optional Spotify time range. short_term = last 4 weeks, medium_term = last 6 months, long_term = several years. Defaults to medium_term.',
+        },
+        limit: {
+          type: 'number',
+          description: 'Number of top artists/tracks to consider (1-20, defaults to 10).',
+        },
+      },
     },
   },
 ];
@@ -240,24 +267,20 @@ async function generateChatResponse(
       { role: 'user', content: incomingMessage },
     ];
     
-    // Quality-first: Smart model selection (conservative - default to GPT-4o)
-    // Only use mini for clearly simple tasks to maintain quality
-    const model = selectModel(incomingMessage, messages.length, 'chat');
-    
-    // Quality note: We don't cache conversational responses as they need to be contextual
-    // Caching is only used for deterministic operations (suggestions, patterns, etc.)
+    // Use GPT-4o for all chat interactions to maximize reasoning and tool-use quality
+    const model = 'gpt-4o';
 
     // Generate response with function calling enabled
     const completion = await openai.chat.completions.create({
-      model, // Smart selection: GPT-4o for complex, GPT-4o-mini only for clearly simple
+      model,
       messages: messages as any,
       tools: CHAT_FUNCTIONS.map(fn => ({
         type: 'function' as const,
         function: fn,
       })),
       tool_choice: 'auto',
-      temperature: 0.7,
-      max_tokens: 4000, // Keep full 4K for quality - mini will naturally use less
+      temperature: 0.3,
+      max_tokens: 4000,
     });
     
     const message = completion.choices[0]?.message;
@@ -491,8 +514,14 @@ export async function POST(request: NextRequest) {
         console.log('[CHAT API] User message saved to Airtable:', { recordId, threadId, messageLength: message.trim().length });
       }
 
-      // Extract patterns and contacts from user message (async, don't block)
+      // Extract patterns from user message (async, don't block)
       const timestamp = new Date().toISOString();
+      
+      // NOTE: Automatic contact extraction is disabled - let AI handle contact recognition
+      // through get_contact_by_name function. This prevents creating bad contacts.
+      // Contact extraction will only happen when:
+      // 1. User provides complete info (name + phone/email) - handled by explicit extraction
+      // 2. User provides info after AI asks for it - handled by contact update logic below
       
       Promise.all([
         extractPatternsFromMessage(
@@ -516,18 +545,40 @@ export async function POST(request: NextRequest) {
             stack: err instanceof Error ? err.stack : undefined,
           });
         }),
-        extractContactFromMessage(
-          recordId,
-          message.trim(),
-          timestamp
-        ).catch(err => {
-          console.warn('[CONTACT EXTRACTION] Failed to extract contact:', err);
-        }),
+        // Extract contacts only if we have high confidence (name + phone/email both present)
+        // Check if message contains both a name pattern AND phone/email
+        (async () => {
+          const messageText = message.trim();
+          const hasPhone = /\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b|\b\d{10,11}\b/.test(messageText);
+          const hasEmail = /\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/.test(messageText);
+          const hasNamePattern = /(?:call|text|email|message)\s+[A-Z][a-z]+/i.test(messageText);
+          
+          // Only extract if we have high confidence (name + contact method both present)
+          if (hasNamePattern && (hasPhone || hasEmail)) {
+            try {
+              await extractContactFromMessage(recordId, messageText, timestamp);
+              console.log('[CONTACT EXTRACTION] Extracted contact with complete info (name + phone/email)');
+            } catch (err) {
+              console.warn('[CONTACT EXTRACTION] Failed to extract contact:', err);
+            }
+          }
+        })(),
       ]);
       
-      // Special handling: If user message is just an email address, try to link it to recent contact
+      // Extract relationship from initial message (e.g., "call my friend" → relationship="friend")
+      let extractedRelationship: string | null = null;
+      const relationshipPattern = /(?:my|a|an)\s+(friend|colleague|brother|sister|dad|mom|father|mother|aunt|uncle|cousin|boss|manager|client|customer|neighbor|brother-in-law|sister-in-law)/i;
+      const relationshipMatch = message.match(relationshipPattern);
+      if (relationshipMatch && relationshipMatch[1]) {
+        extractedRelationship = relationshipMatch[1].toLowerCase();
+        console.log('[CHAT] Extracted relationship from message:', extractedRelationship);
+      }
+      
+      // Special handling: If user message is just an email address or phone number, try to link it to recent contact
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const phoneRegex = /^[\d\s\(\)\.\-\+]{10,}$/; // At least 10 digits/characters
       const trimmedMessage = message.trim();
+      
       if (emailRegex.test(trimmedMessage)) {
         // User provided just an email - look for recent contact mention
         try {
@@ -538,9 +589,21 @@ export async function POST(request: NextRequest) {
           
           // Look backwards through messages to find the most recent contact that was asked about
           for (const msg of recentMessages.messages.slice().reverse()) {
-            if (msg.role === 'assistant' && msg.message.includes("don't have their email address")) {
-              // Extract contact name from message like "I found Ali in your contacts, but I don't have their email address"
-              const nameMatch = msg.message.match(/I found (\w+) in your contacts/);
+            // Check for various patterns of AI asking for email
+            const emailRequestPatterns = [
+              /don't have.*email address/i,
+              /What's.*email address/i,
+              /I don't have (.+?) in your contacts.*email/i,
+            ];
+            
+            const isEmailRequest = emailRequestPatterns.some(pattern => pattern.test(msg.message));
+            
+            if (msg.role === 'assistant' && isEmailRequest) {
+              // Extract contact name from various message patterns
+              const nameMatch = msg.message.match(/(?:I found|don't have|What's) (\w+)(?:'s|'s)? (?:in your contacts|email)/i) ||
+                               msg.message.match(/I don't have (\w+) in your contacts/i) ||
+                               msg.message.match(/What's (\w+)'s email/i);
+              
               if (nameMatch && nameMatch[1]) {
                 const contactName = nameMatch[1];
                 console.log('[CHAT] Found contact name from email-only message context:', contactName);
@@ -558,6 +621,112 @@ export async function POST(request: NextRequest) {
           }
         } catch (emailUpdateError) {
           console.warn('[CHAT] Failed to update contact with email from email-only message:', emailUpdateError);
+          // Don't fail the request if this fails
+        }
+      } else if (phoneRegex.test(trimmedMessage.replace(/\D/g, '')) && trimmedMessage.replace(/\D/g, '').length >= 10) {
+        // User provided just a phone number - look for recent contact mention
+        try {
+          const recentMessages = await getChatMessages({
+            threadId,
+            limit: 10,
+          });
+          
+          let contactName: string | null = null;
+          let normalizedPhone: string | null = null;
+          
+          // Look backwards through messages to find the most recent contact that was asked about
+          for (const msg of recentMessages.messages.slice().reverse()) {
+            // Check for various patterns of AI asking for phone number
+            const phoneRequestPatterns = [
+              /don't have.*phone number/i,
+              /What's.*phone number/i,
+              /I don't have (.+?) in your contacts.*phone/i,
+            ];
+            
+            const isPhoneRequest = phoneRequestPatterns.some(pattern => pattern.test(msg.message));
+            
+            if (msg.role === 'assistant' && isPhoneRequest) {
+              // Extract contact name from assistant's message
+              // The AI should have said something like "I don't have [name] in your contacts"
+              // We extract the name from that message - could be "Mo", "mo money", "John Smith", etc.
+              // Match any text between "don't have" and "in your contacts" - this is the name the AI mentioned
+              const nameMatch = msg.message.match(/I don't have (.+?) in your contacts/i) ||
+                               msg.message.match(/don't have (.+?) in your contacts/i) ||
+                               msg.message.match(/What's (.+?)'s phone/i);
+              
+              if (nameMatch && nameMatch[1]) {
+                // Use the name as-is - don't truncate or modify it
+                // If AI said "I don't have mo money in your contacts", use "mo money" as the name
+                contactName = nameMatch[1].trim();
+                console.log('[CHAT] Found contact name from phone-only message context:', contactName);
+                
+                // Normalize phone number
+                const phoneNormalized = formatPhoneNumberToE164(trimmedMessage);
+                if (phoneNormalized && contactName) {
+                  normalizedPhone = phoneNormalized;
+                  
+                  // Try to get relationship from earlier in conversation
+                  let relationshipToStore: string | null = extractedRelationship;
+                  if (!relationshipToStore) {
+                    // Look for relationship in recent user messages
+                    for (const msg of recentMessages.messages.slice().reverse()) {
+                      if (msg.role === 'user') {
+                        const relMatch = msg.message.match(/(?:my|a|an)\s+(friend|colleague|brother|sister|dad|mom|father|mother|aunt|uncle|cousin|boss|manager|client|customer|neighbor)/i);
+                        if (relMatch && relMatch[1]) {
+                          relationshipToStore = relMatch[1].toLowerCase();
+                          break;
+                        }
+                      }
+                    }
+                  }
+                  
+                  // Update contact with phone and relationship (if available)
+                  try {
+                    const createdContact = await upsertContact({
+                      recordId,
+                      name: contactName,
+                      phone: phoneNormalized,
+                      relationship: relationshipToStore || undefined,
+                      lastContacted: new Date().toISOString(),
+                    });
+                    console.log('[CHAT] ✅✅✅ CONTACT CREATED/UPDATED:', { 
+                      name: contactName, 
+                      phone: phoneNormalized,
+                      relationship: relationshipToStore,
+                      contactId: createdContact.id,
+                      hasPhone: !!createdContact.phone
+                    });
+                    // Verify it was actually saved
+                    if (!createdContact.id) {
+                      console.error('[CHAT] ❌❌❌ CONTACT CREATION FAILED - NO ID RETURNED');
+                    }
+                  } catch (upsertError) {
+                    console.error('[CHAT] ❌❌❌ CONTACT CREATION FAILED:', {
+                      error: upsertError,
+                      name: contactName,
+                      phone: phoneNormalized,
+                      relationship: relationshipToStore,
+                      errorMessage: upsertError instanceof Error ? upsertError.message : String(upsertError)
+                    });
+                    // Don't throw - continue with flow
+                  }
+                  break;
+                }
+              }
+            }
+          }
+          
+          // If we updated a contact, we need to ask for message before making call
+          // Store this info to prevent immediate call in post-processing
+          if (contactName && normalizedPhone) {
+            // Set a flag that we just created/updated a contact with phone
+            // This will be checked in post-processing to override AI response
+            console.log('[CHAT] Contact updated with phone, will ask for message before calling:', { contactName, phone: normalizedPhone || 'unknown' });
+            // Store in a way that post-processing can access it
+            // We'll check for phone-only messages in post-processing
+          }
+        } catch (phoneUpdateError) {
+          console.warn('[CHAT] Failed to update contact with phone from phone-only message:', phoneUpdateError);
           // Don't fail the request if this fails
         }
       }
@@ -609,181 +778,181 @@ export async function POST(request: NextRequest) {
     let callRequestId: string | undefined;
     let callStatus: { success: boolean; message: string } | undefined;
     let functionResults: Array<{ name: string; result: any }> = [];
+    let lastContactLookup: { name: string; contact?: { name?: string; phone?: string; email?: string; relationship?: string } } | null = null;
     
     if (functionCalls && functionCalls.length > 0) {
       for (const fc of functionCalls) {
         // Handle Google Calendar requests
         if (fc.name === 'get_calendar_events') {
           try {
-            const { recordId: calendarRecordId, startDate, endDate, maxResults } = fc.arguments;
-            const params = new URLSearchParams({ recordId: calendarRecordId || recordId });
-            if (startDate) params.append('startDate', startDate);
-            if (endDate) params.append('endDate', endDate);
-            if (maxResults) params.append('maxResults', String(maxResults));
-            
-            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-            
-            // Try with retry logic for transient errors
-            let calendarResponse;
-            let calendarData;
-            let retryCount = 0;
-            const maxRetries = 1;
-            
-            while (retryCount <= maxRetries) {
-              try {
-                calendarResponse = await fetch(`${baseUrl}/api/google/calendar?${params.toString()}`);
-                calendarData = await calendarResponse.json();
-                
-                // If successful, break out of retry loop
-                if (calendarResponse.ok && calendarData.success) {
-                  break;
-                }
-                
-                // If it's a 401 "not connected" error, don't retry
-                if (calendarResponse.status === 401 && calendarData.error === 'Google account not connected') {
-                  break;
-                }
-                
-                // For other errors, retry once if we haven't already
-                if (retryCount < maxRetries) {
-                  console.log(`[CHAT] Calendar API error, retrying... (attempt ${retryCount + 1}/${maxRetries + 1})`);
-                  retryCount++;
-                  await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
-                  continue;
-                }
-                
-                break;
-              } catch (fetchError) {
-                console.error(`[CHAT] Calendar fetch error (attempt ${retryCount + 1}):`, fetchError);
-                if (retryCount < maxRetries) {
-                  retryCount++;
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  continue;
-                }
-                throw fetchError;
+            const { startDate, endDate, maxResults } = fc.arguments || {};
+            const events = await fetchCalendarEvents(recordId, {
+              timeMin: startDate ? new Date(startDate).toISOString() : undefined,
+              timeMax: endDate ? new Date(endDate).toISOString() : undefined,
+              maxResults: maxResults ? Number(maxResults) : undefined,
+            });
+
+            functionResults.push({
+              name: 'get_calendar_events',
+              result: { success: true, events },
+            });
+
+            const formatDateTime = (value: string) => {
+              const date = new Date(value);
+              if (Number.isNaN(date.getTime())) {
+                return value;
               }
-            }
-            
-            if (calendarResponse.ok && calendarData.success) {
-              functionResults.push({
-                name: 'get_calendar_events',
-                result: calendarData,
+              const hasTime = value.includes('T');
+              return date.toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                ...(hasTime
+                  ? { hour: 'numeric', minute: '2-digit' }
+                  : {}),
               });
-              
-              // Update agent response with calendar information
-              if (calendarData.events && calendarData.events.length > 0) {
-                const eventsList = calendarData.events.map((e: any) => {
+            };
+
+            const describeRange = () => {
+              if (startDate && endDate) {
+                return `between ${formatDateTime(startDate)} and ${formatDateTime(endDate)}`;
+              }
+              if (startDate) {
+                return `after ${formatDateTime(startDate)}`;
+              }
+              if (endDate) {
+                return `before ${formatDateTime(endDate)}`;
+              }
+              return 'in your upcoming schedule';
+            };
+
+            const timeframeDescription = describeRange();
+
+            if (events.length > 0) {
+              const eventsList = events
+                .map((e) => {
                   const start = e.start ? new Date(e.start).toLocaleString() : 'TBD';
                   return `- ${e.summary} at ${start}${e.location ? ` (${e.location})` : ''}`;
-                }).join('\n');
-                agentResponse = `Here's what you have coming up:\n\n${eventsList}`;
-              } else {
-                agentResponse = "You don't have any events scheduled for that time period.";
-              }
+                })
+                .join('\n');
+              agentResponse = `Here's what you have ${timeframeDescription}:\n\n${eventsList}`;
             } else {
-              // Only show "not connected" message for actual 401 errors
-              if (calendarResponse.status === 401 && calendarData.error === 'Google account not connected') {
-                agentResponse = `I couldn't access your calendar. ${calendarData.message || 'Please connect your Google account in the Integrations page.'}`;
-              } else {
-                // For other errors, show generic retry message
-                console.error('[CHAT] Calendar API error:', {
-                  status: calendarResponse.status,
-                  error: calendarData.error,
-                  message: calendarData.message,
-                });
-                agentResponse = "I'm having trouble accessing your calendar right now. Please try again in a moment.";
-              }
+              agentResponse = `I couldn't find anything ${timeframeDescription}. If that seems off, double-check which calendars are connected in Integrations or tell me to add a new event.`;
             }
           } catch (error) {
-            console.error('[CHAT] Error fetching calendar events:', error);
-            agentResponse = "I encountered an error while trying to access your calendar. Please try again.";
+            if (error instanceof GoogleIntegrationError) {
+              agentResponse =
+                error.reason === 'NOT_CONNECTED'
+                  ? "I couldn't access your calendar because Google isn't connected yet. You can connect it in the Integrations page."
+                  : error.reason === 'TOKEN_REFRESH_FAILED'
+                  ? "Your Google connection looks expired. Try reconnecting it in the Integrations page."
+                  : "I'm having trouble accessing your calendar right now. Please try again in a moment.";
+            } else {
+              console.error('[CHAT] Error fetching calendar events:', error);
+              agentResponse = "I encountered an error while trying to access your calendar. Please try again.";
+            }
           }
           continue;
         }
         
+        if (fc.name === 'get_spotify_insights') {
+          try {
+            const { timeRange, limit } = fc.arguments || {};
+            const insights = await fetchSpotifyInsights(recordId, {
+              timeRange: ['short_term', 'medium_term', 'long_term'].includes(timeRange)
+                ? timeRange
+                : undefined,
+              limit: limit ? Number(limit) : undefined,
+            });
+
+            functionResults.push({
+              name: 'get_spotify_insights',
+              result: { success: true, insights },
+            });
+
+            const topArtistNames = insights.topArtists.slice(0, 3).map((a) => a.name);
+            const topTrackNames = insights.topTracks.slice(0, 3).map((t) => `${t.name} by ${t.artists?.[0]?.name || 'Unknown artist'}`);
+
+            const moodLine = insights.mood
+              ? `Overall vibe feels **${insights.mood.mood}** (${Math.round(
+                  (insights.mood.confidence || 0) * 100,
+                )}% confidence) — ${insights.mood.reasoning}.`
+              : "I couldn't infer a specific mood yet.";
+
+            const artistLine =
+              topArtistNames.length > 0
+                ? `Top artists right now: ${topArtistNames.map((name, idx) => `${idx + 1}. ${name}`).join(' | ')}`
+                : 'No standout artists yet—want me to explore something new?';
+            const trackLine =
+              topTrackNames.length > 0
+                ? `Most-played tracks: ${topTrackNames.map((track, idx) => `${idx + 1}. ${track}`).join(' | ')}`
+                : 'No recent track streaks to report.';
+
+            const checkInSections = [
+              `• Vibe check: ${moodLine.replace(/\*\*/g, '')}`,
+              `• ${artistLine}`,
+              `• ${trackLine}`,
+            ];
+
+            const heroTrack = insights.topTracks[0];
+            const heroArtist = insights.topArtists[0];
+            const spotlight =
+              heroTrack && heroArtist
+                ? `Spotlight: "${heroTrack.name}" by ${heroArtist.name} has been on repeat.`
+                : '';
+
+            agentResponse = `Spotify check-in:\n\n${checkInSections.join('\n')}\n${spotlight ? `\n${spotlight}` : ''}`;
+          } catch (error) {
+            if (error instanceof SpotifyIntegrationError) {
+              agentResponse =
+                error.reason === 'NOT_CONNECTED'
+                  ? "I can't reach Spotify because it isn't connected yet. You can connect it from the Integrations page."
+                  : error.reason === 'TOKEN_REFRESH_FAILED'
+                  ? "Your Spotify connection looks expired. Try reconnecting it in the Integrations page."
+                  : "I'm having trouble reaching Spotify right now. Please try again shortly.";
+            } else {
+              console.error('[CHAT] Error fetching Spotify insights:', error);
+              agentResponse = "I ran into an error while checking Spotify. Please try again.";
+            }
+          }
+          continue;
+        }
+
         // Handle Gmail requests
         if (fc.name === 'get_gmail_messages') {
           try {
-            const { recordId: gmailRecordId, unread, maxResults } = fc.arguments;
-            const params = new URLSearchParams({ recordId: gmailRecordId || recordId });
-            if (unread) params.append('unread', 'true');
-            if (maxResults) params.append('maxResults', String(maxResults));
-            
-            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-            
-            // Try with retry logic for transient errors
-            let gmailResponse;
-            let gmailData;
-            let retryCount = 0;
-            const maxRetries = 1;
-            
-            while (retryCount <= maxRetries) {
-              try {
-                gmailResponse = await fetch(`${baseUrl}/api/google/gmail?${params.toString()}`);
-                gmailData = await gmailResponse.json();
-                
-                // If successful, break out of retry loop
-                if (gmailResponse.ok && gmailData.success) {
-                  break;
-                }
-                
-                // If it's a 401 "not connected" error, don't retry
-                if (gmailResponse.status === 401 && gmailData.error === 'Google account not connected') {
-                  break;
-                }
-                
-                // For other errors, retry once if we haven't already
-                if (retryCount < maxRetries) {
-                  console.log(`[CHAT] Gmail API error, retrying... (attempt ${retryCount + 1}/${maxRetries + 1})`);
-                  retryCount++;
-                  await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
-                  continue;
-                }
-                
-                break;
-              } catch (fetchError) {
-                console.error(`[CHAT] Gmail fetch error (attempt ${retryCount + 1}):`, fetchError);
-                if (retryCount < maxRetries) {
-                  retryCount++;
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  continue;
-                }
-                throw fetchError;
-              }
-            }
-            
-            if (gmailResponse.ok && gmailData.success) {
-              functionResults.push({
-                name: 'get_gmail_messages',
-                result: gmailData,
-              });
-              
-              // Update agent response with Gmail information
-              if (gmailData.messages && gmailData.messages.length > 0) {
-                const messagesList = gmailData.messages.map((m: any) => {
-                  return `- From: ${m.from} | Subject: ${m.subject} | ${m.date}`;
-                }).join('\n');
-                agentResponse = `Here are your ${unread ? 'unread ' : ''}emails:\n\n${messagesList}`;
-              } else {
-                agentResponse = `You don't have any ${unread ? 'unread ' : ''}emails.`;
-              }
+            const { unread, maxResults } = fc.arguments || {};
+            const unreadFlag = typeof unread === 'boolean' ? unread : Boolean(unread);
+            const messages = await fetchGmailMessages(recordId, {
+              unread: unreadFlag,
+              maxResults: maxResults ? Number(maxResults) : undefined,
+            });
+
+            functionResults.push({
+              name: 'get_gmail_messages',
+              result: { success: true, messages },
+            });
+
+            if (messages.length > 0) {
+              const messagesList = messages
+                .map((m) => `- From: ${m.from} | Subject: ${m.subject} | ${m.date}`)
+                .join('\n');
+              agentResponse = `Here are your ${unreadFlag ? 'unread ' : ''}emails:\n\n${messagesList}`;
             } else {
-              // Only show "not connected" message for actual 401 errors
-              if (gmailResponse.status === 401 && gmailData.error === 'Google account not connected') {
-                agentResponse = `I couldn't access your Gmail. ${gmailData.message || 'Please connect your Google account in the Integrations page.'}`;
-              } else {
-                // For other errors, show generic retry message
-                console.error('[CHAT] Gmail API error:', {
-                  status: gmailResponse.status,
-                  error: gmailData.error,
-                  message: gmailData.message,
-                });
-                agentResponse = "I'm having trouble accessing your Gmail right now. Please try again in a moment.";
-              }
+              agentResponse = `You don't have any ${unreadFlag ? 'unread ' : ''}emails.`;
             }
           } catch (error) {
-            console.error('[CHAT] Error fetching Gmail messages:', error);
-            agentResponse = "I encountered an error while trying to access your Gmail. Please try again.";
+            if (error instanceof GoogleIntegrationError) {
+              agentResponse =
+                error.reason === 'NOT_CONNECTED'
+                  ? "I couldn't access your Gmail because Google isn't connected yet. You can connect it in the Integrations page."
+                  : error.reason === 'TOKEN_REFRESH_FAILED'
+                  ? "Your Google connection looks expired. Try reconnecting it in the Integrations page."
+                  : "I'm having trouble accessing your Gmail right now. Please try again in a moment.";
+            } else {
+              console.error('[CHAT] Error fetching Gmail messages:', error);
+              agentResponse = "I encountered an error while trying to access your Gmail. Please try again.";
+            }
           }
           continue;
         }
@@ -839,84 +1008,91 @@ export async function POST(request: NextRequest) {
               }
             }
             
-            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-            
-            // Try with retry logic for transient errors
-            let gmailSendResponse;
-            let gmailSendData;
-            let retryCount = 0;
-            const maxRetries = 1;
-            
-            while (retryCount <= maxRetries) {
-              try {
-                gmailSendResponse = await fetch(`${baseUrl}/api/google/gmail/send`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    recordId: gmailSendRecordId, // Always use request context recordId
-                    to,
-                    subject: subject || '',
-                    body: body || '',
-                  }),
-                });
-                gmailSendData = await gmailSendResponse.json();
-                
-                // If successful, break out of retry loop
-                if (gmailSendResponse.ok && gmailSendData.success) {
-                  break;
-                }
-                
-                // If it's a 401 "not connected" error, don't retry
-                if (gmailSendResponse.status === 401 && gmailSendData.error === 'Google account not connected') {
-                  break;
-                }
-                
-                // For other errors, retry once if we haven't already
-                if (retryCount < maxRetries) {
-                  console.log(`[CHAT] Gmail send API error, retrying... (attempt ${retryCount + 1}/${maxRetries + 1})`);
-                  retryCount++;
-                  await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms before retry
-                  continue;
-                }
-                
-                break;
-              } catch (fetchError) {
-                console.error(`[CHAT] Gmail send fetch error (attempt ${retryCount + 1}):`, fetchError);
-                if (retryCount < maxRetries) {
-                  retryCount++;
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                  continue;
-                }
-                throw fetchError;
-              }
-            }
-            
-            if (gmailSendResponse.ok && gmailSendData.success) {
+            const contactNameForEmail = (
+              lastContactLookup?.contact?.name ||
+              lastContactLookup?.name ||
+              ''
+            ).trim();
+            const relationshipForEmail =
+              lastContactLookup?.contact?.relationship ||
+              extractedRelationship ||
+              undefined;
+
+            try {
+              await sendGmailMessage(gmailSendRecordId, {
+                to,
+                subject: subject || '',
+                body: body || '',
+              });
+
               functionResults.push({
                 name: 'send_gmail',
-                result: gmailSendData,
+                result: {
+                  success: true,
+                  to,
+                  subject: subject || '',
+                },
               });
-              
-              agentResponse = `Email sent successfully to ${to}!`;
-            } else {
-              // Only show "not connected" message for actual 401 errors
-              if (gmailSendResponse.status === 401 && gmailSendData.error === 'Google account not connected') {
-                agentResponse = `I couldn't send the email. ${gmailSendData.message || 'Please connect your Google account in the Integrations page.'}`;
-              } else {
-                // For other errors, show generic retry message
-                console.error('[CHAT] Gmail send API error:', {
-                  status: gmailSendResponse.status,
-                  error: gmailSendData.error,
-                  message: gmailSendData.message,
-                });
-                agentResponse = "I'm having trouble sending the email right now. Please try again in a moment.";
+
+              const safeSubject = (subject || '').trim() || '(no subject)';
+              const safeBody = (body || '').trim();
+              const previewBody =
+                safeBody.length > 140
+                  ? `${safeBody.slice(0, 140)}...`
+                  : safeBody || '(no body provided)';
+
+              if (contactNameForEmail) {
+                try {
+                  await upsertContact({
+                    recordId,
+                    name: contactNameForEmail,
+                    email: to,
+                    relationship: relationshipForEmail || undefined,
+                    lastContacted: new Date().toISOString(),
+                  });
+                  console.log('[CHAT] ✅ Contact synced after email send:', {
+                    name: contactNameForEmail,
+                    email: to,
+                  });
+                } catch (contactSyncError) {
+                  console.warn('[CHAT] Failed to sync contact after email send:', contactSyncError);
+                }
               }
+
+              lastContactLookup = null;
+
+              agentResponse = `Sent your email to ${to} with subject "${safeSubject}". Message preview: "${previewBody}".`;
+            } catch (error) {
+              if (error instanceof GoogleIntegrationError) {
+                agentResponse =
+                  error.reason === 'NOT_CONNECTED'
+                    ? "I couldn't send the email because Google isn't connected yet. You can connect it in the Integrations page."
+                    : error.reason === 'TOKEN_REFRESH_FAILED'
+                    ? "Your Google connection looks expired. Try reconnecting it in the Integrations page."
+                    : error.reason === 'INSUFFICIENT_PERMISSIONS'
+                    ? "Google is connected but missing permission to send emails. Please reconnect Google and allow Gmail access."
+                    : error.message || "I'm having trouble sending the email right now. Please try again in a moment.";
+              } else {
+                console.error('[CHAT] Error sending Gmail:', error);
+                agentResponse =
+                  error instanceof Error
+                    ? `I couldn't send the email: ${error.message}`
+                    : "I encountered an error while trying to send the email. Please try again.";
+              }
+              continue;
             }
           } catch (error) {
-            console.error('[CHAT] Error sending Gmail:', error);
-            agentResponse = "I encountered an error while trying to send the email. Please try again.";
+            if (error instanceof GoogleIntegrationError) {
+              agentResponse =
+                error.reason === 'NOT_CONNECTED'
+                  ? "I couldn't send the email because Google isn't connected yet. You can connect it in the Integrations page."
+                  : error.reason === 'TOKEN_REFRESH_FAILED'
+                  ? "Your Google connection looks expired. Try reconnecting it in the Integrations page."
+                  : "I'm having trouble sending the email right now. Please try again in a moment.";
+            } else {
+              console.error('[CHAT] Error sending Gmail:', error);
+              agentResponse = "I encountered an error while trying to send the email. Please try again.";
+            }
           }
           continue;
         }
@@ -937,13 +1113,14 @@ export async function POST(request: NextRequest) {
               continue;
             }
             
-            // Extract only first 1-2 words from name (safety check in case agent passes full sentence)
-            const nameParts = name.trim().split(/\s+/);
-            const cleanName = nameParts.slice(0, 2).join(' '); // Only first 1-2 words
+            // Use the name as-is - trust the AI to extract correctly
+            // If user said "mo money", that's the name - don't truncate it
+            const cleanName = name.trim();
             
             console.log('[CHAT] Contact lookup requested:', { providedName: name.trim(), cleanName, recordId: lookupRecordId });
             
             const contact = await getContactByName(lookupRecordId, cleanName);
+            lastContactLookup = { name: cleanName, contact: contact || undefined };
             
             if (contact) {
               const result: any = {
@@ -1059,8 +1236,10 @@ export async function POST(request: NextRequest) {
                       // Set call status for response
                       callStatus = {
                         success: true,
+                        callId: callResult.call_id || callResult.task_id,
+                        phoneNumber: phoneDisplay,
                         message: `Successfully called ${contact.name} at ${phoneDisplay}.`,
-                      };
+                      } as any;
                       // Update callRequestId
                       callRequestId = callResult.call_id || callResult.task_id;
                     } else {
@@ -1169,15 +1348,28 @@ export async function POST(request: NextRequest) {
               });
               console.log('[CHAT] Contact lookup successful:', { name: contact.name, hasPhone: !!contact.phone, hasEmail: !!contact.email, autoCallTriggered: result.autoCallTriggered || false });
             } else {
+              // Contact not found - AI should ask for phone number/email
+              const userMessage = message.trim().toLowerCase();
+              const isCallRequest = userMessage.includes('call') || userMessage.includes('phone') || userMessage.includes('text');
+              const isEmailRequest = userMessage.includes('email') || userMessage.includes('send');
+              
               functionResults.push({
                 name: 'get_contact_by_name',
                 result: {
                   success: false,
                   error: 'Contact not found',
                   message: `I couldn't find a contact named "${cleanName}" in your contacts.`,
+                  // Add instruction for AI about what to do next
+                  instruction: isCallRequest 
+                    ? `Contact "${cleanName}" not found. You MUST ask the user: "I don't have ${cleanName} in your contacts. What's their phone number?"`
+                    : isEmailRequest
+                    ? `Contact "${cleanName}" not found. You MUST ask the user: "I don't have ${cleanName} in your contacts. What's their email address?"`
+                    : `Contact "${cleanName}" not found in contacts.`,
+                  requestedAction: isCallRequest ? 'call' : isEmailRequest ? 'email' : null,
+                  contactName: cleanName,
                 },
               });
-              console.log('[CHAT] Contact lookup failed - contact not found:', cleanName);
+              console.log('[CHAT] Contact lookup failed - contact not found:', cleanName, 'Requested action:', isCallRequest ? 'call' : isEmailRequest ? 'email' : 'none');
             }
           } catch (error) {
             console.error('[CHAT] Error looking up contact:', error);
@@ -1196,13 +1388,71 @@ export async function POST(request: NextRequest) {
         // Handle outbound call requests
         if (fc.name === 'make_outbound_call' || fc.name === 'schedule_outbound_call') {
           try {
-            // Normalize phone number before making call
+            // Check if user just provided phone number without message
+            // If message is missing or generic, ask for it before making call
+            const callMessage = fc.arguments.message || '';
             const rawPhoneNumber = fc.arguments.phone_number;
             const normalizedPhone = formatPhoneNumberToE164(rawPhoneNumber);
+            
+            // Check if this is a phone-only message (user just provided phone after being asked)
+            const phoneOnlyRegex = /^[\d\s\(\)\.\-\+]{10,}$/;
+            const isPhoneOnlyMessage = phoneOnlyRegex.test(message.trim().replace(/\D/g, '')) && 
+                                       message.trim().replace(/\D/g, '').length >= 10 &&
+                                       (!callMessage || callMessage.trim() === '' || callMessage.length < 5);
+            
+            // CRITICAL: Check for missing message BEFORE making call
+            if (isPhoneOnlyMessage || !callMessage || callMessage.trim() === '' || callMessage.length < 5) {
+              // User just provided phone number, need to ask for message
+              // Check if we recently asked for phone number
+              try {
+                const recentMessages = await getChatMessages({
+                  threadId,
+                  limit: 5,
+                });
+                
+                const recentlyAskedForPhone = recentMessages.messages.some(msg => 
+                  msg.role === 'assistant' && 
+                  (msg.message.includes("phone number") || msg.message.includes("don't have"))
+                );
+                
+                if (recentlyAskedForPhone) {
+                  // Extract contact name from recent assistant messages
+                  // The AI should have said "I don't have [name] in your contacts"
+                  // Extract whatever name the AI mentioned - could be "Mo", "mo money", "John Smith", etc.
+                  let contactName = 'them';
+                  for (const msg of recentMessages.messages.slice().reverse()) {
+                    if (msg.role === 'assistant' && msg.message.includes("don't have")) {
+                      // Match any text between "don't have" and "in your contacts" - that's the name
+                      const nameMatch = msg.message.match(/I don't have (.+?) in your contacts/i) ||
+                                       msg.message.match(/don't have (.+?) in your contacts/i);
+                      if (nameMatch && nameMatch[1]) {
+                        contactName = nameMatch[1].trim(); // Use name as-is, don't truncate
+                        break;
+                      }
+                    }
+                  }
+                  
+                  // Override response to ask for message instead of making call
+                  agentResponse = `Got it! What message should I deliver to ${contactName}?`;
+                  callStatus = {
+                    success: false,
+                    message: 'Need message before making call',
+                  };
+                  console.log('[CHAT] Phone number provided but no message - asking for message:', { contactName, phone: normalizedPhone || 'unknown' });
+                  continue; // Skip making the call - CRITICAL
+                }
+              } catch (error) {
+                console.warn('[CHAT] Error checking recent messages for phone-only detection:', error);
+              }
+            }
             
             // Check for duplicate calls: prevent making the same call twice in quick succession
             // Check recent chat messages for the same call request
             try {
+              if (!normalizedPhone) {
+                throw new Error('Phone number not normalized');
+              }
+              
               const recentMessages = await getChatMessages({
                 threadId,
                 limit: 10,
@@ -1272,8 +1522,76 @@ export async function POST(request: NextRequest) {
               continue;
             }
 
-            // Extract contact info from the message before making call
-            // Build a message string with all available info for extraction
+            // CRITICAL: Extract contact name from conversation context and create/update contact BEFORE making call
+            let contactNameFromContext: string | null = null;
+            let relationshipFromContext: string | null = null;
+            
+            try {
+              const recentMessages = await getChatMessages({ threadId, limit: 10 });
+              
+              // Look for contact name in recent assistant messages
+              // The AI should have said "I don't have [name] in your contacts. What's their phone number?"
+              for (const msg of recentMessages.messages.slice().reverse()) {
+                if (msg.role === 'assistant' && msg.message.includes("don't have")) {
+                  // Match any text between "don't have" and "in your contacts" - that's the name
+                  const nameMatch = msg.message.match(/I don't have (.+?) in your contacts/i) ||
+                                   msg.message.match(/don't have (.+?) in your contacts/i);
+                  if (nameMatch && nameMatch[1]) {
+                    contactNameFromContext = nameMatch[1].trim(); // Use name as-is, don't truncate
+                    break;
+                  }
+                }
+              }
+              
+              // Look for relationship in recent user messages
+              for (const msg of recentMessages.messages.slice().reverse()) {
+                if (msg.role === 'user') {
+                  const relMatch = msg.message.match(/(?:my|a|an)\s+(friend|colleague|brother|sister|dad|mom|father|mother|aunt|uncle|cousin|boss|manager|client|customer|neighbor)/i);
+                  if (relMatch && relMatch[1]) {
+                    relationshipFromContext = relMatch[1].toLowerCase();
+                    break;
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn('[CHAT] Error getting contact name/relationship from context:', error);
+            }
+
+            const contactNameForCallUpdate =
+              (typeof fc.arguments.caller_name === 'string' &&
+                fc.arguments.caller_name.trim()) ||
+              contactNameFromContext ||
+              lastContactLookup?.contact?.name ||
+              lastContactLookup?.name ||
+              null;
+            const relationshipForCallUpdate =
+              relationshipFromContext ||
+              lastContactLookup?.contact?.relationship ||
+              extractedRelationship ||
+              undefined;
+            
+            // Create/update contact BEFORE making call (backup in case phone-only handler failed)
+            if (normalizedPhone && contactNameFromContext) {
+              try {
+                const createdContact = await upsertContact({
+                  recordId,
+                  name: contactNameFromContext,
+                  phone: normalizedPhone,
+                  relationship: relationshipFromContext || undefined,
+                  lastContacted: new Date().toISOString(),
+                });
+                console.log('[CHAT] ✅✅✅ CONTACT CREATED WHEN CALL MADE (backup):', { 
+                  name: contactNameFromContext, 
+                  phone: normalizedPhone,
+                  relationship: relationshipFromContext,
+                  contactId: createdContact.id
+                });
+              } catch (error) {
+                console.error('[CHAT] ❌ Failed to create contact when call made:', error);
+              }
+            }
+            
+            // Also try extraction from message (for cases where name is in the message itself)
             const messageForExtraction = `${message || ''} ${fc.arguments.caller_name ? `call ${fc.arguments.caller_name}` : ''}`.trim();
             if (messageForExtraction) {
               try {
@@ -1318,9 +1636,30 @@ export async function POST(request: NextRequest) {
               const phoneDisplay = normalizedPhone.replace(/^\+1/, '').replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3');
               callStatus = {
                 success: true,
+                callId: callResult.call_id || callResult.task_id,
+                phoneNumber: phoneDisplay,
                 message: `${kendallName || 'I'} successfully called ${phoneDisplay}.`
-              };
+              } as any;
               console.log('[CHAT SUCCESS] Outbound call initiated:', { normalizedPhone, callRequestId });
+
+              if (contactNameForCallUpdate) {
+                try {
+                  await upsertContact({
+                    recordId,
+                    name: contactNameForCallUpdate,
+                    phone: normalizedPhone,
+                    relationship: relationshipForCallUpdate || undefined,
+                    lastContacted: new Date().toISOString(),
+                  });
+                  console.log('[CHAT] ✅ Contact synced after call:', {
+                    name: contactNameForCallUpdate,
+                    phone: normalizedPhone,
+                  });
+                } catch (contactSyncError) {
+                  console.warn('[CHAT] Failed to sync contact after call:', contactSyncError);
+                }
+              }
+              lastContactLookup = null;
               
               // Store call request context for immediate calls (not scheduled)
               // This links the VAPI call completion webhook back to this chat thread
@@ -1397,17 +1736,22 @@ export async function POST(request: NextRequest) {
             success: fr.result?.success, 
             hasContact: !!fr.result?.contact,
             contactName: fr.result?.contact?.name,
-            hasEmail: !!fr.result?.contact?.email 
+            hasEmail: !!fr.result?.contact?.email,
+            hasPhone: !!fr.result?.contact?.phone
           });
           
           if (fr.result && fr.result.success) {
+            // Contact found - check if missing required info
             const contact = fr.result.contact;
             const userMessage = message.trim().toLowerCase();
             const isEmailRequest = userMessage.includes('email') || userMessage.includes('send');
+            const isCallRequest = userMessage.includes('call') || userMessage.includes('phone') || userMessage.includes('text');
             
-            console.log('[CHAT] Checking if should ask for email:', { 
+            console.log('[CHAT] Checking if should ask for missing info:', { 
               isEmailRequest, 
+              isCallRequest,
               hasEmail: !!contact?.email,
+              hasPhone: !!contact?.phone,
               contactName: contact?.name 
             });
             
@@ -1434,8 +1778,127 @@ export async function POST(request: NextRequest) {
                 console.log('[CHAT] ✅ Post-process: Overrode agent response to ask for email:', agentResponse);
               }
             }
+            
+            // If user requested call but contact doesn't have phone, override response
+            if (isCallRequest && contact && !contact.phone) {
+              const genericResponses = [
+                "I'll take care of that",
+                "Sounds good",
+                "I'll make the call",
+                "I'll call them",
+                "Do you need anything else"
+              ];
+              const isGenericResponse = !agentResponse || 
+                agentResponse.trim() === '' || 
+                genericResponses.some(phrase => agentResponse.toLowerCase().includes(phrase.toLowerCase()));
+              
+              if (isGenericResponse) {
+                agentResponse = `I found ${contact.name} in your contacts, but I don't have their phone number. What's ${contact.name}'s phone number?`;
+                console.log('[CHAT] ✅ Post-process: Overrode agent response to ask for phone:', agentResponse);
+              }
+            }
+          } else if (fr.result && !fr.result.success && fr.result.instruction) {
+            // Contact not found - override generic response to ask for info
+            const genericResponses = [
+              "I'll take care of that",
+              "Sounds good",
+              "I'll make the call",
+              "I'll call them",
+              "I'll send the email",
+              "Do you need anything else"
+            ];
+            const isGenericResponse = !agentResponse || 
+              agentResponse.trim() === '' || 
+              genericResponses.some(phrase => agentResponse.toLowerCase().includes(phrase.toLowerCase()));
+            
+            // CRITICAL: Always override if contact not found, even if response isn't generic
+            // This ensures we ALWAYS ask for phone/email when contact doesn't exist
+            if (fr.result.requestedAction && fr.result.contactName) {
+              const contactName = fr.result.contactName;
+              if (fr.result.requestedAction === 'call') {
+                agentResponse = `I don't have ${contactName} in your contacts. What's their phone number?`;
+                console.log('[CHAT] ✅ Post-process: Contact not found - asking for phone:', { contactName });
+              } else if (fr.result.requestedAction === 'email') {
+                agentResponse = `I don't have ${contactName} in your contacts. What's their email address?`;
+                console.log('[CHAT] ✅ Post-process: Contact not found - asking for email:', { contactName });
+              }
+            } else if (isGenericResponse && fr.result.requestedAction && fr.result.contactName) {
+              // Fallback: only override if generic response
+              const contactName = fr.result.contactName;
+              if (fr.result.requestedAction === 'call') {
+                agentResponse = `I don't have ${contactName} in your contacts. What's their phone number?`;
+              } else if (fr.result.requestedAction === 'email') {
+                agentResponse = `I don't have ${contactName} in your contacts. What's their email address?`;
+              }
+              console.log('[CHAT] ✅ Post-process: Overrode generic response to ask for contact info:', agentResponse);
+            }
           }
         }
+      }
+    }
+    
+    // Post-process: Check if user provided just a phone number (after being asked)
+    // If so, we should ask for message instead of making call immediately
+    const phoneOnlyRegex = /^[\d\s\(\)\.\-\+]{10,}$/;
+    const isPhoneOnlyMessage = phoneOnlyRegex.test(message.trim().replace(/\D/g, '')) && 
+                               message.trim().replace(/\D/g, '').length >= 10 &&
+                               message.trim().length < 20; // Likely just a phone number
+    
+    if (isPhoneOnlyMessage) {
+      // Check if we recently asked for phone number
+      try {
+        const recentMessages = await getChatMessages({
+          threadId,
+          limit: 5,
+        });
+        
+        const recentlyAskedForPhone = recentMessages.messages.some(msg => 
+          msg.role === 'assistant' && 
+          (msg.message.includes("phone number") || msg.message.includes("don't have"))
+        );
+        
+        if (recentlyAskedForPhone) {
+          // Extract contact name from recent assistant messages
+          // The AI should have said "I don't have [name] in your contacts"
+          // Extract whatever name the AI mentioned - could be "Mo", "mo money", "John Smith", etc.
+          let contactName = 'them';
+          for (const msg of recentMessages.messages.slice().reverse()) {
+            if (msg.role === 'assistant' && msg.message.includes("don't have")) {
+              // Match any text between "don't have" and "in your contacts" - that's the name
+              const nameMatch = msg.message.match(/I don't have (.+?) in your contacts/i) ||
+                               msg.message.match(/don't have (.+?) in your contacts/i);
+              if (nameMatch && nameMatch[1]) {
+                contactName = nameMatch[1].trim(); // Use name as-is, don't truncate
+                break;
+              }
+            }
+          }
+          
+          // Check if AI tried to make a call without message
+          const triedToCall = functionCalls && functionCalls.some(fc => 
+            (fc.name === 'make_outbound_call' || fc.name === 'schedule_outbound_call') &&
+            (!fc.arguments?.message || fc.arguments.message.trim() === '' || fc.arguments.message.length < 5)
+          );
+          
+          if (triedToCall) {
+            // Override response to ask for message
+            agentResponse = `Got it! What message should I deliver to ${contactName}?`;
+            console.log('[CHAT] ✅ Post-process: Phone number provided, asking for message:', { contactName });
+            
+            // Remove the call function call since we don't have message yet
+            if (functionCalls) {
+              functionCalls = functionCalls.filter(fc => 
+                fc.name !== 'make_outbound_call' && fc.name !== 'schedule_outbound_call'
+              );
+            }
+          } else if (!agentResponse || agentResponse.includes("I'll make the call") || agentResponse.includes("Sounds good")) {
+            // AI gave generic response, ask for message
+            agentResponse = `Got it! What message should I deliver to ${contactName}?`;
+            console.log('[CHAT] ✅ Post-process: Phone number provided, asking for message (generic response override):', { contactName });
+          }
+        }
+      } catch (error) {
+        console.warn('[CHAT] Error in phone-only post-processing:', error);
       }
     } else {
       // Agent didn't call get_contact_by_name - check if it should have
@@ -1447,15 +1910,93 @@ export async function POST(request: NextRequest) {
         console.log('[CHAT] ⚠️ Agent should have called get_contact_by_name but didn\'t. User message:', userMessage);
       }
     }
+    
+    // Post-process: Catch generic responses when AI should have asked for contact info
+    // This is a safety net - the AI should handle this via get_contact_by_name function
+    // We only override if AI gave generic response AND we can see from function results that contact wasn't found
+    // We do NOT extract names here - we trust the AI to do that via get_contact_by_name
+    const trimmedMessage = message.trim();
+    const isPhoneNumber = /^[\d\s\(\)\.\-\+]{10,}$/.test(trimmedMessage.replace(/\D/g, '')) && trimmedMessage.replace(/\D/g, '').length >= 10;
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedMessage);
+    
+    // Only post-process if message is NOT a phone number or email (likely a name or other text)
+    if (!isPhoneNumber && !isEmail && trimmedMessage.length < 50) {
+      try {
+        const recentMessages = await getChatMessages({
+          threadId,
+          limit: 5,
+        });
+        
+        // Check if we recently asked for a name
+        const recentlyAskedForName = recentMessages.messages.some(msg => 
+          msg.role === 'assistant' && 
+          (msg.message.includes("friend's name") || 
+           msg.message.includes("name") && (msg.message.includes("message") || msg.message.includes("call")) ||
+           msg.message.includes("Who do you") ||
+           msg.message.includes("Can you please provide"))
+        );
+        
+        // Check if this is a call or email request context
+        const isCallContext = recentMessages.messages.some(msg => 
+          msg.role === 'user' && 
+          (msg.message.toLowerCase().includes('call') || msg.message.toLowerCase().includes('phone'))
+        );
+        const isEmailContext = recentMessages.messages.some(msg => 
+          msg.role === 'user' && 
+          (msg.message.toLowerCase().includes('email') || msg.message.toLowerCase().includes('send'))
+        );
+        
+        // Check if assistant gave generic response
+        const genericResponses = [
+          "I'll take care of that",
+          "Sounds good",
+          "I'll make the call",
+          "I'll call them",
+          "I'll send the email",
+          "Do you need anything else"
+        ];
+        const isGenericResponse = !agentResponse || 
+          agentResponse.trim() === '' || 
+          genericResponses.some(phrase => agentResponse.toLowerCase().includes(phrase.toLowerCase()));
+        
+        // Only override if: we asked for name, it's a call/email context, AI gave generic response, AND get_contact_by_name wasn't called or returned not found
+        const contactLookupWasCalled = functionResults && functionResults.some(fr => fr.name === 'get_contact_by_name');
+        const contactNotFound = functionResults && functionResults.some(fr => 
+          fr.name === 'get_contact_by_name' && fr.result && !fr.result.success
+        );
+        
+        if (recentlyAskedForName && (isCallContext || isEmailContext) && isGenericResponse && 
+            (!contactLookupWasCalled || contactNotFound)) {
+          // AI should have called get_contact_by_name but didn't, or contact wasn't found
+          // We can't extract the name here (that's AI's job), so we give a generic prompt
+          if (isCallContext) {
+            agentResponse = `I don't have that contact in your contacts. What's their phone number?`;
+            console.log('[CHAT] ✅ Post-process: Generic response after name request - asking for phone (AI should have called get_contact_by_name)');
+          } else if (isEmailContext) {
+            agentResponse = `I don't have that contact in your contacts. What's their email address?`;
+            console.log('[CHAT] ✅ Post-process: Generic response after name request - asking for email (AI should have called get_contact_by_name)');
+          }
+        }
+      } catch (error) {
+        console.warn('[CHAT] Error in post-processing:', error);
+      }
+    }
 
-    return NextResponse.json({
+    // Ensure callStatus is always included if it exists (for banner visibility)
+    const response: any = {
       success: true,
       message: agentMessage,
       response: agentResponse,
       functionCalls: functionCalls || undefined,
       kendallName: kendallName,
-      callStatus: callStatus,
-    });
+    };
+    
+    // Always include callStatus if it exists (even if success: false)
+    if (callStatus) {
+      response.callStatus = callStatus;
+    }
+    
+    return NextResponse.json(response);
   } catch (error) {
     // ✅ Catch-all error handler with detailed logging
     console.error('[API ERROR] POST /api/chat/send failed with unexpected error:', error);

@@ -11,19 +11,21 @@ interface StatCardProps {
 export default function StatCard({ label, value, icon }: StatCardProps) {
   return (
     <div
-      className="p-6 rounded-xl"
+      className="p-5 rounded-lg w-full"
       style={{
-        backgroundColor: `${colors.accent}15`,
-        border: `1px solid ${colors.accent}40`,
+        backgroundColor: `${colors.accent}10`,
+        border: `1px solid ${colors.accent}25`,
       }}
     >
-      {icon && (
-        <div className="mb-3" style={{ color: colors.accent }}>
-          {icon}
-        </div>
-      )}
+      <div className="flex items-center justify-center mb-2">
+        {icon && (
+          <div style={{ color: colors.accent, opacity: 0.8 }}>
+            {icon}
+          </div>
+        )}
+      </div>
       <div
-        className="text-3xl font-bold mb-1"
+        className="text-2xl font-semibold mb-1 text-center"
         style={{
           color: colors.text,
           fontFamily: 'var(--font-inter), sans-serif',
@@ -32,11 +34,13 @@ export default function StatCard({ label, value, icon }: StatCardProps) {
         {value}
       </div>
       <div
-        className="text-sm"
+        className="text-xs text-center"
         style={{
           color: colors.text,
-          opacity: 0.7,
+          opacity: 0.6,
           fontFamily: 'var(--font-inter), sans-serif',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
         }}
       >
         {label}

@@ -26,6 +26,7 @@ function DashboardPageContent() {
       if (urlRecordId && typeof window !== 'undefined') {
         localStorage.setItem('myKendallRecordId', urlRecordId);
       }
+      setLoading(false);
     } else {
       setLoading(false);
     }
@@ -52,12 +53,11 @@ function DashboardPageContent() {
       className="min-h-screen flex flex-col"
       style={{
         backgroundColor: colors.primary,
-        paddingTop: '80px', // Space for fixed navbar
       }}
     >
       <ChatNavbar recordId={recordId} />
       
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" style={{ paddingTop: '100px' }}>
         <StatsDashboard recordId={recordId} />
       </div>
     </main>

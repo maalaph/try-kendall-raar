@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     await updateUserRecord(recordId, {
       'Google OAuth Access Token': '',
       'Google OAuth Refresh Token': '',
-      'Google OAuth Token Expiry': '',
+      'Google OAuth Token Expiry': null,
       'Google Calendar Connected': false,
       'Google Gmail Connected': false,
       'Google Email': '',
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 
 

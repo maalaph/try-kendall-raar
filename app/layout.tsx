@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, League_Spartan, Crimson_Pro } from "next/font/google";
 import "./globals.css";
 import { config } from "@/lib/config";
-import Navbar from "@/components/Navbar";
+import ConditionalNavbar from "@/components/ConditionalNavbar";
 import AnimatedBackground from "@/components/AnimatedBackground";
 
 const inter = Inter({
@@ -56,9 +56,7 @@ export default function RootLayout({
         style={{ backgroundColor: config.brand.visual.palette.primary, color: config.brand.visual.palette.text }}
       >
         <AnimatedBackground />
-        <div id="main-navbar">
-          <Navbar />
-        </div>
+        <ConditionalNavbar />
         {children}
       </body>
     </html>

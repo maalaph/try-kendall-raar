@@ -14,6 +14,36 @@ import { getUserContext, getUserContacts, getUserMemory, getUserDocuments } from
 
 const VAPI_API_URL = 'https://api.vapi.ai';
 
+/**
+ * Normalize phone number for comparison (remove all non-digits, handle +1 prefix)
+ */
+function normalizePhoneForComparison(phone: string): string {
+  if (!phone) return '';
+  const cleaned = phone.replace(/\D/g, '');
+  // Remove leading 1 if present (US country code)
+  if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    return cleaned.slice(1);
+  }
+  return cleaned;
+}
+
+/**
+ * Determine callType by comparing callerPhone to owner's phone number
+ */
+function determineCallType(callerPhone: string, ownerPhone: string | null | undefined): 'inbound' | 'outbound' {
+  if (!ownerPhone || !callerPhone) {
+    // Default to outbound if we can't determine
+    return 'outbound';
+  }
+  
+  const normalizedCaller = normalizePhoneForComparison(callerPhone);
+  const normalizedOwner = normalizePhoneForComparison(ownerPhone);
+  
+  // If caller phone matches owner phone → inbound (owner calling assistant)
+  // Otherwise → outbound (assistant calling recipient)
+  return normalizedCaller === normalizedOwner ? 'inbound' : 'outbound';
+}
+
 // Function definitions for OpenAI function calling
 const SMS_FUNCTIONS = [
   {
@@ -431,11 +461,13 @@ async function handleSMSEvent(payload: any, request: NextRequest) {
             const ownerPhone = await getOwnerPhoneByAgentId(agentInfo.agentId);
             if (ownerPhone) {
               // Create note in Airtable
+              const callerPhone = caller_phone || fromNumber;
               await createCallNote({
                 agentId: agentInfo.agentId,
-                callerPhone: caller_phone || fromNumber,
+                callerPhone: callerPhone,
                 note: note_content || '',
                 smsSent: false, // Will send SMS below
+                callType: determineCallType(callerPhone, ownerPhone),
               });
               
               // Send SMS to owner
@@ -2850,6 +2882,7 @@ export async function POST(request: NextRequest) {
                   smsSent: false, // Outbound calls don't send SMS
                   callDuration: callDuration,
                   read: false,
+                  callType: determineCallType(phoneNumber || 'unknown', ownerPhone),
                 });
                 console.log('[VAPI WEBHOOK] Saved outbound call transcript to Call Notes table:', {
                   callId,
@@ -2965,6 +2998,7 @@ export async function POST(request: NextRequest) {
               smsSent: false, // Outbound calls don't send SMS
               callDuration: callDuration,
               read: false,
+              callType: determineCallType(phoneNumber || 'unknown', ownerPhone),
             });
             console.log('[VAPI WEBHOOK] Saved outbound call transcript to Call Notes table:', {
               callId,
@@ -3086,6 +3120,7 @@ export async function POST(request: NextRequest) {
               note: noteContent,
               ownerPhone: undefined,
               smsSent: false,
+              callType: determineCallType(callerPhone, ownerPhone),
             });
             console.log('[VAPI WEBHOOK] Saved note to Airtable (no SMS sent - owner phone not found)');
           } catch (error) {
@@ -3207,6 +3242,7 @@ ${assistantSummary}`;
           smsSent,
           callDuration,
           read: false, // New messages are unread by default
+          callType: determineCallType(callerPhone, ownerPhone),
         });
         console.log('[VAPI WEBHOOK] Saved note to Airtable, smsSent:', smsSent, 'callDuration:', callDuration);
       } catch (error) {

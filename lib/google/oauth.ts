@@ -12,6 +12,7 @@ export const GOOGLE_SCOPES = [
   // Gmail scopes (light, non-restricted)
   'https://www.googleapis.com/auth/gmail.labels',
   'https://www.googleapis.com/auth/gmail.metadata',
+  'https://www.googleapis.com/auth/gmail.send',
 ];
 
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
@@ -85,6 +86,7 @@ export async function refreshAccessToken(refreshToken: string) {
 
   return await response.json();
 }
+
 
 
 
