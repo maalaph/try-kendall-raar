@@ -3035,20 +3035,25 @@ export async function POST(request: NextRequest) {
               const callDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
               const callNotes = `Called on ${callDate}: ${assistantSummary}`;
               
-              // Update/create contact
-              await upsertContact({
+              // Update/create contact with lastContacted timestamp
+              // Note: Don't pass contactCount - let upsertContact handle incrementing it
+              const lastContactedTimestamp = new Date().toISOString();
+              const updatedContact = await upsertContact({
                 recordId: ownerRecordId,
                 name: recipientName || 'Unknown',
                 phone: normalizedPhone,
                 notes: callNotes,
-                lastContacted: new Date().toISOString(),
-                contactCount: 1, // Will be incremented in upsertContact if contact exists
+                lastContacted: lastContactedTimestamp,
+                // Don't pass contactCount - upsertContact will increment it automatically
               });
               
-              console.log('[VAPI WEBHOOK] Updated contact after outbound call:', {
+              console.log('[VAPI WEBHOOK] ✅ Updated contact after outbound call:', {
                 name: recipientName || 'Unknown',
                 phone: normalizedPhone,
                 recordId: ownerRecordId,
+                lastContacted: lastContactedTimestamp,
+                contactCount: updatedContact?.contactCount || 'unknown',
+                contactId: updatedContact?.id || 'unknown',
               });
             }
           } catch (contactError) {

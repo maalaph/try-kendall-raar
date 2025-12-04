@@ -13,6 +13,7 @@ import {
   sendGmailMessage,
   GoogleIntegrationError,
 } from '@/lib/integrations/google';
+import { createEvent } from '@/lib/google/calendar';
 import {
   fetchSpotifyInsights,
   SpotifyIntegrationError,
@@ -92,6 +93,40 @@ const CHAT_FUNCTIONS = [
         },
       },
       required: ['recordId'],
+    },
+  },
+  {
+    name: 'create_calendar_event',
+    description: 'Create a new calendar event in the user\'s Google Calendar. Use this when the user asks to add an event, schedule something, or create a calendar entry.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: {
+          type: 'string',
+          description: 'The user\'s recordId (required to identify which user\'s calendar to use). Always use the recordId from the chat context.',
+        },
+        summary: {
+          type: 'string',
+          description: 'The event title/summary (REQUIRED)',
+        },
+        description: {
+          type: 'string',
+          description: 'Optional: Event description or notes',
+        },
+        startDateTime: {
+          type: 'string',
+          description: 'Start date and time in ISO 8601 format (e.g., "2024-10-12T12:00:00-04:00"). For all-day events, use just the date (YYYY-MM-DD).',
+        },
+        endDateTime: {
+          type: 'string',
+          description: 'End date and time in ISO 8601 format. For all-day events, use just the date (YYYY-MM-DD). If not provided, defaults to 1 hour after start.',
+        },
+        allDay: {
+          type: 'boolean',
+          description: 'Whether this is an all-day event. If true, startDateTime and endDateTime should be dates only (YYYY-MM-DD).',
+        },
+      },
+      required: ['recordId', 'summary', 'startDateTime'],
     },
   },
   {
@@ -854,6 +889,149 @@ export async function POST(request: NextRequest) {
           }
           continue;
         }
+
+        // Handle calendar event creation
+        if (fc.name === 'create_calendar_event') {
+          try {
+            console.log('[CHAT] Creating calendar event with arguments:', fc.arguments);
+            const { recordId: eventRecordId, summary, description, startDateTime, endDateTime, allDay } = fc.arguments || {};
+            const eventCreateRecordId = eventRecordId || recordId;
+
+            if (!summary || !startDateTime) {
+              console.warn('[CHAT] Missing required fields for calendar event:', { summary, startDateTime });
+              functionResults.push({
+                name: 'create_calendar_event',
+                result: { success: false, error: 'Summary and startDateTime are required' },
+              });
+              agentResponse = "I need an event title and start time to create the calendar event. Can you provide those?";
+              continue;
+            }
+
+            // Parse dates
+            const startDate = new Date(startDateTime);
+            let endDate: Date;
+            
+            if (endDateTime) {
+              endDate = new Date(endDateTime);
+            } else if (allDay) {
+              // For all-day events, end date should be the day after start date
+              endDate = new Date(startDate);
+              endDate.setDate(endDate.getDate() + 1);
+            } else {
+              // Default to 1 hour later for timed events
+              endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+            }
+
+            if (Number.isNaN(startDate.getTime())) {
+              console.error('[CHAT] Invalid startDateTime format:', startDateTime);
+              functionResults.push({
+                name: 'create_calendar_event',
+                result: { success: false, error: 'Invalid startDateTime format' },
+              });
+              agentResponse = "The start date/time format is invalid. Please provide a valid date and time.";
+              continue;
+            }
+
+            if (Number.isNaN(endDate.getTime())) {
+              console.error('[CHAT] Invalid endDateTime format:', endDateTime);
+              endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // Fallback to 1 hour later
+            }
+
+            // Build event data
+            let eventData: any = {
+              summary,
+            };
+
+            if (description) {
+              eventData.description = description;
+            }
+
+            // Handle all-day events vs timed events
+            if (allDay) {
+              // All-day events use date only (YYYY-MM-DD)
+              const startDateStr = startDate.toISOString().split('T')[0];
+              // For all-day events, end date should be exclusive (next day)
+              const endDateStr = endDate.toISOString().split('T')[0];
+              eventData.start = { date: startDateStr };
+              eventData.end = { date: endDateStr };
+              console.log('[CHAT] Creating all-day event:', { startDateStr, endDateStr });
+            } else {
+              // Timed events use dateTime with timezone
+              const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+              eventData.start = { 
+                dateTime: startDate.toISOString(),
+                timeZone: timeZone
+              };
+              eventData.end = { 
+                dateTime: endDate.toISOString(),
+                timeZone: timeZone
+              };
+              console.log('[CHAT] Creating timed event:', { 
+                start: eventData.start.dateTime, 
+                end: eventData.end.dateTime,
+                timeZone 
+              });
+            }
+
+            console.log('[CHAT] Calling createEvent with:', {
+              recordId: eventCreateRecordId,
+              eventData,
+            });
+
+            const createdEvent = await createEvent(eventCreateRecordId, eventData);
+
+            functionResults.push({
+              name: 'create_calendar_event',
+              result: { 
+                success: true, 
+                eventId: createdEvent.id,
+                summary: createdEvent.summary,
+                start: allDay ? eventData.start.date : eventData.start.dateTime,
+                end: allDay ? eventData.end.date : eventData.end.dateTime,
+              },
+            });
+
+            const eventTime = allDay 
+              ? startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+              : startDate.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+            
+            agentResponse = `I've added "${summary}" to your calendar for ${eventTime}.`;
+            
+            console.log('[CHAT] ✅ Calendar event created successfully:', {
+              eventId: createdEvent.id,
+              summary,
+              start: eventData.start,
+              end: eventData.end,
+              allDay,
+              recordId: eventCreateRecordId,
+            });
+          } catch (error) {
+            console.error('[CHAT] ❌ Error creating calendar event:', {
+              error: error instanceof Error ? error.message : String(error),
+              errorType: error instanceof GoogleIntegrationError ? error.reason : 'UNKNOWN',
+              arguments: fc.arguments,
+              recordId: eventRecordId || recordId,
+              stack: error instanceof Error ? error.stack : undefined,
+            });
+
+            if (error instanceof GoogleIntegrationError) {
+              agentResponse =
+                error.reason === 'NOT_CONNECTED'
+                  ? "I couldn't create the event because Google isn't connected yet. You can connect it in the Integrations page."
+                  : error.reason === 'TOKEN_REFRESH_FAILED'
+                  ? "Your Google connection looks expired. Try reconnecting it in the Integrations page."
+                  : error.message || "I'm having trouble creating the calendar event right now. Please try again in a moment.";
+            } else {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              agentResponse = `I couldn't create the calendar event: ${errorMessage}. Please check your Google connection in the Integrations page or try again.`;
+            }
+            functionResults.push({
+              name: 'create_calendar_event',
+              result: { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
+            });
+          }
+          continue;
+        }
         
         if (fc.name === 'get_spotify_insights') {
           try {
@@ -991,13 +1169,18 @@ export async function POST(request: NextRequest) {
                       const contactName = nameMatch[1];
                       console.log('[CHAT] Found contact name from context:', contactName);
                       
-                      // Update contact with email
+                      // Update contact with email and lastContacted
                       await upsertContact({
                         recordId: gmailSendRecordId,
                         name: contactName,
                         email: to,
+                        lastContacted: new Date().toISOString(),
                       });
-                      console.log('[CHAT] Updated contact with email:', { name: contactName, email: to });
+                      console.log('[CHAT] ✅ Updated contact with email and lastContacted:', { 
+                        name: contactName, 
+                        email: to,
+                        lastContacted: new Date().toISOString()
+                      });
                       break;
                     }
                   }
@@ -1041,8 +1224,10 @@ export async function POST(request: NextRequest) {
                   ? `${safeBody.slice(0, 140)}...`
                   : safeBody || '(no body provided)';
 
-              if (contactNameForEmail) {
-                try {
+              // Always update contact after successful email send, even if we only have email
+              try {
+                if (contactNameForEmail) {
+                  // We have a contact name, update with full info
                   await upsertContact({
                     recordId,
                     name: contactNameForEmail,
@@ -1053,16 +1238,51 @@ export async function POST(request: NextRequest) {
                   console.log('[CHAT] ✅ Contact synced after email send:', {
                     name: contactNameForEmail,
                     email: to,
+                    lastContacted: new Date().toISOString(),
                   });
-                } catch (contactSyncError) {
-                  console.warn('[CHAT] Failed to sync contact after email send:', contactSyncError);
+                } else {
+                  // No contact name found, but we have email - try to find or create contact by email
+                  // Extract name from email if possible (e.g., "alialfaras7@gmail.com" -> "Ali")
+                  const emailNameMatch = to.match(/^([^@]+)@/);
+                  if (emailNameMatch) {
+                    const potentialName = emailNameMatch[1].split(/[._0-9]/)[0];
+                    if (potentialName && potentialName.length > 1) {
+                      const capitalizedName = potentialName.charAt(0).toUpperCase() + potentialName.slice(1).toLowerCase();
+                      await upsertContact({
+                        recordId,
+                        name: capitalizedName,
+                        email: to,
+                        lastContacted: new Date().toISOString(),
+                      });
+                      console.log('[CHAT] ✅ Created/updated contact from email after send:', {
+                        name: capitalizedName,
+                        email: to,
+                        lastContacted: new Date().toISOString(),
+                      });
+                    }
+                  }
                 }
+              } catch (contactSyncError) {
+                console.error('[CHAT] ❌ Failed to sync contact after email send:', {
+                  error: contactSyncError instanceof Error ? contactSyncError.message : String(contactSyncError),
+                  name: contactNameForEmail || 'unknown',
+                  email: to,
+                });
               }
 
               lastContactLookup = null;
 
               agentResponse = `Sent your email to ${to} with subject "${safeSubject}". Message preview: "${previewBody}".`;
             } catch (error) {
+              console.error('[CHAT] ❌ Gmail send error details:', {
+                error: error instanceof Error ? error.message : String(error),
+                errorType: error instanceof GoogleIntegrationError ? error.reason : 'UNKNOWN',
+                recordId: gmailSendRecordId,
+                to,
+                subject: subject?.substring(0, 50),
+                stack: error instanceof Error ? error.stack : undefined,
+              });
+
               if (error instanceof GoogleIntegrationError) {
                 agentResponse =
                   error.reason === 'NOT_CONNECTED'
@@ -1073,11 +1293,13 @@ export async function POST(request: NextRequest) {
                     ? "Google is connected but missing permission to send emails. Please reconnect Google and allow Gmail access."
                     : error.message || "I'm having trouble sending the email right now. Please try again in a moment.";
               } else {
-                console.error('[CHAT] Error sending Gmail:', error);
-                agentResponse =
-                  error instanceof Error
-                    ? `I couldn't send the email: ${error.message}`
-                    : "I encountered an error while trying to send the email. Please try again.";
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.error('[CHAT] ❌ Unexpected Gmail error:', {
+                  errorMessage,
+                  error,
+                  recordId: gmailSendRecordId,
+                });
+                agentResponse = `I couldn't send the email: ${errorMessage}. Please check your Google connection in the Integrations page or try again.`;
               }
               continue;
             }
@@ -1642,22 +1864,72 @@ export async function POST(request: NextRequest) {
               } as any;
               console.log('[CHAT SUCCESS] Outbound call initiated:', { normalizedPhone, callRequestId });
 
-              if (contactNameForCallUpdate) {
-                try {
+              // Always update contact after successful call, even if we only have phone number
+              const lastContactedTimestamp = new Date().toISOString();
+              try {
+                if (contactNameForCallUpdate) {
+                  // We have a contact name, update with full info
                   await upsertContact({
                     recordId,
                     name: contactNameForCallUpdate,
                     phone: normalizedPhone,
                     relationship: relationshipForCallUpdate || undefined,
-                    lastContacted: new Date().toISOString(),
+                    lastContacted: lastContactedTimestamp,
                   });
                   console.log('[CHAT] ✅ Contact synced after call:', {
                     name: contactNameForCallUpdate,
                     phone: normalizedPhone,
+                    lastContacted: lastContactedTimestamp,
                   });
-                } catch (contactSyncError) {
-                  console.warn('[CHAT] Failed to sync contact after call:', contactSyncError);
+                } else {
+                  // No contact name, but we have phone - try to find existing contact by phone
+                  // If found, update it; if not, create with phone number as name placeholder
+                  try {
+                    const existingContacts = await getContactByName(recordId, normalizedPhone);
+                    if (existingContacts && existingContacts.length > 0) {
+                      // Found existing contact, update it
+                      await upsertContact({
+                        recordId,
+                        name: existingContacts[0].name,
+                        phone: normalizedPhone,
+                        lastContacted: lastContactedTimestamp,
+                      });
+                      console.log('[CHAT] ✅ Updated existing contact after call (by phone):', {
+                        name: existingContacts[0].name,
+                        phone: normalizedPhone,
+                        lastContacted: lastContactedTimestamp,
+                      });
+                    } else {
+                      // No existing contact found, create one with phone as identifier
+                      await upsertContact({
+                        recordId,
+                        name: phoneDisplay, // Use formatted phone as name placeholder
+                        phone: normalizedPhone,
+                        lastContacted: lastContactedTimestamp,
+                      });
+                      console.log('[CHAT] ✅ Created contact after call (phone only):', {
+                        name: phoneDisplay,
+                        phone: normalizedPhone,
+                        lastContacted: lastContactedTimestamp,
+                      });
+                    }
+                  } catch (phoneLookupError) {
+                    console.warn('[CHAT] Could not lookup contact by phone, creating new contact:', phoneLookupError);
+                    // Create contact with phone number as name
+                    await upsertContact({
+                      recordId,
+                      name: phoneDisplay,
+                      phone: normalizedPhone,
+                      lastContacted: lastContactedTimestamp,
+                    });
+                  }
                 }
+              } catch (contactSyncError) {
+                console.error('[CHAT] ❌ Failed to sync contact after call:', {
+                  error: contactSyncError instanceof Error ? contactSyncError.message : String(contactSyncError),
+                  name: contactNameForCallUpdate || 'unknown',
+                  phone: normalizedPhone,
+                });
               }
               lastContactLookup = null;
               

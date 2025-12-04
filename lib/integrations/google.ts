@@ -178,6 +178,13 @@ export async function sendGmailMessage(
   { to, subject, body }: GmailSendOptions,
 ): Promise<{ messageId: string }> {
   try {
+    console.log('[GMAIL] Attempting to send email:', {
+      recordId,
+      to,
+      subject: subject?.substring(0, 50),
+      bodyLength: body?.length || 0,
+    });
+
     const gmail = await getGmailClient(recordId);
     const message = [
       `To: ${to}`,
@@ -198,9 +205,45 @@ export async function sendGmailMessage(
       requestBody: { raw: encodedMessage },
     });
 
-    return { messageId: response.data.id || '' };
+    const messageId = response.data.id || '';
+    console.log('[GMAIL] ✅ Email sent successfully:', {
+      recordId,
+      to,
+      messageId,
+      subject: subject?.substring(0, 50),
+    });
+
+    return { messageId };
   } catch (error: any) {
-    if (error?.response?.status === 403) {
+    const errorDetails = {
+      recordId,
+      to,
+      error: error?.message || String(error),
+      status: error?.response?.status,
+      statusText: error?.response?.statusText,
+      errorData: error?.response?.data,
+      errorCode: error?.code,
+      stack: error?.stack,
+    };
+    
+    console.error('[GMAIL] ❌ Error sending email:', errorDetails);
+
+    // Check for specific error types
+    if (error?.message?.includes('not connected') || error?.message?.includes('Google account not connected')) {
+      throw new GoogleIntegrationError(
+        'NOT_CONNECTED',
+        'Google account not connected. Please connect your Google account in the Integrations page.',
+      );
+    }
+
+    if (error?.message?.includes('Failed to refresh access token') || error?.message?.includes('refresh token')) {
+      throw new GoogleIntegrationError(
+        'TOKEN_REFRESH_FAILED',
+        'Failed to refresh Google access token. Please reconnect your Google account.',
+      );
+    }
+
+    if (error?.response?.status === 403 || error?.code === 403) {
       const apiMessage =
         error?.response?.data?.error?.message ||
         error?.message ||
@@ -210,6 +253,13 @@ export async function sendGmailMessage(
         apiMessage,
       );
     }
+
+    // Re-throw GoogleIntegrationError as-is
+    if (error instanceof GoogleIntegrationError) {
+      throw error;
+    }
+
+    // For any other error, wrap it
     handleGoogleError(error);
   }
 }

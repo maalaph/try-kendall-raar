@@ -106,19 +106,44 @@ export async function createEvent(
   eventData: {
     summary: string;
     description?: string;
-    start: { dateTime: string; timeZone?: string };
-    end: { dateTime: string; timeZone?: string };
+    start: { dateTime?: string; date?: string; timeZone?: string };
+    end: { dateTime?: string; date?: string; timeZone?: string };
     attendees?: Array<{ email: string }>;
   }
 ) {
-  const calendar = await getCalendarClient(userId);
-  
-  const response = await calendar.events.insert({
-    calendarId: 'primary',
-    requestBody: eventData,
-  });
+  try {
+    console.log('[CALENDAR] Attempting to create event:', {
+      userId,
+      summary: eventData.summary?.substring(0, 50),
+      start: eventData.start.dateTime || eventData.start.date,
+      end: eventData.end?.dateTime || eventData.end?.date,
+      isAllDay: !!eventData.start.date,
+    });
 
-  return response.data;
+    const calendar = await getCalendarClient(userId);
+    
+    const response = await calendar.events.insert({
+      calendarId: 'primary',
+      requestBody: eventData,
+    });
+
+    console.log('[CALENDAR] ✅ Event created successfully:', {
+      userId,
+      eventId: response.data.id,
+      summary: eventData.summary?.substring(0, 50),
+    });
+
+    return response.data;
+  } catch (error: any) {
+    console.error('[CALENDAR] ❌ Error creating event:', {
+      userId,
+      summary: eventData.summary?.substring(0, 50),
+      error: error?.message || String(error),
+      status: error?.response?.status,
+      errorDetails: error?.response?.data,
+    });
+    throw error;
+  }
 }
 
 /**

@@ -48,17 +48,20 @@ export async function upsertContact(contact: Contact): Promise<Contact> {
       normalizedPhone = formatPhoneNumberToE164(contact.phone) || contact.phone;
     }
 
+    // Always set lastContacted - use provided value or current timestamp
+    const lastContactedTimestamp = contact.lastContacted || new Date().toISOString();
+
     const fields: Record<string, any> = {
       recordId: [contact.recordId],
       Name: contact.name, // Airtable field is "Name" (capital N), not "name"
       updatedAt: new Date().toISOString(),
+      lastContacted: lastContactedTimestamp, // Always set lastContacted
     };
 
     if (normalizedPhone) fields.phone = normalizedPhone;
     if (contact.email) fields.email = contact.email;
     if (contact.relationship) fields.relationship = contact.relationship;
     if (contact.notes) fields.notes = contact.notes;
-    if (contact.lastContacted) fields.lastContacted = contact.lastContacted;
     if (contact.contactCount !== undefined) fields.contactCount = contact.contactCount;
     if (contact.tags && contact.tags.length > 0) fields.tags = contact.tags.join(',');
 
@@ -144,12 +147,18 @@ export async function upsertContact(contact: Contact): Promise<Contact> {
           mergedFields.notes = allNotes.join(`\n\n--- ${date} ---\n`);
         }
         
-        // Use the highest contact count + 1
+        // Use the highest contact count + 1 (always increment when updating)
         const maxCount = Math.max(
           ...allMatchingContacts.map(c => c.contactCount || 0),
           contact.contactCount || 0
         );
+        // Always increment contactCount when updating (don't use provided value, always increment)
         mergedFields.contactCount = maxCount + 1;
+        console.log('[CONTACTS] Incrementing contactCount for multiple contacts:', {
+          maxCount,
+          newCount: mergedFields.contactCount,
+          contactName: mergedContact.name,
+        });
         
         if (contact.lastContacted) {
           mergedFields.lastContacted = contact.lastContacted;
@@ -227,16 +236,17 @@ export async function upsertContact(contact: Contact): Promise<Contact> {
           mergedFields.email = existing.email;
         }
 
-        // Increment contact count
+        // Always increment contact count (don't use provided value, always increment)
         const currentCount = existing.contactCount || 0;
         mergedFields.contactCount = currentCount + 1;
+        console.log('[CONTACTS] Incrementing contactCount:', {
+          existingCount: currentCount,
+          newCount: mergedFields.contactCount,
+          contactName: mergedFields.Name,
+        });
 
-        // Update lastContacted
-        if (contact.lastContacted) {
-          mergedFields.lastContacted = contact.lastContacted;
-        } else {
-          mergedFields.lastContacted = new Date().toISOString();
-        }
+        // Always update lastContacted - use provided value or current timestamp
+        mergedFields.lastContacted = contact.lastContacted || new Date().toISOString();
 
         // Update existing contact
         const url = `${CONTACTS_API_URL}/${existing.id}`;
@@ -248,22 +258,34 @@ export async function upsertContact(contact: Contact): Promise<Contact> {
 
         if (response.ok) {
           const result = await response.json();
-          console.log('[CONTACTS] Updated existing contact:', {
+          console.log('[CONTACTS] ✅ Updated existing contact:', {
             id: existing.id,
             name: mergedFields.Name,
             phone: normalizedPhone,
+            email: mergedFields.email,
+            lastContacted: mergedFields.lastContacted,
             contactCount: mergedFields.contactCount,
+            recordId: contact.recordId,
           });
           return parseContactFromRecord(result);
         } else {
           const errorData = await response.json().catch(() => ({}));
-          console.error('[CONTACTS] Failed to update existing contact:', errorData);
+          console.error('[CONTACTS] ❌ Failed to update existing contact:', {
+            id: existing.id,
+            name: mergedFields.Name,
+            phone: normalizedPhone,
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
+          });
+          throw new Error(`Failed to update contact: ${response.status} ${response.statusText}`);
         }
     }
 
     // Create new contact
     fields.createdAt = new Date().toISOString();
     fields.contactCount = contact.contactCount || 1;
+    // lastContacted is already set in fields above, but ensure it's there
     if (!fields.lastContacted) {
       fields.lastContacted = new Date().toISOString();
     }
@@ -276,14 +298,26 @@ export async function upsertContact(contact: Contact): Promise<Contact> {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `Failed to create contact: ${response.status}`);
+      console.error('[CONTACTS] ❌ Failed to create new contact:', {
+        name: fields.Name,
+        phone: normalizedPhone,
+        email: fields.email,
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+      });
+      throw new Error(errorData.error?.message || `Failed to create contact: ${response.status} ${response.statusText}`);
     }
 
     const result = await response.json();
-    console.log('[CONTACTS] Created new contact:', {
+    console.log('[CONTACTS] ✅ Created new contact:', {
       id: result.id,
       name: fields.Name,
       phone: normalizedPhone,
+      email: fields.email,
+      lastContacted: fields.lastContacted,
+      contactCount: fields.contactCount,
+      recordId: contact.recordId,
     });
     return parseContactFromRecord(result);
   } catch (error) {

@@ -905,7 +905,15 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                                     ? `0 0 6px ${colors.accent}30`
                                     : 'none',
                                   transition: 'all 0.2s ease',
+                                  cursor: 'text',
+                                  userSelect: 'text',
                                 }}
+                                onDoubleClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleEditTitle(e, thread.threadId, thread.title);
+                                }}
+                                title="Double-click to rename"
                               >
                                 {thread.title}
                               </span>
