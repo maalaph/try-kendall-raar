@@ -267,22 +267,24 @@ async function generateChatResponse(
       chatSystemPrompt += `
 
 === FIRST MESSAGE ONLY - CASUAL GREETING (MANDATORY) ===
-🚨🚨🚨 YOU MUST ALWAYS USE CASUAL GREETING FORMAT - THIS IS ABSOLUTELY REQUIRED 🚨🚨🚨
+🚨🚨🚨 YOU MUST ALWAYS USE CASUAL GREETING FORMAT WITH THEIR NAME - THIS IS ABSOLUTELY REQUIRED 🚨🚨🚨
 - This is the FIRST message in the conversation - you MUST greet ${nicknameOrFullName} by name using CASUAL format
 - Use their nickname if available (${nicknameStr ? `"${nicknameStr}"` : 'not available'}), otherwise use their full name ("${fullNameStr}")
 - You MUST use one of these casual greeting formats - NO EXCEPTIONS:
   * "Hi ${nicknameOrFullName}! What's up?"
   * "Hey ${nicknameOrFullName}! What's up?"
   * "What's up ${nicknameOrFullName}?"
+  * "Hey ${nicknameOrFullName}!"
   
 🚫 ABSOLUTELY FORBIDDEN - NEVER USE THESE:
+- "Hey there" ❌ (MUST include their name)
 - "Hello! How can I help you today?" ❌
 - "Hello! How can I assist you?" ❌
 - "How can I help you?" ❌
-- Any formal or corporate greeting ❌
-- Generic greetings without their name ❌
+- Any greeting without their name/nickname ❌
+- Generic greetings like "hey there", "hi there", "hello there" ❌
 
-✅ REQUIRED: Use casual, friendly greeting with their name - think texting a friend, not a business call
+✅ REQUIRED: ALWAYS include their name or nickname in the greeting - think texting a friend, not a business call
 - After this first greeting, don't repeatedly use their name - be conversational (e.g., "Got it!" not "Got it, ${nicknameOrFullName}!")`;
     }
     
@@ -895,7 +897,10 @@ export async function POST(request: NextRequest) {
           try {
             console.log('[CHAT] Creating calendar event with arguments:', fc.arguments);
             const { recordId: eventRecordId, summary, description, startDateTime, endDateTime, allDay } = fc.arguments || {};
-            const eventCreateRecordId = eventRecordId || recordId;
+            // Validate that eventRecordId is not the literal string 'recordId' - if AI passes invalid value, use actual recordId
+            const eventCreateRecordId = (eventRecordId && eventRecordId !== 'recordId' && typeof eventRecordId === 'string' && eventRecordId.startsWith('rec')) 
+              ? eventRecordId 
+              : recordId;
 
             if (!summary || !startDateTime) {
               console.warn('[CHAT] Missing required fields for calendar event:', { summary, startDateTime });
@@ -1010,7 +1015,7 @@ export async function POST(request: NextRequest) {
               error: error instanceof Error ? error.message : String(error),
               errorType: error instanceof GoogleIntegrationError ? error.reason : 'UNKNOWN',
               arguments: fc.arguments,
-              recordId: eventRecordId || recordId,
+              recordId: eventCreateRecordId,
               stack: error instanceof Error ? error.stack : undefined,
             });
 
@@ -1198,7 +1203,7 @@ export async function POST(request: NextRequest) {
             ).trim();
             const relationshipForEmail =
               lastContactLookup?.contact?.relationship ||
-              extractedRelationship ||
+              (typeof extractedRelationship !== 'undefined' ? extractedRelationship : undefined) ||
               undefined;
 
             try {
@@ -1789,7 +1794,7 @@ export async function POST(request: NextRequest) {
             const relationshipForCallUpdate =
               relationshipFromContext ||
               lastContactLookup?.contact?.relationship ||
-              extractedRelationship ||
+              (typeof extractedRelationship !== 'undefined' ? extractedRelationship : undefined) ||
               undefined;
             
             // Create/update contact BEFORE making call (backup in case phone-only handler failed)

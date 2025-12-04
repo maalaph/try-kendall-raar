@@ -62,7 +62,8 @@ export async function upsertContact(contact: Contact): Promise<Contact> {
     if (contact.email) fields.email = contact.email;
     if (contact.relationship) fields.relationship = contact.relationship;
     if (contact.notes) fields.notes = contact.notes;
-    if (contact.contactCount !== undefined) fields.contactCount = contact.contactCount;
+    // Don't set contactCount here - it will be handled in the update/create logic below
+    // Only set it if explicitly provided AND we're creating a new contact
     if (contact.tags && contact.tags.length > 0) fields.tags = contact.tags.join(',');
 
     // Try to find existing contact by normalized phone number OR email
@@ -284,7 +285,10 @@ export async function upsertContact(contact: Contact): Promise<Contact> {
 
     // Create new contact
     fields.createdAt = new Date().toISOString();
-    fields.contactCount = contact.contactCount || 1;
+    // For new contacts, set contactCount to 1 (first contact)
+    // Only use provided value if it's explicitly set and > 0
+    fields.contactCount = (contact.contactCount !== undefined && contact.contactCount > 0) ? contact.contactCount : 1;
+    console.log('[CONTACTS] Creating new contact with contactCount:', fields.contactCount);
     // lastContacted is already set in fields above, but ensure it's there
     if (!fields.lastContacted) {
       fields.lastContacted = new Date().toISOString();
