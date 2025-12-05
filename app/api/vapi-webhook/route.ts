@@ -934,8 +934,34 @@ async function handleFunctionCallEvent(
                          payload.toolCallId ||
                          '';
       
+      // CRITICAL: Check if this is an outbound call - if so, skip owner verification entirely
+      // For outbound calls, we are CALLING someone, not receiving a call from them
+      const callType = payload.call?.type || payload.message?.call?.type || '';
+      const metadataIsOutbound = payload.call?.metadata?.isOutboundCall === true || 
+                                  payload.message?.call?.metadata?.isOutboundCall === true;
+      const variableValuesIsOutbound = payload.call?.assistantOverrides?.variableValues?.isOutboundCall === 'true' ||
+                                        payload.message?.call?.assistantOverrides?.variableValues?.isOutboundCall === 'true';
+      const isOutboundCall = callType === 'outboundPhoneCall' || metadataIsOutbound || variableValuesIsOutbound;
+      
+      console.log('[VAPI WEBHOOK] check_if_owner call direction check:', {
+        callType,
+        metadataIsOutbound,
+        variableValuesIsOutbound,
+        isOutboundCall,
+      });
+      
+      if (isOutboundCall) {
+        console.log('[VAPI WEBHOOK] ⚠️ check_if_owner called on OUTBOUND call - returning skip instruction');
+        return NextResponse.json({
+          results: [{
+            toolCallId: toolCallId,
+            result: 'OUTBOUND CALL DETECTED. This function should NOT be called on outbound calls. You are CALLING someone, not receiving a call. Do NOT verify the caller. Skip owner verification and IMMEDIATELY deliver the message from variableValues.message. Do NOT ask "how can I help you" - just deliver the message.',
+          }]
+        });
+      }
+      
       try {
-        console.log('[VAPI WEBHOOK] ===== check_if_owner FUNCTION CALLED =====');
+        console.log('[VAPI WEBHOOK] ===== check_if_owner FUNCTION CALLED (INBOUND) =====');
         console.log('[VAPI WEBHOOK] Caller phone number:', callerPhoneNumber || '(NOT FOUND)');
         console.log('[VAPI WEBHOOK] Assistant ID:', assistantId || '(NOT FOUND)');
         console.log('[VAPI WEBHOOK] Extracted toolCallId:', toolCallId || '(NOT FOUND)');
