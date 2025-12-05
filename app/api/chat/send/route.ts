@@ -4,7 +4,7 @@ import { buildChatSystemPrompt } from '@/lib/promptBlocks';
 import { formatPhoneNumberToE164 } from '@/lib/vapi';
 import { extractPatternsFromMessage } from '@/lib/patternExtractor';
 import { extractContactFromMessage } from '@/lib/contactExtractor';
-import { getContactByName, upsertContact } from '@/lib/contacts';
+import { getContactByName, upsertContact, getContactByEmail, getUserContacts } from '@/lib/contacts';
 import { analyzeSentiment, getResponseTone } from '@/lib/sentiment';
 import { checkRateLimit } from '@/lib/rateLimiter';
 import {
@@ -1271,10 +1271,122 @@ export async function POST(request: NextRequest) {
             });
 
             if (messages.length > 0) {
-              const messagesList = messages
-                .map((m) => `- From: ${m.from} | Subject: ${m.subject} | ${m.date}`)
-                .join('\n');
-              agentResponse = `Here are your ${unreadFlag ? 'unread ' : ''}emails:\n\n${messagesList}`;
+              // Get user contacts to check if senders are known contacts
+              let userContacts: Array<{ email?: string; name?: string }> = [];
+              try {
+                userContacts = await getUserContacts(recordId);
+              } catch (contactError) {
+                console.warn('[CHAT] Failed to fetch contacts for email analysis:', contactError);
+              }
+              
+              // Analyze emails for importance and categorize
+              const urgentEmails: Array<{ msg: typeof messages[0]; reason: string }> = [];
+              const importantEmails: Array<{ msg: typeof messages[0]; reason: string }> = [];
+              const promotionalEmails: typeof messages = [];
+              
+              for (const msg of messages) {
+                const subject = msg.subject.toLowerCase();
+                const from = msg.from.toLowerCase();
+                
+                // Check if sender is a known contact
+                const isKnownContact = userContacts.some(
+                  c => c.email && from.includes(c.email.toLowerCase())
+                );
+                
+                // Security/urgent patterns
+                if (
+                  subject.includes('login attempt') ||
+                  subject.includes('sign-in') ||
+                  subject.includes('security alert') ||
+                  subject.includes('password') ||
+                  subject.includes('verification code') ||
+                  subject.includes('attempted') ||
+                  subject.includes('account')
+                ) {
+                  urgentEmails.push({ 
+                    msg, 
+                    reason: 'Security-related - needs immediate attention' 
+                  });
+                }
+                // Time-sensitive patterns
+                else if (
+                  subject.includes('meeting') ||
+                  subject.includes('deadline') ||
+                  subject.includes('urgent') ||
+                  subject.includes('asap') ||
+                  subject.includes('time sensitive') ||
+                  subject.includes('reply') ||
+                  subject.includes('re:')
+                ) {
+                  importantEmails.push({ 
+                    msg, 
+                    reason: isKnownContact ? 'Time-sensitive email from contact' : 'Time-sensitive item' 
+                  });
+                }
+                // Known contacts
+                else if (isKnownContact) {
+                  importantEmails.push({ 
+                    msg, 
+                    reason: 'Email from known contact' 
+                  });
+                }
+                // Promotional/marketing patterns
+                else if (
+                  from.includes('noreply') ||
+                  from.includes('no-reply') ||
+                  from.includes('marketing@') ||
+                  from.includes('newsletter@') ||
+                  from.includes('promo@') ||
+                  from.includes('@engage.') ||
+                  from.includes('@mail.') ||
+                  subject.includes('newsletter') ||
+                  subject.includes('promotion') ||
+                  subject.includes('special offer') ||
+                  subject.includes('discount') ||
+                  subject.includes('sale') ||
+                  subject.includes('unsubscribe')
+                ) {
+                  promotionalEmails.push(msg);
+                }
+                // Default to important if not promotional
+                else {
+                  importantEmails.push({ 
+                    msg, 
+                    reason: 'Standard email' 
+                  });
+                }
+              }
+              
+              // Build intelligent response
+              const responseParts: string[] = [];
+              
+              if (urgentEmails.length > 0) {
+                responseParts.push(
+                  `⚠️ **Urgent items that need attention:**\n\n` +
+                  urgentEmails.map(e => 
+                    `• **${e.msg.from}**: "${e.msg.subject}" - ${e.reason}`
+                  ).join('\n')
+                );
+              }
+              
+              if (importantEmails.length > 0) {
+                responseParts.push(
+                  `📧 **Important emails:**\n\n` +
+                  importantEmails.slice(0, 8).map(e => 
+                    `• ${e.msg.from}: "${e.msg.subject}"`
+                  ).join('\n') +
+                  (importantEmails.length > 8 ? `\n\n...and ${importantEmails.length - 8} more important emails` : '')
+                );
+              }
+              
+              // Only mention promotional if not specifically asking for unread
+              if (promotionalEmails.length > 0 && !unreadFlag) {
+                responseParts.push(`\n${promotionalEmails.length} promotional/marketing emails (hidden unless you want to see them)`);
+              }
+              
+              agentResponse = responseParts.length > 0 
+                ? responseParts.join('\n\n')
+                : `Here are your ${unreadFlag ? 'unread ' : ''}emails:\n\n${messages.map(m => `- From: ${m.from} | Subject: ${m.subject} | ${m.date}`).join('\n')}`;
             } else {
               agentResponse = `You don't have any ${unreadFlag ? 'unread ' : ''}emails.`;
             }
@@ -1385,39 +1497,110 @@ export async function POST(request: NextRequest) {
 
               // Always update contact after successful email send, even if we only have email
               try {
-                if (contactNameForEmail) {
-                  // We have a contact name, update with full info
+                // CRITICAL: Check conversation history to find contact name if not already found
+                let resolvedContactName = contactNameForEmail;
+                
+                if (!resolvedContactName) {
+                  // Look back through recent messages to find who we were discussing
+                  try {
+                    const recentMessages = await getChatMessages({
+                      threadId,
+                      limit: 10,
+                    });
+                    
+                    // Look for contact name mentioned in recent conversation
+                    for (const msg of recentMessages.messages.slice().reverse()) {
+                      // Check user messages for patterns like "email ryan", "call john", etc.
+                      if (msg.role === 'user') {
+                        const userMessage = msg.message.toLowerCase();
+                        // Pattern: "email ryan", "email to ryan", "send email to ryan"
+                        const emailPatterns = [
+                          /email\s+(?:to\s+)?(\w+)/i,
+                          /send\s+(?:an?\s+)?email\s+(?:to\s+)?(\w+)/i,
+                          /email\s+(\w+)/i,
+                        ];
+                        
+                        for (const pattern of emailPatterns) {
+                          const match = msg.message.match(pattern);
+                          if (match && match[1]) {
+                            resolvedContactName = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+                            console.log('[CHAT] Found contact name from user message:', resolvedContactName);
+                            break;
+                          }
+                        }
+                        
+                        if (resolvedContactName) break;
+                      }
+                      
+                      // Check assistant messages for contact lookup context
+                      if (msg.role === 'assistant' && (msg.message.includes("don't have") || msg.message.includes("in your contacts"))) {
+                        // Extract contact name from assistant's message
+                        const namePatterns = [
+                          /I found (\w+) in your contacts/i,
+                          /don't have (\w+) in your contacts/i,
+                          /I don't have (\w+)'s (?:email|phone)/i,
+                          /What's (\w+)'s email/i,
+                        ];
+                        
+                        for (const pattern of namePatterns) {
+                          const match = msg.message.match(pattern);
+                          if (match && match[1]) {
+                            resolvedContactName = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+                            console.log('[CHAT] Found contact name from assistant message context:', resolvedContactName);
+                            break;
+                          }
+                        }
+                        
+                        if (resolvedContactName) break;
+                      }
+                    }
+                  } catch (contextError) {
+                    console.warn('[CHAT] Failed to check conversation context:', contextError);
+                  }
+                }
+                
+                if (resolvedContactName) {
+                  // We have a contact name from context - update existing contact or create with correct name
                   await upsertContact({
                     recordId,
-                    name: contactNameForEmail,
+                    name: resolvedContactName, // Use the name from context, NOT from email
                     email: to,
                     relationship: relationshipForEmail || undefined,
                     lastContacted: new Date().toISOString(),
                   });
-                  console.log('[CHAT] ✅ Contact synced after email send:', {
-                    name: contactNameForEmail,
+                  console.log('[CHAT] ✅ Contact synced after email send (from context):', {
+                    name: resolvedContactName,
                     email: to,
                     lastContacted: new Date().toISOString(),
                   });
                 } else {
-                  // No contact name found, but we have email - try to find or create contact by email
-                  // Extract name from email if possible (e.g., "alialfaras7@gmail.com" -> "Ali")
-                  const emailNameMatch = to.match(/^([^@]+)@/);
-                  if (emailNameMatch) {
-                    const potentialName = emailNameMatch[1].split(/[._0-9]/)[0];
-                    if (potentialName && potentialName.length > 1) {
-                      const capitalizedName = potentialName.charAt(0).toUpperCase() + potentialName.slice(1).toLowerCase();
-                      await upsertContact({
-                        recordId,
-                        name: capitalizedName,
-                        email: to,
-                        lastContacted: new Date().toISOString(),
-                      });
-                      console.log('[CHAT] ✅ Created/updated contact from email after send:', {
-                        name: capitalizedName,
-                        email: to,
-                        lastContacted: new Date().toISOString(),
-                      });
+                  // No contact name found in context - check if contact exists by email first
+                  const existingContactByEmail = await getContactByEmail(recordId, to);
+                  
+                  if (existingContactByEmail) {
+                    // Contact exists with this email - just update lastContacted
+                    await upsertContact({
+                      recordId,
+                      name: existingContactByEmail.name,
+                      email: to,
+                      lastContacted: new Date().toISOString(),
+                    });
+                    console.log('[CHAT] ✅ Updated existing contact (found by email) after email send');
+                  } else {
+                    // Last resort: Extract name from email, but log it as fallback
+                    const emailNameMatch = to.match(/^([^@]+)@/);
+                    if (emailNameMatch) {
+                      const potentialName = emailNameMatch[1].split(/[._0-9]/)[0];
+                      if (potentialName && potentialName.length > 1) {
+                        const capitalizedName = potentialName.charAt(0).toUpperCase() + potentialName.slice(1).toLowerCase();
+                        console.warn('[CHAT] ⚠️ Creating contact from email prefix (fallback - no context found):', capitalizedName);
+                        await upsertContact({
+                          recordId,
+                          name: capitalizedName,
+                          email: to,
+                          lastContacted: new Date().toISOString(),
+                        });
+                      }
                     }
                   }
                 }
