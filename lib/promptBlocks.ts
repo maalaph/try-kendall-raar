@@ -3,7 +3,7 @@
  * These functions generate formatted blocks that fill placeholders in the master template
  */
 
-import { MASTER_SYSTEM_PROMPT_TEMPLATE } from './promptTemplate';
+import { MASTER_SYSTEM_PROMPT_TEMPLATE, MEDIUM_SYSTEM_PROMPT_TEMPLATE } from './promptTemplate';
 import { CHAT_SYSTEM_PROMPT_TEMPLATE } from './chatPromptTemplate';
 import { OUTBOUND_CALL_PROMPT_TEMPLATE } from './outboundPromptTemplate';
 
@@ -668,6 +668,50 @@ export function buildOutboundCallPrompt(data: {
   let prompt = OUTBOUND_CALL_PROMPT_TEMPLATE
     .replace(/\{\{kendall_name\}\}/g, kendallName)
     .replace(/\{\{owner_name\}\}/g, ownerName);
+
+  return prompt;
+}
+
+/**
+ * Build medium-sized system prompt for VAPI agents
+ * Uses dynamic context fetching via functions instead of embedding user data
+ * ~150-200 lines vs the full ~570 line MASTER template
+ */
+export function buildMediumSystemPrompt(data: {
+  kendallName: string;
+  fullName: string;
+  nickname?: string;
+  selectedTraits: string[];
+  useCaseChoice: string;
+  boundaryChoices: string[];
+  ownerPhoneNumber?: string;
+  additionalInstructions?: string;
+}): string {
+  const nicknameOrFullName = data.nickname && data.nickname.trim() 
+    ? data.nickname.trim() 
+    : data.fullName;
+
+  const toneBlock = buildToneBlock(data.selectedTraits);
+  const useCaseBlock = buildUseCaseBlock(data.useCaseChoice);
+  const boundariesBlock = buildBoundariesBlock(data.boundaryChoices);
+
+  // Format owner phone number for display (use provided or default message)
+  const ownerPhoneNumber = data.ownerPhoneNumber || 'NOT PROVIDED - Owner recognition will not work until phone number is configured';
+
+  // Handle additional instructions section
+  const additionalInstructionsSection = data.additionalInstructions
+    ? `\n=== ADDITIONAL INSTRUCTIONS ===\n${data.additionalInstructions}\n`
+    : '';
+
+  let prompt = MEDIUM_SYSTEM_PROMPT_TEMPLATE
+    .replace(/\{\{kendall_name\}\}/g, data.kendallName || 'Kendall')
+    .replace(/\{\{full_name\}\}/g, data.fullName)
+    .replace(/\{\{nickname_or_full_name\}\}/g, nicknameOrFullName)
+    .replace(/\{\{tone_block\}\}/g, toneBlock)
+    .replace(/\{\{use_case_block\}\}/g, useCaseBlock)
+    .replace(/\{\{boundaries_block\}\}/g, boundariesBlock)
+    .replace(/\{\{owner_phone_number\}\}/g, ownerPhoneNumber)
+    .replace(/\{\{additional_instructions_section\}\}/g, additionalInstructionsSection);
 
   return prompt;
 }

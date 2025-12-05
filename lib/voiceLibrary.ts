@@ -33,6 +33,55 @@ export const curatedVoiceLibrary: CuratedVoice[] = [
 ];
 
 /**
+ * ElevenLabs voice IDs confirmed to fail when routed through Vapi.
+ * We exclude them from the curated library so users never see unusable voices.
+ */
+const UNSUPPORTED_ELEVENLABS_VOICE_IDS = new Set<string>([
+  '0FLxgjNYHJnHnNQ3nwk8',
+  '0mDYz2rpzUksQMbNcdCc',
+  '1a0nAYA3FcNQcMMfbddY',
+  '8WRfTpaUoqZSfTerOXzI',
+  'DQLhorDHb2d4HkZj4kFd',
+  'GoGUcAZovo4MFeLxJdZd',
+  'GsfuR3Wo2BACoxELWyEF',
+  'Gsndh0O5AnuI2Hj3YUlA',
+  'KEVRa7mtDwmBo6pi4ItL',
+  'KleDBQ7etYG6NMjnQ9Jw',
+  'L5zW3PqYZoWAeS4J1qMV',
+  'LeKjR2H906hH45YTS8O5',
+  'M5t0724ORuAGCh3p3DUR',
+  'MKlLqCItoCkvdhrxgtLv',
+  'QF9HJC7XWnue5c9W3LkY',
+  'RO2BvjCY3XHTRsIYByXn',
+  'Sq93GQT4X1lKDXsQcixO',
+  'U0W3edavfdI8ibPeeteQ',
+  'Wz5VyMwarjxJoceKovDZ',
+  'XagEPz76kWQQ0RWKvQAf',
+  'XjdmlV0OFXfXE6Mg2Sb7',
+  'XsmrVB66q3D4TaXVaWNF',
+  'cgLpYGyXZhkyalKZ0xeZ',
+  'dOZwtV72qwiKnZGSlLsC',
+  'dOdGri2hgsKdUEaU09Ct',
+  'eZm9vdjYgL9PZKtf7XMM',
+  'ee2pDOfqzj2pBerZvUCH',
+  'efGTHf4ukBiG4n8lptfp',
+  'm3yAHyFEFKtbCIM5n7GF',
+  'mEHuKdn0uRQSMynXjRNO',
+  'nTMUXLFSfbWmdKKy7nDC',
+  'nlyULslzTRhqlyv46oPj',
+  'nzeAacJi50IvxcyDnMXa',
+  'ocZQ262SsZb9RIxcQBOj',
+  'u0REnIJvUgcGQYW2Ux8K',
+  'wFOtYWBAKv6z33WjceQa',
+  'wNl2YBRc8v5uIcq6gOxd',
+  'xYWUvKNK6zWCgsdAK7Wi',
+  'zYcjlYFOd3taleS0gkk3',
+  'zZeq6FndupLBP33ngh9e',
+  'zhqwEJnIn9nJv0L8nUkS',
+  'ztnpYzQJyWffPj1VC5Uw',
+]);
+
+/**
  * Curate a diverse subset of voices ensuring variety in gender, accent, age, and tone
  * @param voices Array of voices to curate from
  * @param maxVoices Maximum number of voices to return (default: 500)
@@ -336,8 +385,19 @@ export async function initializeVoiceLibrary(): Promise<CuratedVoice[]> {
     const curatedVoices = curateDiverseVoices(voicesToProcess, MAX_VOICES);
     console.log(`[VOICE LIBRARY] Curated ${curatedVoices.length} diverse voices from ${voicesToProcess.length} verified voices`);
 
+    const curatedVoicesFiltered = curatedVoices.filter((voice: any) => {
+      const voiceId = voice.voice_id || voice.id || voice.voiceId;
+      return voiceId ? !UNSUPPORTED_ELEVENLABS_VOICE_IDS.has(String(voiceId).trim()) : true;
+    });
+
+    if (curatedVoicesFiltered.length !== curatedVoices.length) {
+      console.log(
+        `[VOICE LIBRARY] Removed ${curatedVoices.length - curatedVoicesFiltered.length} unsupported ElevenLabs voices (Vapi rejects these IDs)`
+      );
+    }
+
     // Map curated voices to library format
-    const mappedVoices: CuratedVoice[] = curatedVoices.map((voice: any) => {
+    const mappedVoices: CuratedVoice[] = curatedVoicesFiltered.map((voice: any) => {
       const gender = (voice.labels?.gender || '').toLowerCase();
       const accent = voice.labels?.accent || '';
       const age = voice.labels?.age || '';

@@ -4,8 +4,8 @@
  * Works in both development and production environments
  */
 
-import { getScheduledCallTasks, updateScheduledCallTask, getOwnerInfoByAgentId, updateScheduledCallTaskAtomically, createOutboundCallRequest } from '@/lib/airtable';
-import { buildOutboundCallPrompt } from '@/lib/promptBlocks';
+import { getScheduledCallTasks, updateScheduledCallTask, getOwnerInfoByAgentId, updateScheduledCallTaskAtomically, createOutboundCallRequest, getOwnerPhoneByAgentId } from '@/lib/airtable';
+import { buildVoicemailMessage, getStartSpeakingPlan, getVoicemailDetectionConfig } from '@/lib/callExperienceConfig';
 
 const VAPI_API_URL = 'https://api.vapi.ai';
 
@@ -88,6 +88,7 @@ async function makeVAPICall(
       owner = { fullName: callerName || 'the owner', kendallName: 'Kendall' };
     }
   }
+  const ownerPhone = await getOwnerPhoneByAgentId(assistantId);
 
   // Use recipient name from override if provided, otherwise extract from message
   const recipientName = recipientNameOverride || extractRecipientName(message, callerName);
@@ -97,37 +98,51 @@ async function makeVAPICall(
   const greeting = recipientName
     ? `Hi ${recipientName}, I'm ${owner.kendallName}, ${owner.fullName}'s assistant. How are you?`
     : `Hi there, I'm ${owner.kendallName}, ${owner.fullName}'s assistant. How are you?`;
-
-  // Build minimal outbound call prompt
-  const outboundPrompt = buildOutboundCallPrompt({
-    kendallName: owner.kendallName,
+  const voicemailMessage = buildVoicemailMessage({
     ownerName: owner.fullName,
+    kendallName: owner.kendallName,
+    message,
+    ownerPhone,
+    recipientName,
+  });
+  const startSpeakingPlan = getStartSpeakingPlan();
+  const voicemailDetection = getVoicemailDetectionConfig();
+
+  // Log outbound call configuration
+  console.log('[BACKGROUND EXECUTOR] Outbound call config:', {
+    recipientName: recipientName || '(not extracted)',
+    messagePreview: message.substring(0, 50),
+    hasVoicemailMessage: !!voicemailMessage,
+    hasVoicemailDetection: !!voicemailDetection,
   });
 
-  // Log the prompt to verify it's the outbound prompt (first 200 chars)
-  console.log('[BACKGROUND EXECUTOR] Outbound prompt preview:', outboundPrompt.substring(0, 200) + '...');
-  console.log('[BACKGROUND EXECUTOR] Outbound prompt length:', outboundPrompt.length);
-  console.log('[BACKGROUND EXECUTOR] Outbound prompt contains "OUTBOUND CALL":', outboundPrompt.includes('OUTBOUND CALL'));
-  console.log('[BACKGROUND EXECUTOR] Outbound prompt contains "check_if_owner":', outboundPrompt.includes('check_if_owner'));
+  const assistantOverrides: Record<string, any> = {
+    // Note: prompt/systemPrompt/messages are NOT supported in assistantOverrides for /call
+    // The base assistant prompt already references variableValues for outbound call handling
+    firstMessageMode: 'assistant-waits-for-user',
+    variableValues: {
+      isOutboundCall: 'true',
+      greeting: greeting,
+      recipientName: recipientName || '',
+      message: message,
+      ownerName: owner.fullName,
+      kendallName: owner.kendallName,
+      voicemailMessage,
+      ownerPhone: ownerPhone || '',
+    },
+    voicemailDetection,
+    voicemailMessage,
+  };
+  if (startSpeakingPlan) {
+    assistantOverrides.startSpeakingPlan = startSpeakingPlan;
+  }
 
   const callPayload: any = {
     customer: {
       number: phoneNumber,
     },
     assistantId: assistantId,
-    assistantOverrides: {
-      // Note: systemPrompt is not supported in assistantOverrides - relying on variableValues and firstMessage
-      firstMessage: greeting,
-      firstMessageMode: 'assistant-speaks-first',
-      variableValues: {
-        isOutboundCall: 'true',
-        greeting: greeting,
-        recipientName: recipientName || '',
-        message: message,
-        ownerName: owner.fullName,
-        kendallName: owner.kendallName,
-      },
-    },
+    assistantOverrides,
     metadata: {
       message: message,
       callerName: callerName || owner.fullName,
@@ -136,6 +151,7 @@ async function makeVAPICall(
       kendallName: owner.kendallName,
       greeting: greeting, // Greeting stored in metadata for the assistant to use
       recipientName: recipientName, // Recipient name if extracted
+      ownerPhone,
     },
   };
 
@@ -155,25 +171,26 @@ async function makeVAPICall(
     ownerName: owner.fullName,
     kendallName: owner.kendallName,
     isOutboundCall: 'true',
-    hasFirstMessage: !!greeting,
-    firstMessageMode: 'assistant-speaks-first',
+    voicemailMessage: voicemailMessage.substring(0, 60),
+    startSpeakingPlan,
   });
   
   console.log('[BACKGROUND EXECUTOR] Full call payload:', JSON.stringify(callPayload, null, 2));
   
   // Add detailed payload verification logging
   console.log('[BACKGROUND EXECUTOR] VERIFYING PAYLOAD STRUCTURE:', {
-    hasFirstMessage: !!callPayload.assistantOverrides?.firstMessage,
-    firstMessage: callPayload.assistantOverrides?.firstMessage,
-    firstMessageMode: callPayload.assistantOverrides?.firstMessageMode,
-    hasVariableValues: !!callPayload.assistantOverrides?.variableValues,
-    variableValuesMessage: callPayload.assistantOverrides?.variableValues?.message?.substring(0, 50) || 'MISSING',
-    variableValuesRecipientName: callPayload.assistantOverrides?.variableValues?.recipientName || 'MISSING',
-    variableValuesIsOutboundCall: callPayload.assistantOverrides?.variableValues?.isOutboundCall,
+    firstMessageMode: assistantOverrides.firstMessageMode,
+    hasVariableValues: !!assistantOverrides.variableValues,
+    variableValuesMessage: assistantOverrides.variableValues?.message?.substring(0, 50) || 'MISSING',
+    variableValuesRecipientName: assistantOverrides.variableValues?.recipientName || 'MISSING',
+    variableValuesIsOutboundCall: assistantOverrides.variableValues?.isOutboundCall,
     hasMetadata: !!callPayload.metadata,
     metadataMessage: callPayload.metadata?.message?.substring(0, 50) || 'MISSING',
     metadataIsOutboundCall: callPayload.metadata?.isOutboundCall,
     metadataRecipientName: callPayload.metadata?.recipientName || 'MISSING',
+    hasVoicemailDetection: !!assistantOverrides.voicemailDetection,
+    hasVoicemailMessage: !!assistantOverrides.voicemailMessage,
+    hasStartSpeakingPlan: !!assistantOverrides.startSpeakingPlan,
   });
 
   const response = await fetch(`${VAPI_API_URL}/call`, {

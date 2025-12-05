@@ -199,6 +199,26 @@
 
 ---
 
+## 📞 Outbound Call Experience (Voicemail Detection)
+
+- Added `lib/callExperienceConfig.ts` to centralize outbound call tuning (voicemail detection, start-speaking delay, voicemail copy builder).
+- All outbound call payloads (`/api/make-call`, background executor, scheduled call runner) now:
+  - wait for a live speaker (`assistantOverrides.firstMessageMode = 'assistant-waits-for-user'`);
+  - provide Vapi with `startSpeakingPlan`, `voicemailDetection`, and the templated `voicemailMessage`.
+- New/updated env knobs (all optional with safe defaults):
+  - `VAPI_VOICEMAIL_PROVIDER` (default `twilio`)
+  - `VAPI_VOICEMAIL_TYPES` (comma list of detection signals)
+  - `VAPI_MACHINE_DETECTION_TIMEOUT`
+  - `VAPI_MACHINE_DETECTION_SPEECH_THRESHOLD`
+  - `VAPI_MACHINE_DETECTION_SPEECH_END_THRESHOLD`
+  - `VAPI_MACHINE_DETECTION_SILENCE_TIMEOUT`
+  - `VAPI_START_SPEAKING_WAIT_SECONDS`
+  - `VAPI_SMART_ENDPOINTING_ENABLED`
+- Vapi webhook now listens for answering-machine detection events:
+  - Human detected → outbound call request marked `in-call`.
+  - Voicemail detected → status set to `voicemail` and a chat note is posted (“I left the recorded message…”).
+- Airtable schemas: outbound call request + chat message status enums now include `voicemail` so ops can filter these events easily.
+
 ## 🎯 What You'll Get
 
 1. **Step 2 (NEW):** Voice selection with preview

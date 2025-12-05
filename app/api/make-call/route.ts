@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createScheduledCallTask } from '@/lib/airtable';
+import { createScheduledCallTask, getOwnerInfoByAgentId, getOwnerPhoneByAgentId } from '@/lib/airtable';
 import { parseTimeExpression, isFutureTime } from '@/lib/timeParser';
+import { buildVoicemailMessage, getStartSpeakingPlan, getVoicemailDetectionConfig } from '@/lib/callExperienceConfig';
 
 const VAPI_API_URL = 'https://api.vapi.ai';
 
@@ -79,14 +80,59 @@ async function makeVAPICall(
   callerName?: string,
   phoneNumberId?: string
 ): Promise<{ callId: string; status: string }> {
+  let owner = await getOwnerInfoByAgentId(assistantId);
+  if (!owner) {
+    owner = { fullName: callerName || 'the owner', kendallName: 'Kendall' };
+  }
+  const ownerPhone = await getOwnerPhoneByAgentId(assistantId);
+  const recipientName = undefined;
+  const greeting = recipientName
+    ? `Hi ${recipientName}, I'm ${owner.kendallName}, ${owner.fullName}'s assistant. How are you?`
+    : `Hi there, I'm ${owner.kendallName}, ${owner.fullName}'s assistant. How are you?`;
+  const voicemailMessage = buildVoicemailMessage({
+    ownerName: owner.fullName,
+    kendallName: owner.kendallName,
+    message,
+    ownerPhone,
+    recipientName,
+  });
+  const startSpeakingPlan = getStartSpeakingPlan();
+  const voicemailDetection = getVoicemailDetectionConfig();
+
+  const assistantOverrides: Record<string, any> = {
+    firstMessageMode: 'assistant-waits-for-user',
+    variableValues: {
+      isOutboundCall: 'true',
+      greeting,
+      recipientName: recipientName || '',
+      message,
+      ownerName: owner.fullName,
+      kendallName: owner.kendallName,
+      voicemailMessage,
+      ownerPhone: ownerPhone || '',
+    },
+    voicemailDetection,
+    voicemailMessage,
+  };
+  if (startSpeakingPlan) {
+    assistantOverrides.startSpeakingPlan = startSpeakingPlan;
+  }
+
   const callPayload: any = {
     customer: {
       number: phoneNumber,
     },
     assistantId: assistantId,
+    assistantOverrides,
     metadata: {
       message: message,
-      callerName: callerName || 'the owner',
+      callerName: callerName || owner.fullName,
+      isOutboundCall: true,
+      ownerName: owner.fullName,
+      kendallName: owner.kendallName,
+      greeting,
+      recipientName,
+      ownerPhone,
     },
   };
 

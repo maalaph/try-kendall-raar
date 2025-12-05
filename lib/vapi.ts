@@ -2,7 +2,7 @@
  * VAPI helper functions for My Kendall agent creation and phone number management
  */
 
-import { buildSystemPrompt, buildLeanSystemPrompt } from './promptBlocks';
+import { buildSystemPrompt, buildLeanSystemPrompt, buildMediumSystemPrompt } from './promptBlocks';
 import { getElevenLabsMapping } from './voiceMapping';
 
 const VAPI_API_URL = 'https://api.vapi.ai';
@@ -661,17 +661,16 @@ export async function createAgentFromTemplate({
     // Format owner phone number for prompt (use E.164 format for consistency)
     const ownerPhoneNumber = mobileNumber ? (formatPhoneNumberToE164(mobileNumber) || mobileNumber) : undefined;
     
-    // Build full detailed system prompt (~300 lines)
-    const systemPrompt = buildSystemPrompt({
+    // Build medium-sized system prompt (~150-200 lines) - fetches user context dynamically via functions
+    // Note: analyzedFileContent and userContextAndRules are no longer embedded in prompt
+    // The agent will call get_user_context and get_user_documents functions to fetch this data
+    const systemPrompt = buildMediumSystemPrompt({
       kendallName: assistantName,
       fullName,
       nickname,
       selectedTraits,
       useCaseChoice,
       boundaryChoices,
-      userContextAndRules,
-      analyzedFileContent,
-      fileUsageInstructions,
       ownerPhoneNumber,
     });
 
@@ -891,29 +890,24 @@ export async function updateAgentFromTemplate({
     console.log('[VAPI DEBUG] updateAgentFromTemplate called with:');
     console.log('[VAPI DEBUG] - agentId:', agentId);
     console.log('[VAPI DEBUG] - fullName:', fullName);
-    console.log('[VAPI DEBUG] - analyzedFileContent length:', analyzedFileContent?.length || 0);
-    console.log('[VAPI DEBUG] - analyzedFileContent preview:', analyzedFileContent?.substring(0, 200) || 'EMPTY');
-    console.log('[VAPI DEBUG] - analyzedFileContent includes WHO THEY ARE:', analyzedFileContent?.includes('WHO THEY ARE') || false);
-    console.log('[VAPI DEBUG] - analyzedFileContent includes WORK EXPERIENCE:', analyzedFileContent?.includes('WORK EXPERIENCE') || false);
     
     // Format owner phone number for prompt (use E.164 format for consistency)
     const ownerPhoneNumber = mobileNumber ? (formatPhoneNumberToE164(mobileNumber) || mobileNumber) : undefined;
     
-    // Build full detailed system prompt (~300 lines)
-    const systemPrompt = buildSystemPrompt({
+    // Build medium-sized system prompt (~150-200 lines) - fetches user context dynamically via functions
+    // Note: analyzedFileContent and userContextAndRules are no longer embedded in prompt
+    // The agent will call get_user_context and get_user_documents functions to fetch this data
+    const systemPrompt = buildMediumSystemPrompt({
       kendallName: assistantName,
       fullName,
       nickname,
       selectedTraits,
       useCaseChoice,
       boundaryChoices,
-      userContextAndRules,
-      analyzedFileContent,
-      fileUsageInstructions,
       ownerPhoneNumber,
     });
     
-    console.log('[VAPI DEBUG] Lean system prompt built:');
+    console.log('[VAPI DEBUG] Medium system prompt built:');
     console.log('[VAPI DEBUG] - System prompt length:', systemPrompt.length);
     console.log('[VAPI DEBUG] - System prompt token estimate:', Math.ceil(systemPrompt.length / 4));
 

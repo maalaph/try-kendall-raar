@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord, getOrCreateThreadId, createChatMessage, getChatMessages, createOutboundCallRequest } from '@/lib/airtable';
+import { getUserRecord, getOrCreateThreadId, createChatMessage, getChatMessages, createOutboundCallRequest, upsertCalendarEventRecord } from '@/lib/airtable';
 import { buildChatSystemPrompt } from '@/lib/promptBlocks';
 import { formatPhoneNumberToE164 } from '@/lib/vapi';
 import { extractPatternsFromMessage } from '@/lib/patternExtractor';
@@ -215,6 +215,115 @@ const CHAT_FUNCTIONS = [
   },
 ];
 
+const TIMEZONE_OFFSET_REGEX = /([zZ]|[+\-]\d{2}:?\d{2})$/;
+const ISO_NAIVE_DATETIME_REGEX = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2})(?::(\d{2}))?(?::(\d{2}))?)?$/;
+const DEFAULT_TIME_ZONE = 'UTC';
+const timeZoneFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+type ParsedDateWithZone = {
+  date: Date;
+  wasNaive: boolean;
+};
+
+function sanitizeTimeZoneInput(timeZone?: string): string {
+  if (!timeZone || typeof timeZone !== 'string') {
+    return DEFAULT_TIME_ZONE;
+  }
+  const trimmed = timeZone.trim();
+  if (!trimmed) {
+    return DEFAULT_TIME_ZONE;
+  }
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: trimmed });
+    return trimmed;
+  } catch {
+    console.warn('[CHAT] Invalid timezone provided, falling back to UTC:', timeZone);
+    return DEFAULT_TIME_ZONE;
+  }
+}
+
+function getTimeZoneFormatter(timeZone: string) {
+  if (!timeZoneFormatterCache.has(timeZone)) {
+    timeZoneFormatterCache.set(
+      timeZone,
+      new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    );
+  }
+  return timeZoneFormatterCache.get(timeZone)!;
+}
+
+function getTimeZoneOffsetMinutes(date: Date, timeZone: string) {
+  try {
+    const formatter = getTimeZoneFormatter(timeZone);
+    const parts = formatter.formatToParts(date);
+    const namedParts: Record<string, string> = {};
+    for (const part of parts) {
+      if (part.type !== 'literal') {
+        namedParts[part.type] = part.value;
+      }
+    }
+    const asUTC = Date.UTC(
+      Number(namedParts.year),
+      Number(namedParts.month) - 1,
+      Number(namedParts.day),
+      Number(namedParts.hour),
+      Number(namedParts.minute),
+      Number(namedParts.second)
+    );
+    return (asUTC - date.getTime()) / 60000;
+  } catch (error) {
+    console.warn('[CHAT] Failed to compute timezone offset, defaulting to 0:', { timeZone, error });
+    return 0;
+  }
+}
+
+function parseDateTimeWithTimeZone(
+  input: string,
+  timeZone: string
+): ParsedDateWithZone {
+  const trimmed = typeof input === 'string' ? input.trim() : '';
+  if (!trimmed) {
+    return { date: new Date(NaN), wasNaive: false };
+  }
+
+  const parsedDate = new Date(trimmed);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return { date: parsedDate, wasNaive: false };
+  }
+
+  if (TIMEZONE_OFFSET_REGEX.test(trimmed)) {
+    return { date: parsedDate, wasNaive: false };
+  }
+
+  const match = ISO_NAIVE_DATETIME_REGEX.exec(trimmed);
+  if (!match) {
+    return { date: parsedDate, wasNaive: false };
+  }
+
+  const [, yearStr, monthStr, dayStr, hourStr, minuteStr, secondStr] = match;
+  const year = Number(yearStr);
+  const month = Number(monthStr) - 1;
+  const day = Number(dayStr);
+  const hour = Number(hourStr ?? '0');
+  const minute = Number(minuteStr ?? '0');
+  const second = Number(secondStr ?? '0');
+
+  const baseUtcDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+  const offsetMinutes = getTimeZoneOffsetMinutes(baseUtcDate, timeZone);
+  const adjustedDate = new Date(baseUtcDate.getTime() - offsetMinutes * 60000);
+
+  return { date: adjustedDate, wasNaive: true };
+}
+
 /**
  * Generate chat response using OpenAI with agent's system prompt and function calling
  */
@@ -399,7 +508,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { recordId, message, threadId: providedThreadId } = body;
+    const { recordId, message, threadId: providedThreadId, clientTimeZone } = body;
 
     // ✅ Validate required fields
     if (!recordId || !message || typeof message !== 'string' || !message.trim()) {
@@ -448,6 +557,14 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    const storedTimeZone =
+      (typeof userRecord.fields.timeZone === 'string' && userRecord.fields.timeZone) ||
+      (typeof userRecord.fields['Time Zone'] === 'string' && userRecord.fields['Time Zone']) ||
+      undefined;
+    const preferredTimeZone = sanitizeTimeZoneInput(
+      (typeof clientTimeZone === 'string' && clientTimeZone) || storedTimeZone
+    );
 
     // ✅ Get or create threadId with error handling
     let threadId: string;
@@ -895,7 +1012,10 @@ export async function POST(request: NextRequest) {
         // Handle calendar event creation
         if (fc.name === 'create_calendar_event') {
           try {
-            console.log('[CHAT] Creating calendar event with arguments:', fc.arguments);
+            console.log('[CHAT] Creating calendar event with arguments:', {
+              ...fc.arguments,
+              preferredTimeZone,
+            });
             const { recordId: eventRecordId, summary, description, startDateTime, endDateTime, allDay } = fc.arguments || {};
             // Validate that eventRecordId is not the literal string 'recordId' - if AI passes invalid value, use actual recordId
             const eventCreateRecordId = (eventRecordId && eventRecordId !== 'recordId' && typeof eventRecordId === 'string' && eventRecordId.startsWith('rec')) 
@@ -912,12 +1032,14 @@ export async function POST(request: NextRequest) {
               continue;
             }
 
-            // Parse dates
-            const startDate = new Date(startDateTime);
+            const startParseResult = parseDateTimeWithTimeZone(startDateTime, preferredTimeZone);
+            const startDate = startParseResult.date;
             let endDate: Date;
+            let endParseResult: ParsedDateWithZone | null = null;
             
             if (endDateTime) {
-              endDate = new Date(endDateTime);
+              endParseResult = parseDateTimeWithTimeZone(endDateTime, preferredTimeZone);
+              endDate = endParseResult.date;
             } else if (allDay) {
               // For all-day events, end date should be the day after start date
               endDate = new Date(startDate);
@@ -962,19 +1084,22 @@ export async function POST(request: NextRequest) {
               console.log('[CHAT] Creating all-day event:', { startDateStr, endDateStr });
             } else {
               // Timed events use dateTime with timezone
-              const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
               eventData.start = { 
                 dateTime: startDate.toISOString(),
-                timeZone: timeZone
+                timeZone: preferredTimeZone
               };
               eventData.end = { 
                 dateTime: endDate.toISOString(),
-                timeZone: timeZone
+                timeZone: preferredTimeZone
               };
               console.log('[CHAT] Creating timed event:', { 
                 start: eventData.start.dateTime, 
                 end: eventData.end.dateTime,
-                timeZone 
+                timeZone: preferredTimeZone,
+                originalStartDateTime: startDateTime,
+                originalEndDateTime: endDateTime,
+                startWasNaive: startParseResult.wasNaive,
+                endWasNaive: endParseResult?.wasNaive ?? false,
               });
             }
 
@@ -997,8 +1122,8 @@ export async function POST(request: NextRequest) {
             });
 
             const eventTime = allDay 
-              ? startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
-              : startDate.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+              ? startDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: preferredTimeZone })
+              : startDate.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: preferredTimeZone });
             
             agentResponse = `I've added "${summary}" to your calendar for ${eventTime}.`;
             
@@ -1009,7 +1134,36 @@ export async function POST(request: NextRequest) {
               end: eventData.end,
               allDay,
               recordId: eventCreateRecordId,
+              preferredTimeZone,
+              originalStartDateTime: startDateTime,
+              originalEndDateTime: endDateTime,
+              startWasNaive: startParseResult.wasNaive,
+              endWasNaive: endParseResult?.wasNaive ?? false,
             });
+
+            if (createdEvent.id) {
+              try {
+                await upsertCalendarEventRecord({
+                  googleEventId: createdEvent.id,
+                  userRecordId: eventCreateRecordId,
+                  summary,
+                  description,
+                  startDateTime: startDate.toISOString(),
+                  endDateTime: endDate.toISOString(),
+                  timeZone: preferredTimeZone,
+                  allDay: Boolean(allDay),
+                  location: createdEvent.location || undefined,
+                  attendees: createdEvent.attendees
+                    ?.map((attendee: any) => attendee.email)
+                    .filter((email: string | undefined): email is string => Boolean(email)),
+                  status: 'Active',
+                  source: 'Kendall',
+                  eventUrl: createdEvent.htmlLink || undefined,
+                });
+              } catch (calendarSyncError) {
+                console.error('[CHAT] Failed to sync calendar event to Airtable:', calendarSyncError);
+              }
+            }
           } catch (error) {
             console.error('[CHAT] ❌ Error creating calendar event:', {
               error: error instanceof Error ? error.message : String(error),

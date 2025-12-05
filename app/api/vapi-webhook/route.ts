@@ -538,6 +538,141 @@ async function handleSMSEvent(payload: any, request: NextRequest) {
   }
 }
 
+type VoicemailDetectionCategory = 'human' | 'machine' | 'unknown';
+
+function extractVoicemailDetectionInfo(payload: any, eventType?: string): { category: VoicemailDetectionCategory; rawType: string } | null {
+  const normalizedEvent = (eventType || '').toString().toLowerCase();
+  const detectionPayload =
+    payload.machineDetection ||
+    payload.voicemailDetection ||
+    payload.machine_detection ||
+    payload.voicemail_detection ||
+    payload.detection ||
+    payload.result?.machineDetection ||
+    payload.message?.machineDetection ||
+    null;
+
+  const rawType =
+    detectionPayload?.type ||
+    detectionPayload?.result ||
+    detectionPayload?.status ||
+    payload.machineDetectionType ||
+    payload.voicemailDetectionType ||
+    payload.detectionType ||
+    payload.machine_detection_type ||
+    payload.voicemail_detection_type ||
+    (typeof detectionPayload === 'string' ? detectionPayload : undefined) ||
+    (normalizedEvent.includes('machine') || normalizedEvent.includes('voicemail') ? normalizedEvent : undefined);
+
+  if (!detectionPayload && !rawType && !normalizedEvent.includes('machine') && !normalizedEvent.includes('voicemail')) {
+    return null;
+  }
+
+  const normalizedType = (rawType || '').toLowerCase();
+  let category: VoicemailDetectionCategory = 'unknown';
+  if (normalizedType.includes('human')) {
+    category = 'human';
+  } else if (
+    normalizedType.includes('machine') ||
+    normalizedType.includes('voicemail') ||
+    normalizedType.includes('beep') ||
+    normalizedType.includes('unknown') ||
+    normalizedEvent.includes('machine') ||
+    normalizedEvent.includes('voicemail')
+  ) {
+    category = 'machine';
+  }
+
+  return {
+    category,
+    rawType: rawType || eventType || 'unknown',
+  };
+}
+
+async function handleVoicemailDetectionEvent(
+  payload: any,
+  detection: { category: VoicemailDetectionCategory; rawType: string }
+): Promise<NextResponse | null> {
+  if (!detection || detection.category === 'unknown') {
+    return null;
+  }
+
+  const callId =
+    payload.call?.id ||
+    payload.message?.call?.id ||
+    payload.callId ||
+    payload.id ||
+    payload.message?.call_id ||
+    '';
+
+  if (!callId) {
+    console.warn('[VAPI WEBHOOK] Voicemail detection event missing callId, ignoring');
+    return NextResponse.json({ success: true, message: 'Voicemail detection logged (no callId)' });
+  }
+
+  const callRequest = await getOutboundCallRequestByCallId(callId);
+  if (!callRequest) {
+    console.log('[VAPI WEBHOOK] No outbound call request found for detection event, ignoring', { callId });
+    return NextResponse.json({ success: true, message: 'Voicemail detection logged (no matching call request)' });
+  }
+
+  const assistantId =
+    payload.assistant?.id ||
+    payload.call?.assistantId ||
+    payload.message?.call?.assistantId ||
+    payload.assistantId ||
+    payload.assistant_id;
+
+  if (detection.category === 'human') {
+    if (callRequest.fields.status !== 'in-call') {
+      await updateOutboundCallRequest(callId, { status: 'in-call' });
+      console.log('[VAPI WEBHOOK] Human detected, call request marked in-call', { callId });
+    }
+    return NextResponse.json({ success: true, message: 'Human detected, status updated' });
+  }
+
+  if (detection.category === 'machine') {
+    const alreadyVoicemail = callRequest.fields.status === 'voicemail';
+    if (!alreadyVoicemail) {
+      await updateOutboundCallRequest(callId, { status: 'voicemail' });
+      console.log('[VAPI WEBHOOK] Voicemail detected, status updated', { callId, detection: detection.rawType });
+    } else {
+      console.log('[VAPI WEBHOOK] Voicemail detection received but status already voicemail', { callId });
+    }
+
+    const recordId = Array.isArray(callRequest.fields.recordId)
+      ? callRequest.fields.recordId[0]
+      : callRequest.fields.recordId;
+    const threadId = callRequest.fields.threadId;
+
+    if (!alreadyVoicemail && recordId && threadId && assistantId) {
+      try {
+        await createChatMessage({
+          recordId,
+          agentId: assistantId,
+          threadId,
+          message: 'It went to voicemail, so I left the recorded message and will send the summary when it finishes.',
+          role: 'assistant',
+          messageType: 'system',
+          callRequestId: callId,
+          callStatus: 'voicemail',
+        });
+        console.log('[VAPI WEBHOOK] Posted voicemail detection notice to chat', {
+          recordId,
+          threadId,
+          callId,
+        });
+      } catch (error) {
+        console.error('[VAPI WEBHOOK] Failed to post voicemail detection message to chat:', error);
+      }
+    }
+
+    return NextResponse.json({ success: true, message: 'Voicemail detected, status updated' });
+  }
+
+  return null;
+}
+
 /**
  * Handle function call events (real-time function execution)
  */
@@ -2043,6 +2178,16 @@ export async function POST(request: NextRequest) {
     if (isSMSEvent) {
       console.log('[VAPI WEBHOOK] SMS event detected, processing SMS...');
       return await handleSMSEvent(payload, request);
+    }
+    
+    // Check for voicemail / answering-machine detection events
+    const detectionInfo = extractVoicemailDetectionInfo(payload, eventType);
+    if (detectionInfo) {
+      console.log('[VAPI WEBHOOK] Voicemail detection event detected:', detectionInfo);
+      const detectionResponse = await handleVoicemailDetectionEvent(payload, detectionInfo);
+      if (detectionResponse) {
+        return detectionResponse;
+      }
     }
     
     // ===== CRITICAL: CHECK FOR FUNCTION CALLS FIRST (before Phase 1) =====

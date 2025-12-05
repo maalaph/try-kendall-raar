@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
 import SmartSuggestions from './SmartSuggestions';
@@ -51,6 +51,16 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
   const isTabVisibleRef = useRef(true);
   const isUserScrollingRef = useRef(false);
   const hasInitialMessagesRef = useRef(false);
+  const clientTimeZone = useMemo(() => {
+    try {
+      if (typeof Intl !== 'undefined' && typeof Intl.DateTimeFormat === 'function') {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      }
+    } catch {
+      // Ignore and fall through
+    }
+    return 'UTC';
+  }, []);
 
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -457,7 +467,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
       const response = await fetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordId, message: finalMessage, threadId }),
+        body: JSON.stringify({ recordId, message: finalMessage, threadId, clientTimeZone }),
       });
 
       if (!response.ok) throw new Error('Failed to send message');

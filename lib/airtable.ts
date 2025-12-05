@@ -773,6 +773,11 @@ const SCHEDULED_CALLS_API_URL = process.env.AIRTABLE_BASE_ID && process.env.AIRT
   ? `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_SCHEDULED_CALLS_TABLE_ID}`
   : '';
 
+// Calendar Events table URL
+const CALENDAR_EVENTS_API_URL = process.env.AIRTABLE_BASE_ID && process.env.AIRTABLE_CALENDAR_EVENTS_TABLE_ID
+  ? `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_CALENDAR_EVENTS_TABLE_ID}`
+  : '';
+
 /**
  * Create a scheduled call task record
  */
@@ -852,6 +857,125 @@ export async function createScheduledCallTask(data: {
     return result;
   } catch (error) {
     console.error('[AIRTABLE ERROR] createScheduledCallTask failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Calendar Events helper functions
+ */
+
+type CalendarEventStatus = 'Active' | 'Updated' | 'Cancelled';
+
+export interface CalendarEventUpsertInput {
+  googleEventId: string;
+  userRecordId: string;
+  summary: string;
+  description?: string;
+  startDateTime: string;
+  endDateTime: string;
+  timeZone: string;
+  allDay?: boolean;
+  location?: string;
+  attendees?: string[];
+  status?: CalendarEventStatus;
+  source?: string;
+  eventUrl?: string;
+}
+
+function buildCalendarEventFields(data: CalendarEventUpsertInput): Record<string, any> {
+  const fields: Record<string, any> = {
+    'Google Event ID': data.googleEventId,
+    'User Record': data.userRecordId ? [data.userRecordId] : undefined,
+    Title: data.summary,
+    Description: data.description,
+    'Start DateTime': data.startDateTime,
+    'End DateTime': data.endDateTime,
+    'Time Zone': data.timeZone,
+    'All Day?': Boolean(data.allDay),
+    Location: data.location,
+    Attendees: data.attendees && data.attendees.length > 0 ? data.attendees.join(', ') : undefined,
+    Status: data.status || 'Active',
+    Source: data.source || 'Kendall',
+    'Event URL': data.eventUrl,
+  };
+
+  Object.keys(fields).forEach((key) => {
+    if (fields[key] === undefined || fields[key] === null || fields[key] === '') {
+      delete fields[key];
+    }
+  });
+
+  return fields;
+}
+
+async function findCalendarEventRecordId(googleEventId: string): Promise<string | null> {
+  if (!CALENDAR_EVENTS_API_URL) {
+    return null;
+  }
+
+  const filterFormula = `{Google Event ID} = "${googleEventId}"`;
+  const lookupUrl = `${CALENDAR_EVENTS_API_URL}?filterByFormula=${encodeURIComponent(filterFormula)}&maxRecords=1`;
+  const response = await fetch(lookupUrl, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    console.error('[AIRTABLE ERROR] findCalendarEventRecordId failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      errorData,
+      googleEventId,
+    });
+    throw new Error(`Failed to find calendar event record: ${errorData?.error?.message || response.statusText}`);
+  }
+
+  const result = await response.json();
+  const record = result.records?.[0];
+  return record?.id || null;
+}
+
+export async function upsertCalendarEventRecord(data: CalendarEventUpsertInput) {
+  try {
+    if (!CALENDAR_EVENTS_API_URL) {
+      console.warn('[AIRTABLE WARNING] Calendar Events table not configured. Set AIRTABLE_CALENDAR_EVENTS_TABLE_ID to enable calendar logging.');
+      return null;
+    }
+
+    if (!data.googleEventId) {
+      throw new Error('googleEventId is required to sync calendar events');
+    }
+
+    const fields = buildCalendarEventFields(data);
+    const existingId = await findCalendarEventRecordId(data.googleEventId);
+
+    const url = existingId ? `${CALENDAR_EVENTS_API_URL}/${existingId}` : CALENDAR_EVENTS_API_URL;
+    const method = existingId ? 'PATCH' : 'POST';
+
+    const response = await fetch(url, {
+      method,
+      headers: getHeaders(),
+      body: JSON.stringify({ fields }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[AIRTABLE ERROR] upsertCalendarEventRecord failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorData,
+        fieldsBeingSent: fields,
+        googleEventId: data.googleEventId,
+      });
+      throw new Error(errorData.error?.message || response.statusText);
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error('[AIRTABLE ERROR] upsertCalendarEventRecord failed:', error);
     throw error;
   }
 }
@@ -1264,7 +1388,7 @@ export async function createOutboundCallRequest(data: {
   callId: string; // VAPI call ID (primary key for lookup)
   recordId: string; // Owner record ID (needed to post back to chat)
   threadId: string; // Chat thread ID (needed to post back to chat)
-  status?: 'pending' | 'in-call' | 'completed' | 'failed';
+  status?: 'pending' | 'in-call' | 'completed' | 'failed' | 'voicemail';
   phoneNumber?: string; // Optional: for reference
 }) {
   try {
@@ -1380,7 +1504,7 @@ export async function getOutboundCallRequestByCallId(callId: string): Promise<{
 export async function updateOutboundCallRequest(
   callId: string,
   updates: {
-    status?: 'pending' | 'in-call' | 'completed' | 'failed';
+    status?: 'pending' | 'in-call' | 'completed' | 'failed' | 'voicemail';
     completedAt?: string;
   }
 ) {
@@ -1702,7 +1826,7 @@ export async function createChatMessage(data: {
   timestamp?: string;
   attachments?: Array<{ url: string; filename: string }>;
   callRequestId?: string;
-  callStatus?: 'queued' | 'in-call' | 'completed' | 'failed';
+  callStatus?: 'queued' | 'in-call' | 'completed' | 'failed' | 'voicemail';
 }) {
   try {
     if (!process.env.AIRTABLE_BASE_ID || !process.env.AIRTABLE_CHAT_MESSAGES_TABLE_ID) {
