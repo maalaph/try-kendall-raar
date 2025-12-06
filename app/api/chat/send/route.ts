@@ -107,7 +107,7 @@ const CHAT_FUNCTIONS = [
   },
   {
     name: 'create_calendar_event',
-    description: 'Create a new calendar event in the user\'s Google Calendar. Use this when the user wants to DO something (block out, block time, reserve time, mark as busy, create event, schedule, add to calendar). This is for DO actions, not KNOW queries. For checking what\'s scheduled, use get_calendar_events instead.',
+    description: 'Create a new calendar event in the user\'s Google Calendar. Use this when the user wants to DO something (block out, block time, reserve time, mark as busy, create event, schedule, add to calendar). This is for DO actions, not KNOW queries. For checking what\'s scheduled, use get_calendar_events instead. IMPORTANT: If you are preparing an email that hints at a meeting, chat, or call (e.g., "let\'s meet up", "want to chat", "schedule a call"), DO NOT call this function immediately. Instead, first ask the user: "I notice your email mentions [meeting/chat/call]. Would you like me to create a calendar event as well?" Only create the calendar event after the user explicitly confirms they want it.',
     parameters: {
       type: 'object',
       properties: {
@@ -163,7 +163,7 @@ const CHAT_FUNCTIONS = [
   },
   {
     name: 'send_gmail',
-    description: 'Send an email via Gmail on behalf of the owner. ONLY call this when you already know the recipient’s email address, subject, and full body text.',
+    description: 'Send an email via Gmail on behalf of the owner. ONLY call this when you already know the recipient's email address, subject, and full body text. IMPORTANT: If you found a contact using get_contact_by_name, you MUST ask the user to confirm: "I found [Name] in your contacts. Did you mean to email them?" Only proceed with preparing the email after the user confirms. Never assume which contact to email - always ask for confirmation first.',
     parameters: {
       type: 'object',
       properties: {
@@ -1900,6 +1900,10 @@ export async function POST(request: NextRequest) {
             // The agent may pass wrong values like '1', so we always use the correct one
             const gmailSendRecordId = recordId; // Always use request context recordId
             
+            // ⚠️ SAFETY CHECK: NEVER call sendGmailMessage here!
+            // All email sending must go through /api/chat/confirm-email endpoint after user approval
+            // This handler only returns a confirmation request with full email content
+            
             if (!to || !to.includes('@')) {
               agentResponse = "I need a valid email address to send the email. What's the recipient's email address?";
               continue;
@@ -2155,47 +2159,31 @@ export async function POST(request: NextRequest) {
                   }
                 }
               } else if (contact.email && isEmailRequest) {
-                // OPTION 2: Automatically trigger email if contact has email and user requested email
-                console.log('[CHAT] Auto-triggering email for contact:', { name: contact.name, email: contact.email });
+                // Contact found with email - ask user to confirm before proceeding
+                console.log('[CHAT] Contact found with email, asking for confirmation:', { name: contact.name, email: contact.email });
                 
-                // Extract email content from user's message
-                let emailSubject = 'Message from owner';
-                let emailBody = 'Hello, this is a message on behalf of the owner.';
+                // IMPORTANT: Ask user to confirm contact before preparing email
+                // This prevents the AI from assuming which contact to email
+                result.instruction = `Contact "${contact.name}" found with email ${contact.email}. You MUST ask the user to confirm: "I found ${contact.name} in your contacts. Did you mean to email them?" Only proceed with preparing the email after the user confirms. Do NOT assume - always ask first.`;
+                result.contactFound = true;
+                result.contactName = contact.name;
+                result.contactEmail = contact.email;
                 
-                // Try to extract subject/body from user's message
-                const emailPatterns = [
-                  /(?:email|send).*?(?:about|regarding|re:)\s+(.+?)(?:\s+(?:that|to|saying|asking|tell|say))?/i,
-                  /(?:tell|say|ask)\s+(?:him|her|them)\s+(.+)/i,
-                  /(?:about|regarding)\s+(.+)/i,
+                // Override agent response to ask for confirmation
+                const genericResponses = [
+                  "I'll take care of that",
+                  "Sounds good",
+                  "I'll send the email",
+                  "Do you need anything else"
                 ];
+                const isGenericResponse = !agentResponse || 
+                  agentResponse.trim() === '' || 
+                  genericResponses.some(phrase => agentResponse.toLowerCase().includes(phrase.toLowerCase()));
                 
-                for (const pattern of emailPatterns) {
-                  const match = message.match(pattern);
-                  if (match && match[1]) {
-                    const extracted = match[1].trim();
-                    if (extracted.length > 0 && extracted.length < 100) {
-                      emailSubject = extracted;
-                      emailBody = extracted;
-                    } else if (extracted.length >= 100) {
-                      emailBody = extracted;
-                    }
-                    break;
-                  }
+                if (isGenericResponse) {
+                  agentResponse = `I found ${contact.name} in your contacts. Did you mean to email them?`;
+                  console.log('[CHAT] Updated agent response to ask for contact confirmation:', agentResponse);
                 }
-                
-                // Check for specific context
-                const userMessage = message.trim().toLowerCase();
-                if (userMessage.includes('dinner') || userMessage.includes('tomorrow') || userMessage.includes('tmr')) {
-                  emailSubject = 'Dinner invitation';
-                  emailBody = 'The owner would like to know if you can come for dinner tomorrow.';
-                }
-                
-                // Note: We don't auto-send emails because we need the user to provide the email content
-                // Instead, we provide the email address to the agent with clear instructions
-                result.instruction = `Contact found with email ${contact.email}. IMMEDIATELY use this email address to send the email using send_gmail function. Subject: "${emailSubject}", Body: "${emailBody}". Do NOT ask for the email address - use ${contact.email} directly.`;
-                result.emailReady = true;
-                result.suggestedSubject = emailSubject;
-                result.suggestedBody = emailBody;
               } else if (contact.phone) {
                 // Contact has phone but user didn't request a call - just inform agent
                 result.instruction = `Contact found with phone number ${contact.phone}. Use this phone number if the user requests a call.`;
