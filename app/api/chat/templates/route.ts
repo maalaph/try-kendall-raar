@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord } from '@/lib/airtable';
+import { getUserRecord } from '@/lib/database';
 import { getAllTemplates, getTemplatesByCategory, renderTemplate } from '@/lib/templates';
 
 /**
@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 
 

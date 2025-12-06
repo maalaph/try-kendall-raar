@@ -1,9 +1,8 @@
 /**
  * Voice Generation Caching System
- * Caches generated voices in Airtable to avoid regeneration and save API costs
+ * Caches generated voices to avoid regeneration and save API costs
  */
 
-import { createUserRecord, getUserRecord, updateUserRecord, searchUserRecords } from './airtable';
 import crypto from 'crypto';
 
 export interface CachedVoice {

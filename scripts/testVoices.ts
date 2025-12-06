@@ -19,7 +19,7 @@ if (fs.existsSync(envPath)) {
   console.warn('[WARN] .env.local not found. Make sure environment variables are set.');
 }
 
-import { getUserRecord } from '../lib/airtable';
+import { getUserRecord } from '../lib/database';
 import { initializeVoiceLibrary, getAllCuratedVoices, CuratedVoice } from '../lib/voiceLibrary';
 import { getVoiceConfigForVAPI } from '../lib/voiceConfigHelper';
 

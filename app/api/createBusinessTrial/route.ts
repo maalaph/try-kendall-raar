@@ -1,4 +1,4 @@
-import { createBusinessTrialRecord } from '@/lib/airtable';
+import { createBusinessTrialRecord } from '@/lib/database';
 import { sendBusinessTrialWelcomeEmail } from '@/lib/email';
 import { rateLimit, getClientIP } from '@/lib/rateLimit';
 import { NextRequest, NextResponse } from 'next/server';

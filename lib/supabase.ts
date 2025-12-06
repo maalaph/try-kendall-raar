@@ -33,3 +33,4 @@ export const getDatabaseUrl = (): string => {
   return process.env.SUPABASE_DB_URL;
 };
 
+

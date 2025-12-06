@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllChatThreads, createNewThread, getUserRecord, createChatMessage } from '@/lib/airtable';
+import { getAllChatThreads, createNewThread, getUserRecord, createChatMessage } from '@/lib/database';
 
 /**
  * GET /api/chat/threads

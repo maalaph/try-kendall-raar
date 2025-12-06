@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord } from '@/lib/airtable';
+import { getUserRecord } from '@/lib/database';
 
 /**
  * POST /api/chat/recurring-tasks
@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
 
 

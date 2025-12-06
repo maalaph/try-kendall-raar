@@ -61,3 +61,4 @@ Both computers can now use the same Ngrok domain simultaneously.
 **"Can't connect both computers"**
 → Ensure both use the same Ngrok authtoken and the endpoint is set to "Pooled"
 
+

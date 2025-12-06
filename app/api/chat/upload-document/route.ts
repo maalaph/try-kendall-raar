@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadFileToBlob } from '@/lib/blobStorage';
-import { getUserRecord, getOrCreateThreadId, createChatMessage } from '@/lib/airtable';
+import { getUserRecord, getOrCreateThreadId, createChatMessage } from '@/lib/database';
 import { createUserDocument, updateDocumentSummary } from '@/lib/userDocuments';
 import OpenAI from 'openai';
 

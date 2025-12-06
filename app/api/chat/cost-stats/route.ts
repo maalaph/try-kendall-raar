@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord } from '@/lib/airtable';
+import { getUserRecord } from '@/lib/database';
 import { getCacheStats } from '@/lib/responseCache';
 import { getRateLimitStatus, RATE_LIMITS } from '@/lib/rateLimiter';
 
@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
 
 

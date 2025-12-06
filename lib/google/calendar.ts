@@ -4,7 +4,7 @@
 
 import { google } from 'googleapis';
 import { refreshAccessToken } from './oauth';
-import { getUserRecord, updateUserRecord } from '@/lib/airtable';
+import { getUserRecord, updateUserRecord } from '@/lib/database';
 
 /**
  * Get authenticated Calendar API client for a user

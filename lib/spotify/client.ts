@@ -2,7 +2,7 @@
  * Spotify API Client with token management
  */
 
-import { getUserRecord, updateUserRecord } from '@/lib/airtable';
+import { getUserRecord, updateUserRecord } from '@/lib/database';
 import { refreshAccessToken } from './oauth';
 
 export interface SpotifyTrack {
@@ -319,6 +319,7 @@ export async function getRecommendations(
     `/recommendations?${params.toString()}`
   );
 }
+
 
 
 

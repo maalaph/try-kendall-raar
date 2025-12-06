@@ -3,7 +3,7 @@
  * Periodically syncs listening history, updates mood patterns, and refreshes analytics
  */
 
-import { getAllUserRecords } from '@/lib/airtable';
+import { getAllUserRecords } from '@/lib/database';
 import { analyzeTimeBasedPatterns, saveMoodPatterns } from './moodAnalysis';
 import { getAnalytics } from './analytics';
 
@@ -15,7 +15,7 @@ export async function syncUserSpotifyData(recordId: string): Promise<void> {
     console.log(`[SPOTIFY SYNC] Starting sync for user ${recordId}`);
     
     // Check if user has Spotify connected
-    const { getUserRecord } = await import('@/lib/airtable');
+    const { getUserRecord } = await import('@/lib/database');
     const userRecord = await getUserRecord(recordId);
     const fields = userRecord.fields;
     
@@ -34,7 +34,7 @@ export async function syncUserSpotifyData(recordId: string): Promise<void> {
     }
     
     // Update last sync timestamp
-    const { updateUserRecord } = await import('@/lib/airtable');
+    const { updateUserRecord } = await import('@/lib/database');
     await updateUserRecord(recordId, {
       'Spotify Last Sync': new Date().toISOString(),
     });
@@ -93,6 +93,7 @@ export async function handleSyncRequest(recordId?: string): Promise<{ success: b
     return { success: false, message: error.message || 'Sync failed' };
   }
 }
+
 
 
 

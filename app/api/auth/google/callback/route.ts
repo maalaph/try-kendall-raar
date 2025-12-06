@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCodeForTokens } from '@/lib/google/oauth';
-import { updateUserRecord } from '@/lib/airtable';
+import { updateUserOAuthTokens } from '@/lib/database';
 import { cookies } from 'next/headers';
 import { google } from 'googleapis';
 
@@ -110,17 +110,16 @@ export async function GET(request: NextRequest) {
     });
     
     try {
-      await updateUserRecord(recordId, {
-        'Google OAuth Access Token': tokenData.access_token,
-        'Google OAuth Refresh Token': tokenData.refresh_token,
-        'Google OAuth Token Expiry': tokenExpiry.toISOString(),
-        'Google Calendar Connected': true,
-        'Google Gmail Connected': true,
-        'Google Email': userEmail,
+      await updateUserOAuthTokens(recordId, {
+        google: {
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token || '',
+          expiresAt: tokenExpiry.toISOString(),
+        },
       });
-      console.log('[GOOGLE OAUTH] ✅ Successfully saved to Airtable');
+      console.log('[GOOGLE OAUTH] ✅ Successfully saved to database');
     } catch (updateError: any) {
-      console.error('[GOOGLE OAUTH] ❌ Failed to save to Airtable:', {
+      console.error('[GOOGLE OAUTH] ❌ Failed to save to database:', {
         error: updateError.message,
         recordId,
         stack: updateError.stack,

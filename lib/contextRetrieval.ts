@@ -3,9 +3,9 @@
  * Atomic functions with capped outputs for voice-first performance
  */
 
-import { getUserRecord } from './airtable';
+import { getUserRecord } from './database';
 import { getUserMemories } from './userPatterns';
-import { getUserContacts as getContactsFromAirtable } from './contacts';
+import { getUserContacts as getContactsFromDatabase } from './contacts';
 import { getDocumentSummaries } from './userDocuments';
 
 const FUNCTION_TIMEOUT_MS = 5000; // 5 second max
@@ -125,7 +125,7 @@ export async function getUserContacts(
     );
 
     const fetchContacts = async (): Promise<Array<{ name: string; phone: string; notes?: string }>> => {
-      const contacts = await getContactsFromAirtable(recordId);
+      const contacts = await getContactsFromDatabase(recordId);
       
       // Filter by contactName if provided
       let filteredContacts = contacts;

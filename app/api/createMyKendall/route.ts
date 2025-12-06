@@ -1,4 +1,4 @@
-import { createUserRecord, updateUserRecord, getUserRecord, formatAttachmentField, updateCanadianNumberMapping } from '@/lib/airtable';
+import { createUserRecord, updateUserRecord, getUserRecord, updateCanadianNumberMapping, formatAttachmentField } from '@/lib/database';
 import { createAgent, createAgentFromTemplate, purchaseNumber, updateAgent, updateAgentFromTemplate } from '@/lib/vapi';
 import { parseUserContext } from '@/lib/promptBlocks';
 import { sendKendallWelcomeEmail } from '@/lib/email';
@@ -344,7 +344,7 @@ Specific Instructions:
 
     // Generate and store threadId for chat functionality
     try {
-      const { getOrCreateThreadId } = await import('@/lib/airtable');
+      const { getOrCreateThreadId } = await import('@/lib/database');
       const threadId = await getOrCreateThreadId(recordId);
       console.log('[API] Generated threadId for user:', threadId);
     } catch (error) {

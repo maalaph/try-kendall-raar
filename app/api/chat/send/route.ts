@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-// Use new PostgreSQL database functions instead of Airtable
+// Use PostgreSQL database functions
 import { getUserRecord, getOrCreateThreadId, createChatMessage, getChatMessages } from '@/lib/database';
 import { getContactByName, upsertContact, getContactByEmail, getUserContacts } from '@/lib/database';
 import { getUserPatterns, getUserMemories } from '@/lib/database';
-// Keep Airtable imports for legacy functions that haven't been migrated yet
-import { createOutboundCallRequest, upsertCalendarEventRecord } from '@/lib/airtable';
+// All functions now use Supabase PostgreSQL
+import { createOutboundCallRequest, upsertCalendarEventRecord } from '@/lib/database';
 import { buildChatSystemPrompt } from '@/lib/promptBlocks';
 import { formatPhoneNumberToE164 } from '@/lib/vapi';
 import { extractPatternsFromMessage } from '@/lib/patternExtractor';
@@ -345,7 +345,7 @@ async function generateChatResponse(
   threadId: string = ''
 ): Promise<{ response: string; functionCalls?: Array<{ name: string; arguments: any }>; kendallName?: string }> {
   try {
-    // Get agent data from Airtable
+    // Get agent data from database
     const agentRecord = await getUserRecord(agentRecordId);
     if (!agentRecord || !agentRecord.fields) {
       throw new Error('Agent record not found');
@@ -713,41 +713,21 @@ export async function POST(request: NextRequest) {
     let userRecord;
     try {
       userRecord = await getUserRecord(recordId);
-    } catch (airtableError) {
-      console.error('[API ERROR] Failed to fetch user record:', airtableError);
+    } catch (dbError) {
+      console.error('[API ERROR] Failed to fetch user record:', dbError);
       
       // If user doesn't exist, create a minimal test user
-      const errorMessage = airtableError instanceof Error ? airtableError.message : 'Unknown error';
+      const errorMessage = dbError instanceof Error ? dbError.message : 'Unknown error';
       if (errorMessage.includes('not found')) {
-        console.log(`[API] User record not found in PostgreSQL, fetching from Airtable: ${recordId}`);
+        console.log(`[API] User record not found in PostgreSQL, creating minimal user: ${recordId}`);
         try {
-          // Try to fetch from Airtable first to get real user data
-          let airtableUser = null;
-          try {
-            const { getUserRecord: getAirtableUser } = await import('@/lib/airtable');
-            airtableUser = await getAirtableUser(recordId);
-            console.log(`[API] Found user in Airtable, migrating to PostgreSQL: ${recordId}`);
-          } catch (airtableError) {
-            console.log(`[API] User not found in Airtable either, creating minimal user: ${recordId}`);
-          }
-          
           const { createUserRecord } = await import('@/lib/database');
-          // Use Airtable data if available, otherwise minimal defaults
+          // Create minimal user record
           await createUserRecord({
             recordId: recordId,
-            fullName: airtableUser?.fields?.fullName || 'User',
-            nickname: airtableUser?.fields?.nickname,
-            email: airtableUser?.fields?.email,
-            mobileNumber: airtableUser?.fields?.mobileNumber,
-            kendallName: airtableUser?.fields?.kendallName || 'Kendall',
-            selectedTraits: airtableUser?.fields?.selectedTraits || [],
-            useCaseChoice: airtableUser?.fields?.useCaseChoice,
-            boundaryChoices: airtableUser?.fields?.boundaryChoices || [],
-            userContextAndRules: airtableUser?.fields?.userContextAndRules,
-            analyzedFileContent: airtableUser?.fields?.analyzedFileContent,
-            fileUsageInstructions: airtableUser?.fields?.fileUsageInstructions,
-            vapi_agent_id: airtableUser?.fields?.vapi_agent_id,
-            timeZone: airtableUser?.fields?.timeZone || airtableUser?.fields?.['Time Zone'] || 'UTC',
+            fullName: 'User',
+            kendallName: 'Kendall',
+            timeZone: 'UTC',
           });
           // Retry fetching the user
           userRecord = await getUserRecord(recordId);
@@ -829,7 +809,7 @@ export async function POST(request: NextRequest) {
       // If Chat Messages table doesn't exist or isn't configured, log but continue
       const errorMessage = messagesError instanceof Error ? messagesError.message : 'Unknown error';
       
-      if (errorMessage.includes('Chat Messages Airtable URL is not configured') || 
+      if (errorMessage.includes('Chat Messages') || 
           errorMessage.includes('AIRTABLE_CHAT_MESSAGES_TABLE_ID')) {
         console.warn('[API WARNING] Chat Messages table not configured, continuing without history:', errorMessage);
         recentMessages = { messages: [], hasMore: false };
@@ -898,7 +878,7 @@ export async function POST(request: NextRequest) {
           message: message.trim(),
           role: 'user',
         });
-        console.log('[CHAT API] User message saved to Airtable:', { recordId, threadId, messageLength: message.trim().length });
+        console.log('[CHAT API] User message saved to database:', { recordId, threadId, messageLength: message.trim().length });
         
         // Index user message with embeddings using Trigger.dev (async, don't block)
         // Trigger.dev v4 requires TRIGGER_SECRET_KEY (not TRIGGER_API_KEY)
@@ -1205,7 +1185,7 @@ export async function POST(request: NextRequest) {
     } catch (userMsgError) {
       // Log but don't fail - we still want to return the response
       const errorMessage = userMsgError instanceof Error ? userMsgError.message : String(userMsgError);
-      console.error('[CHAT API ERROR] Failed to save user message to Airtable:', {
+      console.error('[CHAT API ERROR] Failed to save user message to database:', {
         error: errorMessage,
         recordId,
         threadId,
@@ -1230,7 +1210,7 @@ export async function POST(request: NextRequest) {
           message: agentResponse,
           role: 'assistant',
         });
-        console.log('[CHAT API] Agent message saved to Airtable:', { recordId, threadId, messageLength: agentResponse.length });
+        console.log('[CHAT API] Agent message saved to database:', { recordId, threadId, messageLength: agentResponse.length });
         
         // Index assistant message with embeddings using Trigger.dev (async, don't block)
         if (agentMessage?.id) {
@@ -1286,7 +1266,7 @@ export async function POST(request: NextRequest) {
     } catch (agentMsgError) {
       // Log but don't fail - we still want to return the response
       const errorMessage = agentMsgError instanceof Error ? agentMsgError.message : String(agentMsgError);
-      console.error('[CHAT API ERROR] Failed to save agent message to Airtable:', {
+      console.error('[CHAT API ERROR] Failed to save agent message to database:', {
         error: errorMessage,
         recordId,
         threadId,
@@ -1626,7 +1606,7 @@ export async function POST(request: NextRequest) {
                   eventUrl: createdEvent.htmlLink || undefined,
                 });
               } catch (calendarSyncError) {
-                console.error('[CHAT] Failed to sync calendar event to Airtable:', calendarSyncError);
+                console.error('[CHAT] Failed to sync calendar event to database:', calendarSyncError);
               }
             }
           } catch (error) {

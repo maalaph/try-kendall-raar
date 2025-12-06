@@ -7,7 +7,7 @@ import { getContactByName } from "@/lib/database";
 import { fetchCalendarEvents, sendGmailMessage, GoogleIntegrationError } from "@/lib/integrations/google";
 import { createEvent } from "@/lib/google/calendar";
 import { fetchSpotifyInsights, SpotifyIntegrationError } from "@/lib/integrations/spotify";
-import { createOutboundCallRequest } from "@/lib/airtable";
+import { createOutboundCallRequest } from "@/lib/database";
 import { formatPhoneNumberToE164 } from "@/lib/vapi";
 
 export interface FunctionDefinition {
@@ -281,4 +281,5 @@ function initializeFunctions(registry: FunctionRegistry) {
     },
   });
 }
+
 

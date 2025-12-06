@@ -1,4 +1,4 @@
-import { getAllUserRecords } from '@/lib/airtable';
+import { getAllUserRecords } from '@/lib/database';
 import { updateAgentBackgroundSound } from '@/lib/vapi';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 
 

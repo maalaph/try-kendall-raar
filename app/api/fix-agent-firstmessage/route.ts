@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOwnerByPhoneNumber } from '@/lib/airtable';
+import { getOwnerByPhoneNumber } from '@/lib/database';
 import { updateAgentFromTemplate } from '@/lib/vapi';
 
 /**
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     });
     
     // Get full user record to get all the data needed for update
-    const { getUserRecord } = await import('@/lib/airtable');
+    const { getUserRecord } = await import('@/lib/database');
     const userRecord = await getUserRecord(ownerInfo.recordId);
     const fields = userRecord.fields || {};
     

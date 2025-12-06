@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord, getCallStats, getRecentCallNotes, getUnreadCallNotes, getAllCallNotes, deleteCallNote } from '@/lib/airtable';
+import { getUserRecord, getCallStats, getRecentCallNotes, getUnreadCallNotes, getCallNotes, deleteCallNote } from '@/lib/database';
 import { getContactByPhone } from '@/lib/contacts';
 import { formatPhoneNumberToE164 } from '@/lib/vapi';
 

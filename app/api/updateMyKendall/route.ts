@@ -1,4 +1,4 @@
-import { updateUserRecord, getUserRecord } from '@/lib/airtable';
+import { updateUserRecord, getUserRecord } from '@/lib/database';
 import { updateAgent, updateAgentFromTemplate, reassignPhoneNumber } from '@/lib/vapi';
 import { parseUserContext } from '@/lib/promptBlocks';
 import { rateLimit, getClientIP } from '@/lib/rateLimit';

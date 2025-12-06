@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord, getRecentCallNotes, markCallNotesAsRead } from '@/lib/airtable';
+import { getUserRecord, getRecentCallNotes, markCallNotesAsRead } from '@/lib/database';
 
 /**
  * GET /api/call-notes
@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
 
 

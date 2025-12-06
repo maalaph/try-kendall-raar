@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getScheduledCallTasks, updateScheduledCallTask, getOwnerInfoByAgentId, getUserRecord, getOwnerPhoneByAgentId } from '@/lib/airtable';
+import { getScheduledCallTasks, updateScheduledCallTask, getOwnerInfoByAgentId, getUserRecord, getOwnerPhoneByAgentId } from '@/lib/database';
 import { getContactByPhone } from '@/lib/contacts';
 import { buildVoicemailMessage, getStartSpeakingPlan, getVoicemailDetectionConfig } from '@/lib/callExperienceConfig';
 // Import background executor to start it automatically
@@ -320,7 +320,7 @@ export async function GET(request: NextRequest) {
         if (!finalRecipientName && formattedPhone) {
           try {
             // Get user record by agentId (not recordId) - ownerAgentId is a VAPI agent ID
-            const { getUserRecordByAgentId } = await import('@/lib/airtable');
+            const { getUserRecordByAgentId } = await import('@/lib/database');
             const userRecord = await getUserRecordByAgentId(ownerAgentId);
             if (userRecord && userRecord.id) {
               const contact = await getContactByPhone(userRecord.id, formattedPhone);

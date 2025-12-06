@@ -108,3 +108,4 @@ Once this is working, we'll add:
 - Background learning loop (Trigger.dev)
 - Advanced intelligence features
 
+

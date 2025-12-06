@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord } from '@/lib/airtable';
+import { getUserRecord } from '@/lib/database';
 import { getUserMemories } from '@/lib/database';
 import { upsertUserMemory, getUserMemoryByKey, deleteUserMemory } from '@/lib/userPatterns';
 

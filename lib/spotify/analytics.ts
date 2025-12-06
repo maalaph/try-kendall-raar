@@ -4,7 +4,7 @@
  */
 
 import { getRecentlyPlayed, getTopTracks, getTopArtists, SpotifyTrack } from './client';
-import { getUserRecord, updateUserRecord } from '@/lib/airtable';
+import { getUserRecord, updateUserRecord } from '@/lib/database';
 
 export interface ListeningAnalytics {
   totalListeningTime: number; // in minutes
@@ -177,6 +177,7 @@ export function generateInsights(analytics: ListeningAnalytics): string[] {
   
   return insights;
 }
+
 
 
 

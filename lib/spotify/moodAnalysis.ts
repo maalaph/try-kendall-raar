@@ -4,7 +4,7 @@
  */
 
 import { getRecentlyPlayed, getAudioFeatures, SpotifyTrack, SpotifyAudioFeatures } from './client';
-import { getUserRecord, updateUserRecord } from '@/lib/airtable';
+import { getUserRecord, updateUserRecord } from '@/lib/database';
 
 export interface MoodPattern {
   timeOfDay: 'morning' | 'afternoon' | 'evening' | 'night';
@@ -268,6 +268,7 @@ export async function loadMoodPatterns(
     return null;
   }
 }
+
 
 
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateUserRecord } from '@/lib/airtable';
+import { updateUserOAuthTokens } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,13 +13,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Clear all Google OAuth fields
-    await updateUserRecord(recordId, {
-      'Google OAuth Access Token': '',
-      'Google OAuth Refresh Token': '',
-      'Google OAuth Token Expiry': null,
-      'Google Calendar Connected': false,
-      'Google Gmail Connected': false,
-      'Google Email': '',
+    await updateUserOAuthTokens(recordId, {
+      google: {
+        accessToken: '',
+        refreshToken: '',
+        expiresAt: '',
+      },
     });
 
     return NextResponse.json({ success: true });

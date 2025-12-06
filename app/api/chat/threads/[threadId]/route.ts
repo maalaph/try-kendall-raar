@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord, updateThreadTitle } from '@/lib/airtable';
+import { getUserRecord, updateThreadTitle } from '@/lib/database';
 
 const CHAT_MESSAGES_API_URL = process.env.AIRTABLE_BASE_ID && process.env.AIRTABLE_CHAT_MESSAGES_TABLE_ID
   ? `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_CHAT_MESSAGES_TABLE_ID}`

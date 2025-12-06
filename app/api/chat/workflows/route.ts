@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord } from '@/lib/airtable';
+import { getUserRecord } from '@/lib/database';
 import { formatPhoneNumberToE164 } from '@/lib/vapi';
 
 interface WorkflowStep {
@@ -129,6 +129,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 
 

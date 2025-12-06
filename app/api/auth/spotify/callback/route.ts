@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCodeForTokens } from '@/lib/spotify/oauth';
-import { updateUserRecord } from '@/lib/airtable';
+import { updateUserOAuthTokens } from '@/lib/database';
 import { cookies } from 'next/headers';
 
 /**
@@ -176,10 +176,16 @@ export async function GET(request: NextRequest) {
         updateData['Spotify Email'] = userEmail;
       }
 
-      await updateUserRecord(recordId, updateData);
-      console.log('[SPOTIFY OAUTH] ✅ Successfully saved to Airtable');
+      await updateUserOAuthTokens(recordId, {
+        spotify: {
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token || '',
+          expiresAt: tokenExpiry.toISOString(),
+        },
+      });
+      console.log('[SPOTIFY OAUTH] ✅ Successfully saved to database');
     } catch (updateError: any) {
-      console.error('[SPOTIFY OAUTH] ❌ Failed to save to Airtable:', {
+      console.error('[SPOTIFY OAUTH] ❌ Failed to save to database:', {
         error: updateError.message,
         recordId,
         stack: updateError.stack,

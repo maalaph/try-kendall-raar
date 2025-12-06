@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateUserRecord } from '@/lib/airtable';
+import { updateUserOAuthTokens } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 
 
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord, getCallStats, getRecentCallNotes, getUnreadCallNotes } from '@/lib/airtable';
+import { getUserRecord, getCallStats, getRecentCallNotes, getUnreadCallNotes } from '@/lib/database';
 import { fetchGmailMessages, GoogleIntegrationError } from '@/lib/integrations/google';
 import { fetchSpotifyInsights, SpotifyIntegrationError } from '@/lib/integrations/spotify';
 import { getContactByPhone } from '@/lib/contacts';
@@ -242,4 +242,5 @@ async function fetchSpotifyData(recordId: string) {
     },
   };
 }
+
 

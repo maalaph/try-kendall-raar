@@ -4,7 +4,7 @@
 
 import { google } from 'googleapis';
 import { refreshAccessToken } from './oauth';
-import { getUserRecord, updateUserRecord } from '@/lib/airtable';
+import { getUserRecord, updateUserRecord } from '@/lib/database';
 
 /**
  * Get authenticated Gmail API client for a user
@@ -143,6 +143,7 @@ export async function deleteLabel(userId: string, labelId: string) {
     id: labelId,
   });
 }
+
 
 
 

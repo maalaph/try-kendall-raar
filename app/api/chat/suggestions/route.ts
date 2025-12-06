@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord } from '@/lib/airtable';
-import { getChatMessages } from '@/lib/airtable';
+import { getUserRecord, getChatMessages, getOrCreateThreadId } from '@/lib/database';
 import { getUserPatterns } from '@/lib/userPatterns';
 import { getUserMemories } from '@/lib/database';
-import { getOrCreateThreadId } from '@/lib/airtable';
 import { checkRateLimit } from '@/lib/rateLimiter';
 import { getCache, setCache, generateCacheKey } from '@/lib/responseCache';
 

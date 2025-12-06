@@ -1,4 +1,4 @@
-import { getUserRecord } from '@/lib/airtable';
+import { getUserRecord } from '@/lib/database';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
 
 

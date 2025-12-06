@@ -1,10 +1,10 @@
 /**
  * Google API helper functions for accessing Calendar and Gmail
- * Uses stored OAuth tokens from Airtable
+ * Uses stored OAuth tokens from database
  */
 
 import { google } from 'googleapis';
-import { getUserRecord, updateUserRecord } from '@/lib/airtable';
+import { getUserOAuthTokens, updateUserOAuthTokens } from '@/lib/database';
 import { refreshAccessToken, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI } from './oauth';
 
 interface GoogleTokens {
@@ -14,28 +14,23 @@ interface GoogleTokens {
 }
 
 /**
- * Get OAuth tokens from Airtable for a given recordId
+ * Get OAuth tokens from database for a given recordId
  */
 export async function getGoogleTokens(recordId: string): Promise<GoogleTokens | null> {
   try {
-    const userRecord = await getUserRecord(recordId);
-    const fields = userRecord.fields;
+    const tokens = await getUserOAuthTokens(recordId);
 
-    const accessToken = fields['Google OAuth Access Token'] as string | undefined;
-    const refreshToken = fields['Google OAuth Refresh Token'] as string | undefined;
-    const tokenExpiry = fields['Google OAuth Token Expiry'] as string | undefined;
-
-    if (!accessToken || !refreshToken) {
+    if (!tokens.google || !tokens.google.accessToken || !tokens.google.refreshToken) {
       return null;
     }
 
     return {
-      accessToken,
-      refreshToken,
-      expiry: tokenExpiry ? new Date(tokenExpiry) : null,
+      accessToken: tokens.google.accessToken,
+      refreshToken: tokens.google.refreshToken,
+      expiry: tokens.google.expiresAt ? new Date(tokens.google.expiresAt) : null,
     };
   } catch (error) {
-    console.error('[GOOGLE API] Failed to get tokens from Airtable:', error);
+    console.error('[GOOGLE API] Failed to get tokens from database:', error);
     return null;
   }
 }
@@ -51,7 +46,7 @@ function isTokenExpired(expiry: Date | null): boolean {
 }
 
 /**
- * Refresh access token if expired and update Airtable
+ * Refresh access token if expired and update database
  */
 export async function ensureValidAccessToken(recordId: string, tokens: GoogleTokens): Promise<string> {
   if (!isTokenExpired(tokens.expiry)) {
@@ -71,10 +66,13 @@ export async function ensureValidAccessToken(recordId: string, tokens: GoogleTok
     const expiresIn = tokenData.expires_in || 3600;
     const tokenExpiry = new Date(Date.now() + (expiresIn * 1000));
 
-    // Update Airtable with new token
-    await updateUserRecord(recordId, {
-      'Google OAuth Access Token': tokenData.access_token,
-      'Google OAuth Token Expiry': tokenExpiry.toISOString(),
+    // Update database with new token
+    await updateUserOAuthTokens(recordId, {
+      google: {
+        accessToken: tokenData.access_token,
+        refreshToken: tokens.refreshToken, // Keep existing refresh token
+        expiresAt: tokenExpiry.toISOString(),
+      },
     });
 
     console.log('[GOOGLE API] Token refreshed successfully');
@@ -126,6 +124,7 @@ export async function getGmailClient(recordId: string) {
   const auth = await getAuthenticatedGoogleClient(recordId);
   return google.gmail({ version: 'v1', auth });
 }
+
 
 
 

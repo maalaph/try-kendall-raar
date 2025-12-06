@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createScheduledCallTask, getOwnerInfoByAgentId, getOwnerPhoneByAgentId } from '@/lib/airtable';
+import { createScheduledCallTask, getOwnerInfoByAgentId, getOwnerPhoneByAgentId } from '@/lib/database';
 import { parseTimeExpression, isFutureTime } from '@/lib/timeParser';
 import { buildVoicemailMessage, getStartSpeakingPlan, getVoicemailDetectionConfig } from '@/lib/callExperienceConfig';
 
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
 
     // Verify caller is owner (if caller_phone_number provided)
     if (caller_phone_number) {
-      const { getOwnerByPhoneNumber } = await import('@/lib/airtable');
+      const { getOwnerByPhoneNumber } = await import('@/lib/database');
       const ownerInfo = await getOwnerByPhoneNumber(caller_phone_number);
       
       if (!ownerInfo || ownerInfo.agentId !== owner_agent_id) {
@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
       // Make immediate call
       try {
         // Get user record to retrieve phoneNumberId
-        const { getUserRecord } = await import('@/lib/airtable');
+        const { getUserRecord } = await import('@/lib/database');
         
         // Find user record by agent ID
         const filterFormula = `{vapi_agent_id} = "${owner_agent_id}"`;

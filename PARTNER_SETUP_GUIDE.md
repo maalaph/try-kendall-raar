@@ -1,10 +1,13 @@
 # Complete Setup Guide for Partner
 
+## ⚠️ IMPORTANT: Replace All API Keys
+**All keys in this file are placeholders. You MUST replace them with your own keys before using this application.**
+
 ## Quick Start
 
-Since you share the same Airtable base and Supabase database, you just need to:
+Since you share the same Supabase database, you just need to:
 1. Install dependencies
-2. Copy the environment variables below
+2. Copy the environment variables below and **replace all placeholder values with your actual keys**
 3. Start the development server
 
 ---
@@ -25,68 +28,58 @@ Create a file named `.env.local` in the project root and paste the following:
 ```bash
 NEXT_PUBLIC_CALENDLY_URL=https://calendly.com/admin-ordco/15
 
-# Airtable Configuration
-AIRTABLE_API_KEY=patTETTk0kE6nagqL.390f2cb15fa577b6e3d904325f756c891b72d379b5b857f8ca3e6422f6842373
-AIRTABLE_BASE_ID=appRzrocK4whoKzZ7
-AIRTABLE_TABLE_ID=tblEXG9wp3Dm3nPte
+# Airtable Configuration (REMOVED - All data migrated to Supabase)
+# No longer needed - all functionality uses Supabase PostgreSQL
 
 # Vapi Configuration
-VAPI_PRIVATE_KEY=52c9d932-2ae8-47e7-8ace-f27966072ca5
+VAPI_PRIVATE_KEY=your_vapi_private_key
 VAPI_DEFAULT_MODEL=gpt-4o
 
 # Vapi Voice Configuration
 VAPI_VOICE_ID=Alexandra
 
 # Twilio Configuration
-TWILIO_ACCOUNT_SID=ACa46bba8a4285d650e1ef19b3c8ca2fd2
-TWILIO_AUTH_TOKEN=6aebca62039279629c5ba6afca7d4d5f
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
 
 # Gmail SMTP Configuration
-GMAIL_USER=admin@ordco.net
-GMAIL_APP_PASSWORD=cwzwcbmytuysbtqu
+GMAIL_USER=your_gmail_user
+GMAIL_APP_PASSWORD=your_gmail_app_password
 
-# Business Trial Airtable Table
-AIRTABLE_BUSINESS_TRIAL_TABLE_ID=tbli3uJLbubkIRk5S
-OPENAI_API_KEY=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
-BLOB_READ_WRITE_TOKEN=vercel_blob_rw_YAQIFmtj2ekspubC_z6XyZyeMdGjYutFfeM9isVNHMKYGxh
-ELEVENLABS_API_KEY=sk_0b87d06dfeb237a195d89d8afd08aba31e2f0399fbf8c3d2
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key
 
-AIRTABLE_CALL_NOTES_TABLE_ID=tblDn615swgYvoa3m
+# Vercel Blob Storage
+BLOB_READ_WRITE_TOKEN=your_vercel_blob_read_write_token
 
-VAPI_WEBHOOK_URL=https://raar-dev.ngrok.app/api/vapi-webhook
+# ElevenLabs Configuration
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
 
-# Scheduled Calls Airtable Table ID
-AIRTABLE_SCHEDULED_CALLS_TABLE_ID=tblwnjWrCK7p86Tjz
-AIRTABLE_CHAT_MESSAGES_TABLE_ID=tblcQk5eaci1SX6ZL
-AIRTABLE_USER_PATTERNS_TABLE_ID=tblaVMSZIW4g4X91K
-AIRTABLE_USER_MEMORY_TABLE_ID=tblcQk5eaci1SX6ZL
-AIRTABLE_CONTACTS_TABLE_ID=tbldEql6xpdNAl9Do
+VAPI_WEBHOOK_URL=https://your-domain.ngrok.app/api/vapi-webhook
 
 # Google OAuth Credentials
-GOOGLE_CLIENT_ID=625035731744-snfv8sd0r7qkfn8kk2r2id26ndio8nad.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=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
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
 
-# User Documents table
-AIRTABLE_USER_DOCUMENTS_TABLE_ID=tblSG1Zfa1eAEUVTu
-
 # Spotify OAuth Configuration
-SPOTIFY_CLIENT_ID=25dc38efd45a44259319d9d92c61cdeb
-SPOTIFY_CLIENT_SECRET=b1890965642c4ebcb6933cb93a84fdba
+SPOTIFY_CLIENT_ID=your_spotify_client_id
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 SPOTIFY_REDIRECT_URI=http://127.0.0.1:3000/api/auth/spotify/callback
 
 # Supabase Configuration (PostgreSQL Database)
-SUPABASE_URL=https://kwlkbuatidinolgfsxst.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3bGtidWF0aWRpbm9sZ2ZzeHN0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NDk1MTk3MywiZXhwIjoyMDgwNTI3OTczfQ.Hjh5HcIBj70kmj0ZM8fqfmNMQ1lkAHQWdND8fYedhaw
-SUPABASE_DB_URL=postgresql://postgres:Ry4nAli$70@db.kwlkbuatidinolgfsxst.supabase.co:5432/postgres
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+SUPABASE_DB_URL=postgresql://postgres:your_password@db.your-project.supabase.co:5432/postgres
 
 # Trigger.dev Configuration
-TRIGGER_API_KEY=tr_dev_aYSqMuZZQJ5iPnigxifb
-TRIGGER_PROJECT_ID=proj_hsneehqxymxjwpkwntec
+TRIGGER_SECRET_KEY=your_trigger_secret_key
+TRIGGER_PROJECT_ID=your_trigger_project_id
+# Legacy support (optional - will use TRIGGER_SECRET_KEY if both are set)
+# TRIGGER_API_KEY=your_trigger_api_key
 
 # LangGraph Configuration (for advanced agent orchestration)
 USE_LANGGRAPH=true
-TRIGGER_SECRET_KEY=tr_dev_aYSqMuZZQJ5iPnigxifb
 ```
 
 **Important Notes:**
@@ -173,11 +166,11 @@ This checks that all required environment variables are loaded correctly.
 
 ## What Works Out of the Box
 
-Since you share the same Airtable and Supabase:
-- ✅ All Airtable tables are already set up
+Since you share the same Supabase database:
+- ✅ All database tables are already set up
 - ✅ Database connections are configured
-- ✅ All API keys are shared
 - ✅ Chat, dashboard, and all features should work immediately
+- ⚠️ **You must replace all API keys** (see KEY_REPLACEMENT_CHECKLIST.md)
 
 ---
 
@@ -232,4 +225,5 @@ Everything else is already configured since you share the same infrastructure!
 ---
 
 **You're all set!** 🚀
+
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOwnerPhoneByAgentId, createCallNote, getOwnerByPhoneNumber, createScheduledCallTask, getAgentByCanadianNumber, getCanadianNumberByAgentId, getUserRecord, getOutboundCallRequestByCallId, updateOutboundCallRequest, createChatMessage, getAllUserRecords } from '@/lib/airtable';
+import { getOwnerPhoneByAgentId, createCallNote, getOwnerByPhoneNumber, createScheduledCallTask, getAgentByCanadianNumber, getCanadianNumberByAgentId, getUserRecord, getUserRecordByAgentId, getOutboundCallRequestByCallId, updateOutboundCallRequest, createChatMessage, getOrCreateThreadId } from '@/lib/database';
 import { upsertContact } from '@/lib/contacts';
 import { formatPhoneNumberToE164 } from '@/lib/vapi';
 import { sendSMS } from '@/lib/sms';
@@ -8,7 +8,6 @@ import { buildSystemPrompt } from '@/lib/promptBlocks';
 // Import background executor and explicitly start it
 import { startBackgroundExecutor } from '@/lib/backgroundCallExecutor';
 import { extractPatternsFromMessage } from '@/lib/patternExtractor';
-import { getOrCreateThreadId } from '@/lib/airtable';
 import OpenAI from 'openai';
 import { getUserContext, getUserContacts, getUserMemory, getUserDocuments } from '@/lib/contextRetrieval';
 
@@ -2916,31 +2915,14 @@ export async function POST(request: NextRequest) {
     
     if (assistantId) {
       try {
-        // Query Airtable to get recordId from agentId
-        const filterFormula = `{vapi_agent_id} = "${assistantId}"`;
-        const baseId = process.env.AIRTABLE_BASE_ID;
-        const tableId = process.env.AIRTABLE_TABLE_ID;
-        if (baseId && tableId) {
-          const url = `https://api.airtable.com/v0/${baseId}/${tableId}?filterByFormula=${encodeURIComponent(filterFormula)}`;
-          const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${process.env.AIRTABLE_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (response.ok) {
-            const result = await response.json();
-            const records = result.records || [];
-            if (records.length > 0) {
-              ownerRecordId = records[0].id;
-              // Get or create threadId for this user
-              if (ownerRecordId) {
-                ownerThreadId = await getOrCreateThreadId(ownerRecordId);
-                console.log('[VAPI WEBHOOK] Found owner recordId:', ownerRecordId, 'threadId:', ownerThreadId);
-              }
-            }
+        // Query database to get recordId from agentId
+        const userRecord = await getUserRecordByAgentId(assistantId);
+        if (userRecord && userRecord.fields) {
+          ownerRecordId = userRecord.fields.record_id;
+          // Get or create threadId for this user
+          if (ownerRecordId) {
+            ownerThreadId = await getOrCreateThreadId(ownerRecordId);
+            console.log('[VAPI WEBHOOK] Found owner recordId:', ownerRecordId, 'threadId:', ownerThreadId);
           }
         }
       } catch (error) {

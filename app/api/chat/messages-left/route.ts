@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord, getUnreadCallNotes } from '@/lib/airtable';
+import { getUserRecord, getUnreadCallNotes } from '@/lib/database';
 
 /**
  * GET /api/chat/messages-left
@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
 
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAgentByCanadianNumber, getCanadianNumberByAgentId, getUserRecord } from '@/lib/airtable';
+import { getAgentByCanadianNumber, getCanadianNumberByAgentId, getUserRecord } from '@/lib/database';
 import { sendSMS } from '@/lib/sms';
 import { buildSystemPrompt } from '@/lib/promptBlocks';
 import OpenAI from 'openai';

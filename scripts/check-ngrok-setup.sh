@@ -54,3 +54,4 @@ echo "   2. Verify the endpoint is set to 'Pooled' in Ngrok dashboard"
 echo "   3. Check that VAPI_WEBHOOK_URL is set correctly"
 echo "   4. Run: node verify-env.js"
 
+

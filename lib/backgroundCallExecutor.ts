@@ -4,7 +4,7 @@
  * Works in both development and production environments
  */
 
-import { getScheduledCallTasks, updateScheduledCallTask, getOwnerInfoByAgentId, updateScheduledCallTaskAtomically, createOutboundCallRequest, getOwnerPhoneByAgentId } from '@/lib/airtable';
+import { getScheduledCallTasks, updateScheduledCallTask, getOwnerInfoByAgentId, updateScheduledCallTaskAtomically, createOutboundCallRequest, getOwnerPhoneByAgentId } from '@/lib/database';
 import { buildVoicemailMessage, getStartSpeakingPlan, getVoicemailDetectionConfig } from '@/lib/callExperienceConfig';
 
 const VAPI_API_URL = 'https://api.vapi.ai';
