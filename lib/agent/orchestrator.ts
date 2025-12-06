@@ -129,11 +129,14 @@ export async function runAgent(
     return result;
   } catch (error) {
     console.error('[AGENT] LangGraph execution failed:', error);
-    // Return state with error message
-    return {
-      ...state,
-      response: "I encountered an error processing your request. Please try again.",
-    };
+    
+    // If it's a database connection error, provide more helpful message
+    if (error instanceof Error && error.message.includes('ENOTFOUND')) {
+      console.error('[AGENT] Database connection failed. Check SUPABASE_DB_URL and network connectivity.');
+    }
+    
+    // Throw error instead of returning error state - let caller handle fallback
+    throw error;
   }
 }
 

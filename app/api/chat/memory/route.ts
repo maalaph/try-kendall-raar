@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserRecord } from '@/lib/airtable';
-import { upsertUserMemory, getUserMemories, getUserMemoryByKey, deleteUserMemory } from '@/lib/userPatterns';
+import { getUserMemories } from '@/lib/database';
+import { upsertUserMemory, getUserMemoryByKey, deleteUserMemory } from '@/lib/userPatterns';
 
 /**
  * GET /api/chat/memory

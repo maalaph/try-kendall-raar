@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test:voices": "tsx scripts/testVoices.ts",
-    "fetch-vapi-voices": "tsx scripts/fetchVAPIElevenLabsVoices.ts"
+    "fetch-vapi-voices": "tsx scripts/fetchVAPIElevenLabsVoices.ts",
+    "trigger:dev": "npx trigger.dev@latest dev",
+    "trigger:dev:watch": "npx trigger.dev@latest dev --watch",
+    "dev:all": "concurrently \"npm run dev\" \"npm run trigger:dev\""
   },
   "dependencies": {
     "@langchain/core": "^0.3.0",

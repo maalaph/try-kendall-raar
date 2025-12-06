@@ -1,0 +1,73 @@
+{
+  "configPath": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/Desktop/landing_page/trigger.config.mjs",
+  "tasks": [
+    {
+      "id": "index-message",
+      "maxDuration": 300,
+      "filePath": "trigger/embedding-tasks.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "id": "batch-index-messages",
+      "maxDuration": 300,
+      "filePath": "trigger/embedding-tasks.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "id": "backfill-user-embeddings",
+      "maxDuration": 300,
+      "filePath": "trigger/embedding-tasks.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "id": "index-memory",
+      "maxDuration": 300,
+      "filePath": "trigger/embedding-tasks.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "id": "index-all-memories",
+      "maxDuration": 300,
+      "filePath": "trigger/embedding-tasks.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "id": "extract-patterns",
+      "maxDuration": 300,
+      "filePath": "trigger/index.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/Desktop/landing_page/trigger/index.mjs"
+    },
+    {
+      "id": "batch-extract-patterns",
+      "maxDuration": 300,
+      "filePath": "trigger/index.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/Desktop/landing_page/trigger/index.mjs"
+    },
+    {
+      "id": "consolidate-memories",
+      "maxDuration": 300,
+      "filePath": "trigger/index.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/Desktop/landing_page/trigger/index.mjs"
+    },
+    {
+      "id": "update-pattern-confidence",
+      "maxDuration": 300,
+      "filePath": "trigger/index.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/Desktop/landing_page/trigger/index.mjs"
+    }
+  ],
+  "queues": [],
+  "workerEntryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4necxP/.npm/_npx/9327320c903ff367/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs",
+  "runtime": "node",
+  "runtimeVersion": "22.20.0",
+  "customConditions": [],
+  "timings": {
+    "lib/vapiVoices.ts": 0.386415999999997,
+    "lib/vapiElevenLabsVoices.ts": 0.4281249999999943,
+    "lib/voiceConfigHelper.ts": 0.7343329999999924,
+    "trigger/embedding-tasks.ts": 95.84308400000003,
+    "trigger/index.ts": 6.288166999999987,
+    "trigger/learning-loops.ts": 24.117624999999975,
+    "trigger/scheduled-tasks.ts": 0.48820899999998346
+  }
+}

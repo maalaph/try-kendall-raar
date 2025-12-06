@@ -12,10 +12,6 @@ import { extractContactFromMessage } from '@/lib/contactExtractor';
 import { analyzeSentiment, getResponseTone } from '@/lib/sentiment';
 import { retrieveRelevantContext, indexMessage } from '@/lib/semanticMemory';
 // LangGraph imports (optional - only used if USE_LANGGRAPH=true)
-// import { runAgent } from '@/lib/agent/orchestrator';
-// import { HumanMessage } from '@langchain/core/messages';
-// import { getFunctionRegistry } from '@/lib/agent/functions';
-// import type { AgentState } from '@/lib/agent/types';
 import { runAgent } from '@/lib/agent/orchestrator';
 import { HumanMessage } from '@langchain/core/messages';
 import { getFunctionRegistry } from '@/lib/agent/functions';
@@ -345,7 +341,8 @@ async function generateChatResponse(
   agentRecordId: string,
   incomingMessage: string,
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [],
-  isFirstMessage: boolean = false
+  isFirstMessage: boolean = false,
+  threadId: string = ''
 ): Promise<{ response: string; functionCalls?: Array<{ name: string; arguments: any }>; kendallName?: string }> {
   try {
     // Get agent data from Airtable
@@ -559,9 +556,7 @@ async function generateChatResponse(
           new HumanMessage(incomingMessage),
         ];
 
-        // Get threadId (would need to be passed in, for now use empty string)
-        const threadId = ''; // This should be passed from the caller
-
+        // Use threadId from function parameter
         const agentState: AgentState = {
           messages: langchainMessages,
           context: {},
@@ -569,7 +564,7 @@ async function generateChatResponse(
           functionResults: [],
           response: '',
           recordId: agentRecordId,
-          threadId,
+          threadId: threadId || '',
           systemPrompt: chatSystemPrompt,
           availableFunctions: availableFunctions.map(f => ({
             name: f.name,
@@ -578,6 +573,11 @@ async function generateChatResponse(
         };
 
         const result = await runAgent(agentState);
+        
+        // Check if LangGraph returned an error message (indicates failure)
+        if (result.response && result.response.includes('I encountered an error processing your request')) {
+          throw new Error('LangGraph returned error response');
+        }
         
         // Extract function calls from result
         const functionCalls = result.functionCalls || [];
@@ -865,7 +865,8 @@ export async function POST(request: NextRequest) {
         recordId,
         message.trim(),
         conversationHistory,
-        isFirstMessage
+        isFirstMessage,
+        threadId
       );
       agentResponse = responseData.response;
       functionCalls = responseData.functionCalls;
@@ -900,7 +901,8 @@ export async function POST(request: NextRequest) {
         console.log('[CHAT API] User message saved to Airtable:', { recordId, threadId, messageLength: message.trim().length });
         
         // Index user message with embeddings using Trigger.dev (async, don't block)
-        if (process.env.TRIGGER_API_KEY && process.env.TRIGGER_PROJECT_ID) {
+        // Trigger.dev v4 requires TRIGGER_SECRET_KEY (not TRIGGER_API_KEY)
+        if ((process.env.TRIGGER_SECRET_KEY || process.env.TRIGGER_API_KEY) && process.env.TRIGGER_PROJECT_ID) {
           try {
             const { indexMessageTask } = await import('@/trigger/embedding-tasks');
             await indexMessageTask.trigger({
@@ -915,7 +917,17 @@ export async function POST(request: NextRequest) {
             });
             console.log('[TRIGGER] Message indexing task queued');
           } catch (triggerError) {
-            console.warn('[TRIGGER] Failed to queue message indexing, falling back to synchronous:', triggerError);
+            console.error('[TRIGGER ERROR] Failed to queue message indexing:', {
+              error: triggerError instanceof Error ? triggerError.message : String(triggerError),
+              stack: triggerError instanceof Error ? triggerError.stack : undefined,
+              recordId,
+              threadId,
+              messageId: userMessage.id,
+            });
+            // Check if it's a connection error vs task error
+            if (triggerError instanceof Error && triggerError.message.includes('ECONNREFUSED')) {
+              console.error('[TRIGGER ERROR] Dev worker not running! Run: npm run trigger:dev');
+            }
             // Fallback to synchronous indexing
             indexMessage(recordId, threadId, userMessage.id, message.trim(), {
               role: 'user',
@@ -945,7 +957,8 @@ export async function POST(request: NextRequest) {
       // 2. User provides info after AI asks for it - handled by contact update logic below
       
       // Use Trigger.dev for async pattern extraction
-      if (process.env.TRIGGER_API_KEY && process.env.TRIGGER_PROJECT_ID) {
+      // Trigger.dev v4 requires TRIGGER_SECRET_KEY (not TRIGGER_API_KEY)
+      if ((process.env.TRIGGER_SECRET_KEY || process.env.TRIGGER_API_KEY) && process.env.TRIGGER_PROJECT_ID) {
         try {
           const { extractPatternsTask } = await import('@/trigger/learning-loops');
           await extractPatternsTask.trigger({
@@ -961,7 +974,16 @@ export async function POST(request: NextRequest) {
           });
           console.log('[TRIGGER] Pattern extraction task queued for message:', message.substring(0, 50));
         } catch (triggerError) {
-          console.warn('[TRIGGER] Failed to queue pattern extraction task, falling back to synchronous:', triggerError);
+          console.error('[TRIGGER ERROR] Failed to queue pattern extraction task:', {
+            error: triggerError instanceof Error ? triggerError.message : String(triggerError),
+            stack: triggerError instanceof Error ? triggerError.stack : undefined,
+            recordId,
+            messageLength: message.trim().length,
+          });
+          // Check if it's a connection error vs task error
+          if (triggerError instanceof Error && triggerError.message.includes('ECONNREFUSED')) {
+            console.error('[TRIGGER ERROR] Dev worker not running! Run: npm run trigger:dev');
+          }
           // Fallback to synchronous extraction
           extractPatternsFromMessage(
             recordId,
@@ -1212,7 +1234,8 @@ export async function POST(request: NextRequest) {
         
         // Index assistant message with embeddings using Trigger.dev (async, don't block)
         if (agentMessage?.id) {
-          if (process.env.TRIGGER_API_KEY && process.env.TRIGGER_PROJECT_ID) {
+          // Trigger.dev v4 requires TRIGGER_SECRET_KEY (not TRIGGER_API_KEY)
+          if ((process.env.TRIGGER_SECRET_KEY || process.env.TRIGGER_API_KEY) && process.env.TRIGGER_PROJECT_ID) {
             try {
               const { indexMessageTask } = await import('@/trigger/embedding-tasks');
               await indexMessageTask.trigger({
@@ -1228,7 +1251,17 @@ export async function POST(request: NextRequest) {
               });
               console.log('[TRIGGER] Assistant message indexing task queued');
             } catch (triggerError) {
-              console.warn('[TRIGGER] Failed to queue assistant message indexing, falling back to synchronous:', triggerError);
+              console.error('[TRIGGER ERROR] Failed to queue assistant message indexing:', {
+                error: triggerError instanceof Error ? triggerError.message : String(triggerError),
+                stack: triggerError instanceof Error ? triggerError.stack : undefined,
+                recordId,
+                threadId,
+                messageId: agentMessage.id,
+              });
+              // Check if it's a connection error vs task error
+              if (triggerError instanceof Error && triggerError.message.includes('ECONNREFUSED')) {
+                console.error('[TRIGGER ERROR] Dev worker not running! Run: npm run trigger:dev');
+              }
               // Fallback to synchronous indexing
               indexMessage(recordId, threadId, agentMessage.id, agentResponse, {
                 role: 'assistant',

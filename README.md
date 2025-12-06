@@ -16,6 +16,22 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Running Trigger.dev Dev Worker
+
+Trigger.dev tasks require a separate dev worker to execute. Run in a **second terminal**:
+
+```bash
+npm run trigger:dev
+```
+
+Or run both Next.js and Trigger.dev together:
+
+```bash
+npm run dev:all
+```
+
+**Important**: The Trigger.dev dev worker must be running for background tasks (message indexing, pattern extraction) to execute.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

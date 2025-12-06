@@ -187,18 +187,30 @@ export async function getOrCreateThreadId(recordId: string): Promise<string> {
     // Create new thread
     const threadId = `thread_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     
-    const { error: insertError } = await supabase
+    const { data: insertedThread, error: insertError } = await supabase
       .from('threads')
       .insert({
         record_id: recordId,
         thread_id: threadId,
-      });
+      })
+      .select('thread_id')
+      .single();
 
     if (insertError) {
+      console.error('[DATABASE ERROR] Failed to create thread:', {
+        error: insertError.message,
+        recordId,
+        threadId,
+      });
       throw new Error(`Database error: ${insertError.message}`);
     }
 
-    return threadId;
+    // Verify thread was created
+    if (!insertedThread || !insertedThread.thread_id) {
+      throw new Error('Thread was created but not returned from database');
+    }
+
+    return insertedThread.thread_id;
   } catch (error) {
     console.error('[DATABASE ERROR] getOrCreateThreadId failed:', error);
     throw error;
@@ -295,6 +307,38 @@ export async function createChatMessage(data: {
   timestamp?: string;
 }): Promise<ChatMessage> {
   try {
+    // Verify thread exists before creating message (foreign key constraint)
+    // Use limit(1) instead of .single() to handle 0 or multiple results gracefully
+    const { data: threadData, error: threadCheckError } = await supabase
+      .from('threads')
+      .select('thread_id')
+      .eq('thread_id', data.threadId)
+      .limit(1);
+
+    const threadExists = threadData && threadData.length > 0;
+
+    if (threadCheckError || !threadExists) {
+      console.error('[DATABASE ERROR] Thread does not exist before creating message:', {
+        threadId: data.threadId,
+        recordId: data.recordId,
+        threadCheckError: threadCheckError?.message,
+      });
+      
+      // Try to create the thread if it doesn't exist
+      const { error: createThreadError } = await supabase
+        .from('threads')
+        .insert({
+          record_id: data.recordId,
+          thread_id: data.threadId,
+        });
+
+      if (createThreadError) {
+        throw new Error(`Thread does not exist and could not be created: ${createThreadError.message}`);
+      }
+      
+      console.log('[DATABASE] Created missing thread:', data.threadId);
+    }
+
     const { data: result, error } = await supabase
       .from('chat_messages')
       .insert({
@@ -744,26 +788,68 @@ export async function getUserMemories(
   importance?: UserMemory['importance']
 ): Promise<UserMemory[]> {
   try {
+    // Build query - try with importance ordering first, fallback if column missing
     let query = supabase
       .from('user_memories')
       .select('*')
-      .eq('record_id', recordId)
-      .order('importance', { ascending: false })
-      .order('created_at', { ascending: false });
+      .eq('record_id', recordId);
 
     if (memoryType) {
       query = query.eq('memory_type', memoryType);
     }
 
-    if (importance) {
-      query = query.eq('importance', importance);
-    }
+    // Try to order by importance, but handle gracefully if column doesn't exist
+    let { data, error } = await query.order('importance', { ascending: false }).order('created_at', { ascending: false });
 
-    const { data, error } = await query;
+    // If error is about missing 'importance' column, retry without it
+    // Check both error.type, error.code, and error.message for Supabase error structure
+    const isImportanceError = error && (
+      (error as any).type === 'UNKNOWN_FIELD_NAME' ||
+      (error as any).code === '42703' || // PostgreSQL undefined column error
+      (error?.message && (
+        error.message.includes('importance') || 
+        error.message.includes('Unknown field') ||
+        (error.message.includes('column') && error.message.includes('does not exist'))
+      ))
+    );
 
-    if (error) {
+    if (isImportanceError) {
+      console.warn('[DATABASE] user_memories table missing "importance" column. Querying without importance ordering.');
+      query = supabase
+        .from('user_memories')
+        .select('*')
+        .eq('record_id', recordId)
+        .order('created_at', { ascending: false });
+      
+      if (memoryType) {
+        query = query.eq('memory_type', memoryType);
+      }
+      
+      const retryResult = await query;
+      if (retryResult.error) {
+        console.error('[DATABASE ERROR] getUserMemories failed:', retryResult.error);
+        return [];
+      }
+      data = retryResult.data;
+      error = null;
+    } else if (error) {
       console.error('[DATABASE ERROR] getUserMemories failed:', error);
       return [];
+    }
+
+    // Filter by importance in memory if column exists and filter requested
+    if (data && importance) {
+      data = data.filter((m: any) => m.importance === importance);
+    }
+
+    // Sort by importance in memory if column exists (fallback if DB ordering failed)
+    if (data && data.length > 0 && data[0].importance) {
+      data.sort((a: any, b: any) => {
+        const importanceOrder = { high: 3, medium: 2, low: 1 };
+        const aOrder = importanceOrder[a.importance as keyof typeof importanceOrder] || 0;
+        const bOrder = importanceOrder[b.importance as keyof typeof importanceOrder] || 0;
+        return bOrder - aOrder;
+      });
     }
 
     // Filter out expired memories
@@ -972,14 +1058,14 @@ export async function searchSimilarEmbeddings(
       // If the function doesn't exist, fall back to direct query
       console.warn('[DATABASE] search_similar_embeddings function not found, using direct query');
       
-      // Direct query using cosine distance
+      // Direct query - get all embeddings and calculate similarity in memory
+      // Note: Can't order by vector column directly in Supabase query
       let query = supabase
         .from('embeddings')
         .select('*')
         .eq('record_id', recordId)
         .not('embedding', 'is', null)
-        .order('embedding', { ascending: true, foreignTable: 'embeddings' })
-        .limit(limit);
+        .limit(limit * 2); // Get more results to filter by similarity
 
       if (options.threadId) {
         query = query.eq('thread_id', options.threadId);
@@ -988,7 +1074,13 @@ export async function searchSimilarEmbeddings(
       const { data: directData, error: directError } = await query;
 
       if (directError) {
-        throw new Error(`Database error: ${directError.message}`);
+        // If embeddings table doesn't exist or query fails, return empty results gracefully
+        console.warn('[DATABASE] Embeddings query failed, returning empty results:', directError.message);
+        return [];
+      }
+
+      if (!directData || directData.length === 0) {
+        return [];
       }
 
       // Calculate similarity manually (1 - cosine_distance)

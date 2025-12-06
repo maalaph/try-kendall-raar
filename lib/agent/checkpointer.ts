@@ -31,18 +31,50 @@ export async function getCheckpointer(): Promise<PostgresSaver> {
   }
 
   try {
-    // Initialize PostgresSaver with the connection string
-    // PostgresSaver handles connection pooling internally
-    checkpointerInstance = await PostgresSaver.fromConnString(
-      process.env.SUPABASE_DB_URL
-    );
+    const connectionString = process.env.SUPABASE_DB_URL;
+    
+    if (!connectionString) {
+      throw new Error("SUPABASE_DB_URL is not set");
+    }
 
-    // Set up the database schema (creates checkpoint tables if they don't exist)
-    // This only needs to run once, but it's safe to call multiple times
-    await checkpointerInstance.setup();
-
-    console.log("[CHECKPOINTER] Postgres checkpointer initialized successfully");
-    return checkpointerInstance;
+    // Try direct connection first (port 5432)
+    console.log("[CHECKPOINTER] Attempting direct database connection...");
+    try {
+      checkpointerInstance = await PostgresSaver.fromConnString(connectionString);
+      await checkpointerInstance.setup();
+      console.log("[CHECKPOINTER] Postgres checkpointer initialized successfully (direct connection)");
+      return checkpointerInstance;
+    } catch (directError) {
+      const errorMsg = directError instanceof Error ? directError.message : String(directError);
+      console.warn("[CHECKPOINTER] Direct connection failed:", errorMsg);
+      
+      // Try connection pooler (port 6543) as fallback
+      if (connectionString.includes(':5432/')) {
+        console.log("[CHECKPOINTER] Trying connection pooler (port 6543)...");
+        try {
+          const poolerUrl = connectionString.replace(':5432/', ':6543/') + '?pgbouncer=true';
+          checkpointerInstance = await PostgresSaver.fromConnString(poolerUrl);
+          await checkpointerInstance.setup();
+          console.log("[CHECKPOINTER] Postgres checkpointer initialized successfully (connection pooler)");
+          return checkpointerInstance;
+        } catch (poolerError) {
+          console.error("[CHECKPOINTER] Connection pooler also failed:", poolerError instanceof Error ? poolerError.message : String(poolerError));
+          // Fall through to throw original error
+        }
+      }
+      
+      // If both fail, provide helpful diagnostics
+      if (errorMsg.includes('ENOTFOUND')) {
+        console.error("[CHECKPOINTER] DNS resolution failed. Troubleshooting:");
+        console.error("  1. Check Supabase project status: https://supabase.com/dashboard");
+        console.error("  2. Verify project is not paused");
+        console.error("  3. Check SUPABASE_DB_URL format matches: postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres");
+        console.error("  4. Test DNS: nslookup db.kwlkbuatidinolgfsxst.supabase.co");
+        console.error("  5. Note: LangGraph will run without checkpointing (stateless mode)");
+      }
+      
+      throw directError;
+    }
   } catch (error) {
     console.error("[CHECKPOINTER] Failed to initialize Postgres checkpointer:", error);
     throw new Error(
