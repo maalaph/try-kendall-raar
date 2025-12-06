@@ -18,6 +18,11 @@ interface ChatMessageType {
   role: 'user' | 'assistant';
   timestamp: string;
   attachments?: Array<{ url: string; filename: string }>;
+  emailConfirmation?: {
+    to: string;
+    subject: string;
+    body: string;
+  };
 }
 
 interface ChatInterfaceProps {
@@ -491,7 +496,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
             {
               id: data.message?.id || `msg-${Date.now()}`,
               message: message.trim(), // Show original message to user
-              role: 'user',
+              role: 'user' as const,
               timestamp: new Date().toISOString(),
             },
             {
@@ -499,6 +504,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
               message: data.response || '',
               role: 'assistant',
               timestamp: new Date().toISOString(),
+              emailConfirmation: data.emailConfirmation || undefined,
             },
           ];
           
@@ -618,6 +624,84 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
     } finally {
       setSending(false);
     }
+  };
+
+  // Handle email approval
+  const handleEmailApprove = async (emailData: { to: string; subject: string; body: string }, messageId: string) => {
+    try {
+      const response = await fetch('/api/chat/confirm-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: emailData.to,
+          subject: emailData.subject,
+          body: emailData.body,
+          recordId,
+          threadId,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update the message to remove email confirmation and show success
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === messageId) {
+            return {
+              ...msg,
+              message: data.message || `✅ Email sent to ${emailData.to}`,
+              emailConfirmation: undefined,
+            };
+          }
+          return msg;
+        }));
+        
+        // Refresh messages to get the confirmation message from server
+        setTimeout(() => {
+          fetchMessages(undefined, false, true).catch(err => {
+            console.warn('[ChatInterface] Failed to refresh messages after email approval:', err);
+          });
+        }, 500);
+      } else {
+        // Show error message
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === messageId) {
+            return {
+              ...msg,
+              message: `❌ ${data.error || 'Failed to send email'}`,
+              emailConfirmation: undefined,
+            };
+          }
+          return msg;
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to approve email:', error);
+      setMessages(prev => prev.map(msg => {
+        if (msg.id === messageId) {
+          return {
+            ...msg,
+            message: `❌ Failed to send email. Please try again.`,
+            emailConfirmation: undefined,
+          };
+        }
+        return msg;
+      }));
+    }
+  };
+
+  // Handle email cancellation
+  const handleEmailCancel = (messageId: string) => {
+    setMessages(prev => prev.map(msg => {
+      if (msg.id === messageId) {
+        return {
+          ...msg,
+          message: '❌ Email cancelled',
+          emailConfirmation: undefined,
+        };
+      }
+      return msg;
+    }));
   };
 
   // Handle file upload
@@ -906,6 +990,9 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
                   isNewMessage={isNewMessage}
                   isConsecutive={isConsecutive}
                   isTyping={isTyping}
+                  emailConfirmation={msg.emailConfirmation}
+                  onEmailApprove={msg.emailConfirmation ? (emailData) => handleEmailApprove(emailData, msg.id) : undefined}
+                  onEmailCancel={msg.emailConfirmation ? () => handleEmailCancel(msg.id) : undefined}
                 />
               );
             })}

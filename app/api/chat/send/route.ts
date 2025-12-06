@@ -1382,16 +1382,18 @@ export async function POST(request: NextRequest) {
 
         // Handle calendar event creation
         if (fc.name === 'create_calendar_event') {
+          // Declare eventCreateRecordId outside try block so it's accessible in catch block
+          const { recordId: eventRecordId, summary, description, startDateTime, endDateTime, allDay } = fc.arguments || {};
+          // Validate that eventRecordId is not the literal string 'recordId' - if AI passes invalid value, use actual recordId
+          const eventCreateRecordId = (eventRecordId && eventRecordId !== 'recordId' && typeof eventRecordId === 'string' && eventRecordId.startsWith('rec')) 
+            ? eventRecordId 
+            : recordId;
+          
           try {
             console.log('[CHAT] Creating calendar event with arguments:', {
               ...fc.arguments,
               preferredTimeZone,
             });
-            const { recordId: eventRecordId, summary, description, startDateTime, endDateTime, allDay } = fc.arguments || {};
-            // Validate that eventRecordId is not the literal string 'recordId' - if AI passes invalid value, use actual recordId
-            const eventCreateRecordId = (eventRecordId && eventRecordId !== 'recordId' && typeof eventRecordId === 'string' && eventRecordId.startsWith('rec')) 
-              ? eventRecordId 
-              : recordId;
 
             if (!summary || !startDateTime) {
               console.warn('[CHAT] Missing required fields for calendar event:', { summary, startDateTime });
@@ -1944,190 +1946,27 @@ export async function POST(request: NextRequest) {
                 // Don't fail the email send if contact update fails
               }
             }
+
+            // Instead of sending immediately, return confirmation request with full email content
+            const safeSubject = (subject || '').trim() || '(no subject)';
+            const safeBody = (body || '').trim() || '(no body provided)';
+
+            // Return email confirmation request instead of sending
+            functionResults.push({
+              name: 'send_gmail',
+              result: {
+                success: true,
+                pendingConfirmation: true,
+                to,
+                subject: safeSubject,
+                body: safeBody,
+              },
+            });
+
+            // Format response to show full email and request approval
+            agentResponse = `📧 **Email Ready to Send**\n\n**To:** ${to}\n**Subject:** ${safeSubject}\n\n**Body:**\n${safeBody}\n\nPlease review and approve to send.`;
             
-            const contactNameForEmail = (
-              lastContactLookup?.contact?.name ||
-              lastContactLookup?.name ||
-              ''
-            ).trim();
-            const relationshipForEmail =
-              lastContactLookup?.contact?.relationship ||
-              (typeof extractedRelationship !== 'undefined' ? extractedRelationship : undefined) ||
-              undefined;
-
-            try {
-              await sendGmailMessage(gmailSendRecordId, {
-                to,
-                subject: subject || '',
-                body: body || '',
-              });
-
-              functionResults.push({
-                name: 'send_gmail',
-                result: {
-                  success: true,
-                  to,
-                  subject: subject || '',
-                },
-              });
-
-              const safeSubject = (subject || '').trim() || '(no subject)';
-              const safeBody = (body || '').trim();
-              const previewBody =
-                safeBody.length > 140
-                  ? `${safeBody.slice(0, 140)}...`
-                  : safeBody || '(no body provided)';
-
-              // Always update contact after successful email send, even if we only have email
-              try {
-                // CRITICAL: Check conversation history to find contact name if not already found
-                let resolvedContactName = contactNameForEmail;
-                
-                if (!resolvedContactName) {
-                  // Look back through recent messages to find who we were discussing
-                  try {
-                    const recentMessages = await getChatMessages({
-                      threadId,
-                      limit: 10,
-                    });
-                    
-                    // Look for contact name mentioned in recent conversation
-                    for (const msg of recentMessages.messages.slice().reverse()) {
-                      // Check user messages for patterns like "email ryan", "call john", etc.
-                      if (msg.role === 'user') {
-                        const userMessage = msg.message.toLowerCase();
-                        // Pattern: "email ryan", "email to ryan", "send email to ryan"
-                        const emailPatterns = [
-                          /email\s+(?:to\s+)?(\w+)/i,
-                          /send\s+(?:an?\s+)?email\s+(?:to\s+)?(\w+)/i,
-                          /email\s+(\w+)/i,
-                        ];
-                        
-                        for (const pattern of emailPatterns) {
-                          const match = msg.message.match(pattern);
-                          if (match && match[1]) {
-                            resolvedContactName = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
-                            console.log('[CHAT] Found contact name from user message:', resolvedContactName);
-                            break;
-                          }
-                        }
-                        
-                        if (resolvedContactName) break;
-                      }
-                      
-                      // Check assistant messages for contact lookup context
-                      if (msg.role === 'assistant' && (msg.message.includes("don't have") || msg.message.includes("in your contacts"))) {
-                        // Extract contact name from assistant's message
-                        const namePatterns = [
-                          /I found (\w+) in your contacts/i,
-                          /don't have (\w+) in your contacts/i,
-                          /I don't have (\w+)'s (?:email|phone)/i,
-                          /What's (\w+)'s email/i,
-                        ];
-                        
-                        for (const pattern of namePatterns) {
-                          const match = msg.message.match(pattern);
-                          if (match && match[1]) {
-                            resolvedContactName = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
-                            console.log('[CHAT] Found contact name from assistant message context:', resolvedContactName);
-                            break;
-                          }
-                        }
-                        
-                        if (resolvedContactName) break;
-                      }
-                    }
-                  } catch (contextError) {
-                    console.warn('[CHAT] Failed to check conversation context:', contextError);
-                  }
-                }
-                
-                if (resolvedContactName) {
-                  // We have a contact name from context - update existing contact or create with correct name
-                  await upsertContact({
-                    recordId,
-                    name: resolvedContactName, // Use the name from context, NOT from email
-                    email: to,
-                    relationship: relationshipForEmail || undefined,
-                    lastContacted: new Date().toISOString(),
-                  });
-                  console.log('[CHAT] ✅ Contact synced after email send (from context):', {
-                    name: resolvedContactName,
-                    email: to,
-                    lastContacted: new Date().toISOString(),
-                  });
-                } else {
-                  // No contact name found in context - check if contact exists by email first
-                  const existingContactByEmail = await getContactByEmail(recordId, to);
-                  
-                  if (existingContactByEmail) {
-                    // Contact exists with this email - just update lastContacted
-                    await upsertContact({
-                      recordId,
-                      name: existingContactByEmail.name,
-                      email: to,
-                      lastContacted: new Date().toISOString(),
-                    });
-                    console.log('[CHAT] ✅ Updated existing contact (found by email) after email send');
-                  } else {
-                    // Last resort: Extract name from email, but log it as fallback
-                    const emailNameMatch = to.match(/^([^@]+)@/);
-                    if (emailNameMatch) {
-                      const potentialName = emailNameMatch[1].split(/[._0-9]/)[0];
-                      if (potentialName && potentialName.length > 1) {
-                        const capitalizedName = potentialName.charAt(0).toUpperCase() + potentialName.slice(1).toLowerCase();
-                        console.warn('[CHAT] ⚠️ Creating contact from email prefix (fallback - no context found):', capitalizedName);
-                        await upsertContact({
-                          recordId,
-                          name: capitalizedName,
-                          email: to,
-                          lastContacted: new Date().toISOString(),
-                        });
-                      }
-                    }
-                  }
-                }
-              } catch (contactSyncError) {
-                console.error('[CHAT] ❌ Failed to sync contact after email send:', {
-                  error: contactSyncError instanceof Error ? contactSyncError.message : String(contactSyncError),
-                  name: contactNameForEmail || 'unknown',
-                  email: to,
-                });
-              }
-
-              lastContactLookup = null;
-
-              agentResponse = `Sent your email to ${to} with subject "${safeSubject}". Message preview: "${previewBody}".`;
-            } catch (error) {
-              console.error('[CHAT] ❌ Gmail send error details:', {
-                error: error instanceof Error ? error.message : String(error),
-                errorType: error instanceof GoogleIntegrationError ? error.reason : 'UNKNOWN',
-                recordId: gmailSendRecordId,
-                to,
-                subject: subject?.substring(0, 50),
-                stack: error instanceof Error ? error.stack : undefined,
-              });
-
-              if (error instanceof GoogleIntegrationError) {
-                agentResponse =
-                  error.reason === 'NOT_CONNECTED'
-                    ? "I couldn't send the email because Google isn't connected yet. You can connect it in the Integrations page."
-                    : error.reason === 'TOKEN_REFRESH_FAILED'
-                    ? "Your Google connection looks expired. Try reconnecting it in the Integrations page."
-                    : error.reason === 'INSUFFICIENT_PERMISSIONS'
-                    ? "Google is connected but missing permission to send emails. Please reconnect Google and allow Gmail access."
-                    : error.message || "I'm having trouble sending the email right now. Please try again in a moment.";
-              } else {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                console.error('[CHAT] ❌ Unexpected Gmail error:', {
-                  errorMessage,
-                  error,
-                  recordId: gmailSendRecordId,
-                });
-                agentResponse = `I couldn't send the email: ${errorMessage}. Please check your Google connection in the Integrations page or try again.`;
-              }
-              continue;
-            }
+            lastContactLookup = null;
           } catch (error) {
             if (error instanceof GoogleIntegrationError) {
               agentResponse =
@@ -3084,6 +2923,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Check for pending email confirmation
+    let emailConfirmation: any = null;
+    if (functionResults) {
+      const emailResult = functionResults.find((fr: any) => 
+        fr.name === 'send_gmail' && fr.result?.pendingConfirmation
+      );
+      if (emailResult) {
+        emailConfirmation = {
+          to: emailResult.result.to,
+          subject: emailResult.result.subject,
+          body: emailResult.result.body,
+        };
+      }
+    }
+
     // Ensure callStatus is always included if it exists (for banner visibility)
     const response: any = {
       success: true,
@@ -3096,6 +2950,11 @@ export async function POST(request: NextRequest) {
     // Always include callStatus if it exists (even if success: false)
     if (callStatus) {
       response.callStatus = callStatus;
+    }
+    
+    // Include email confirmation data if pending
+    if (emailConfirmation) {
+      response.emailConfirmation = emailConfirmation;
     }
     
     return NextResponse.json(response);

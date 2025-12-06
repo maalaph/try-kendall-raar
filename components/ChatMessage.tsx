@@ -12,6 +12,13 @@ interface ChatMessageProps {
   isNewMessage?: boolean;
   isConsecutive?: boolean;
   isTyping?: boolean;
+  emailConfirmation?: {
+    to: string;
+    subject: string;
+    body: string;
+  };
+  onEmailApprove?: (emailData: { to: string; subject: string; body: string }) => void;
+  onEmailCancel?: () => void;
 }
 
 export default function ChatMessage({ 
@@ -21,7 +28,10 @@ export default function ChatMessage({
   attachments, 
   isNewMessage = false,
   isConsecutive = false,
-  isTyping = false
+  isTyping = false,
+  emailConfirmation,
+  onEmailApprove,
+  onEmailCancel
 }: ChatMessageProps) {
   const isUser = role === 'user';
   const [displayedText, setDisplayedText] = useState('');
@@ -165,6 +175,79 @@ export default function ChatMessage({
 
         {/* Message content - above aura */}
         <div className="relative z-10">
+          {/* Email confirmation preview */}
+          {emailConfirmation && !isUser && (
+            <div
+              className="mb-4 p-4 rounded-lg border"
+              style={{
+                backgroundColor: `${colors.accent}10`,
+                borderColor: `${colors.accent}40`,
+              }}
+            >
+              <div className="mb-3" style={{ color: colors.text, fontSize: '14px', fontWeight: 500 }}>
+                📧 Email Ready to Send
+              </div>
+              <div className="space-y-2 mb-4" style={{ color: colors.text, fontSize: '14px' }}>
+                <div>
+                  <span style={{ opacity: 0.7 }}>To:</span> {emailConfirmation.to}
+                </div>
+                <div>
+                  <span style={{ opacity: 0.7 }}>Subject:</span> {emailConfirmation.subject}
+                </div>
+                <div className="mt-3 pt-3" style={{ borderTop: `1px solid ${colors.accent}30` }}>
+                  <div style={{ opacity: 0.7, marginBottom: '8px' }}>Body:</div>
+                  <div 
+                    className="whitespace-pre-wrap"
+                    style={{
+                      backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      lineHeight: '1.6',
+                    }}
+                  >
+                    {emailConfirmation.body}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => onEmailApprove?.(emailConfirmation)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                  style={{
+                    backgroundColor: colors.accent,
+                    color: '#000',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '0.9';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                  }}
+                >
+                  Approve & Send
+                </button>
+                <button
+                  onClick={() => onEmailCancel?.()}
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: colors.text,
+                    border: `1px solid ${colors.accent}40`,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = `${colors.accent}15`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Message text */}
           <div
             className="break-words"
