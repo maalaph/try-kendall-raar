@@ -3090,6 +3090,7 @@ export async function POST(request: NextRequest) {
         
         // Generate summary message for chat with full transcript if available
         let chatMessage: string;
+        let recipientResponse: string | null = null;
         if (isFailed) {
           const errorMessage = payload.error?.message || payload.message || 'The call failed to complete.';
           chatMessage = `Call to ${phoneDisplay} ended.\n\n${errorMessage}`;
@@ -3111,12 +3112,22 @@ export async function POST(request: NextRequest) {
                 return `${role}: ${content}`;
               });
             
+            // Capture the last caller utterance as a lightweight recipient response
+            const lastCaller = messagesArray
+              .filter((msg: any) => msg.role === 'user' && msg.content)
+              .map((msg: any) => String(msg.content))
+              .pop();
+            if (lastCaller && String(lastCaller).trim().length > 0) {
+              recipientResponse = String(lastCaller).trim();
+            }
+
             if (transcriptMessages.length > 0) {
               fullTranscript = `\n\n=== Full Call Transcript ===\n${transcriptMessages.join('\n\n')}`;
             }
           }
           
-          chatMessage = `Call summary for ${phoneDisplay}:\n\n${assistantSummary}${fullTranscript}`;
+          const acceptanceLine = recipientResponse ? `\n\nRecipient response: ${recipientResponse}` : '';
+          chatMessage = `Call summary for ${phoneDisplay}:\n\n${assistantSummary}${acceptanceLine}${fullTranscript}`;
         }
         
         // Post to chat
