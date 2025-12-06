@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ChatNavbar from '@/components/ChatNavbar';
-import StatsDashboard from '@/components/StatsDashboard';
+import IntegrationDashboard from '@/components/IntegrationDashboard';
 import { colors } from '@/lib/config';
 
 function DashboardPageContent() {
@@ -58,7 +58,7 @@ function DashboardPageContent() {
       <ChatNavbar recordId={recordId} />
       
       <div className="flex-1 overflow-y-auto" style={{ paddingTop: '100px' }}>
-        <StatsDashboard recordId={recordId} />
+        <IntegrationDashboard recordId={recordId} />
       </div>
     </main>
   );

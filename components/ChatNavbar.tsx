@@ -170,7 +170,7 @@ export default function ChatNavbar({ recordId, kendallName = 'Kendall' }: ChatNa
             Chat
           </Link>
 
-          {/* Stats Link */}
+          {/* Dashboard Link */}
           <Link
             href={`/dashboard?recordId=${recordId}`}
             className="transition-all duration-300"
@@ -197,7 +197,7 @@ export default function ChatNavbar({ recordId, kendallName = 'Kendall' }: ChatNa
               }
             }}
           >
-            Stats
+            Dashboard
           </Link>
 
           {/* Integrations Button */}

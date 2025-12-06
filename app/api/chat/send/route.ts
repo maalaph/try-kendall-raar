@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord, getOrCreateThreadId, createChatMessage, getChatMessages, createOutboundCallRequest, upsertCalendarEventRecord } from '@/lib/airtable';
+// Use new PostgreSQL database functions instead of Airtable
+import { getUserRecord, getOrCreateThreadId, createChatMessage, getChatMessages } from '@/lib/database';
+import { getContactByName, upsertContact, getContactByEmail, getUserContacts } from '@/lib/database';
+import { getUserPatterns, getUserMemories } from '@/lib/database';
+// Keep Airtable imports for legacy functions that haven't been migrated yet
+import { createOutboundCallRequest, upsertCalendarEventRecord } from '@/lib/airtable';
 import { buildChatSystemPrompt } from '@/lib/promptBlocks';
 import { formatPhoneNumberToE164 } from '@/lib/vapi';
 import { extractPatternsFromMessage } from '@/lib/patternExtractor';
 import { extractContactFromMessage } from '@/lib/contactExtractor';
-import { getContactByName, upsertContact, getContactByEmail, getUserContacts } from '@/lib/contacts';
 import { analyzeSentiment, getResponseTone } from '@/lib/sentiment';
+import { retrieveRelevantContext, indexMessage } from '@/lib/semanticMemory';
+// LangGraph imports (optional - only used if USE_LANGGRAPH=true)
+// import { runAgent } from '@/lib/agent/orchestrator';
+// import { HumanMessage } from '@langchain/core/messages';
+// import { getFunctionRegistry } from '@/lib/agent/functions';
+// import type { AgentState } from '@/lib/agent/types';
+import { runAgent } from '@/lib/agent/orchestrator';
+import { HumanMessage } from '@langchain/core/messages';
+import { getFunctionRegistry } from '@/lib/agent/functions';
+import type { AgentState } from '@/lib/agent/types';
 import { checkRateLimit } from '@/lib/rateLimiter';
 import {
   fetchCalendarEvents,
@@ -71,7 +85,7 @@ const CHAT_FUNCTIONS = [
   },
   {
     name: 'get_calendar_events',
-    description: 'Get calendar events from the user\'s Google Calendar. Use this when the user asks about their schedule, upcoming events, what they have today/tomorrow/this week, or any calendar-related questions.',
+    description: 'Get calendar events from the user\'s Google Calendar. ONLY use for queries about existing events (KNOW queries). Use this when the user asks about their schedule, upcoming events, what they have today/tomorrow/this week, or to check availability. Do NOT use for requests to block time, reserve time, or create events - use create_calendar_event for those (DO actions).',
     parameters: {
       type: 'object',
       properties: {
@@ -97,7 +111,7 @@ const CHAT_FUNCTIONS = [
   },
   {
     name: 'create_calendar_event',
-    description: 'Create a new calendar event in the user\'s Google Calendar. Use this when the user asks to add an event, schedule something, or create a calendar entry.',
+    description: 'Create a new calendar event in the user\'s Google Calendar. Use this when the user wants to DO something (block out, block time, reserve time, mark as busy, create event, schedule, add to calendar). This is for DO actions, not KNOW queries. For checking what\'s scheduled, use get_calendar_events instead.',
     parameters: {
       type: 'object',
       properties: {
@@ -115,7 +129,7 @@ const CHAT_FUNCTIONS = [
         },
         startDateTime: {
           type: 'string',
-          description: 'Start date and time in ISO 8601 format (e.g., "2024-10-12T12:00:00-04:00"). For all-day events, use just the date (YYYY-MM-DD).',
+          description: 'Start date and time in ISO 8601 format (e.g., "2024-10-12T12:00:00-04:00"). For all-day events, use just the date (YYYY-MM-DD). CRITICAL: For relative dates like "tomorrow", calculate from the CURRENT date/time (today + 1 day), not a hardcoded date. Always use the current year and month when calculating relative dates.',
         },
         endDateTime: {
           type: 'string',
@@ -131,7 +145,7 @@ const CHAT_FUNCTIONS = [
   },
   {
     name: 'get_gmail_messages',
-    description: 'Get Gmail messages from the user\'s inbox. Use this when the user asks about their emails, unread messages, recent emails, or any email-related questions.',
+    description: 'Get and analyze Gmail messages intelligently. DEFAULT BEHAVIOR (when user asks about emails generally): Fetch RECENT emails (not just unread) - last 24-48 hours. Analyze for INSIGHTS and PATTERNS, not just categories. Filter out promotional/marketing automatically. ONLY use unread=true when user explicitly asks for "unread emails" specifically. When user asks vague questions like "emails?", "anything important?", "what should I know?": Get recent emails (unread=false, maxResults=20-30), analyze for insights and patterns, present as natural language insights NOT categories.',
     parameters: {
       type: 'object',
       properties: {
@@ -357,6 +371,122 @@ async function generateChatResponse(
     const nicknameStr = nickname && String(nickname).trim() ? String(nickname).trim() : null;
     const nicknameOrFullName = nicknameStr || fullNameStr;
     
+    // ===== RETRIEVAL PHASE: Load learned patterns and memories =====
+    let patternsContext = '';
+    let memoriesContext = '';
+
+    try {
+      // Load user patterns (behavioral patterns)
+      const allPatterns = await getUserPatterns(agentRecordId);
+      
+      // Filter and rank patterns:
+      // - High confidence (>= 0.6)
+      // - Recently observed (within last 30 days)
+      const relevantPatterns = allPatterns
+        .filter(p => {
+          const confidence = p.confidence || 0;
+          const lastObserved = p.lastObserved ? new Date(p.lastObserved) : null;
+          const daysSinceObserved = lastObserved 
+            ? (Date.now() - lastObserved.getTime()) / (1000 * 60 * 60 * 24)
+            : Infinity;
+          
+          return confidence >= 0.6 && daysSinceObserved <= 30;
+        })
+        .sort((a, b) => {
+          // Sort by confidence (descending), then recency
+          const confDiff = (b.confidence || 0) - (a.confidence || 0);
+          if (confDiff !== 0) return confDiff;
+          
+          const aTime = a.lastObserved ? new Date(a.lastObserved).getTime() : 0;
+          const bTime = b.lastObserved ? new Date(b.lastObserved).getTime() : 0;
+          return bTime - aTime;
+        })
+        .slice(0, 10); // Top 10 most relevant patterns
+      
+      if (relevantPatterns.length > 0) {
+        patternsContext = `\n=== BEHAVIORAL PATTERNS FOR THIS USER ===\n`;
+        patternsContext += `Based on past interactions, I've learned these patterns about ${nicknameOrFullName}:\n\n`;
+        relevantPatterns.forEach((p, idx) => {
+          const confidence = Math.round((p.confidence || 0) * 100);
+          patternsContext += `${idx + 1}. ${p.patternData.description} (confidence: ${confidence}%)\n`;
+        });
+        patternsContext += `\nUse these patterns to:\n`;
+        patternsContext += `- Reference them conversationally ("You usually check emails in the morning, want me to do that now?")\n`;
+        patternsContext += `- Use them for decision heuristics (default times, preferred contacts, meeting windows)\n`;
+        patternsContext += `- Anticipate needs proactively\n`;
+        patternsContext += `- Make personalized suggestions\n\n`;
+      }
+      
+      // Load user memories (long-term preferences/facts)
+      const allMemories = await getUserMemories(agentRecordId);
+      
+      // Filter memories:
+      // - High/medium importance (if field exists)
+      // - Not expired
+      const relevantMemories = allMemories
+        .filter(m => {
+          if (m.expiresAt && new Date(m.expiresAt) < new Date()) return false;
+          // Only filter by importance if the field exists and has a value
+          if (m.importance) {
+            return m.importance === 'high' || m.importance === 'medium';
+          }
+          // If importance field doesn't exist, include all non-expired memories
+          return true;
+        })
+        .sort((a, b) => {
+          // Sort by importance if available, otherwise by recency
+          if (a.importance && b.importance) {
+            const importanceOrder = { high: 3, medium: 2, low: 1 };
+            const aImp = importanceOrder[a.importance] || 2;
+            const bImp = importanceOrder[b.importance] || 2;
+            if (aImp !== bImp) return bImp - aImp;
+          }
+          
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bTime - aTime;
+        })
+        .slice(0, 5); // Top 5 most important memories
+      
+      if (relevantMemories.length > 0) {
+        memoriesContext = `=== LONG-TERM PREFERENCES FOR THIS USER ===\n`;
+        relevantMemories.forEach((m, idx) => {
+          memoriesContext += `${idx + 1}. ${m.value}${m.context ? ` (${m.context})` : ''}\n`;
+        });
+        memoriesContext += `\nUse these preferences to inform your decisions and suggestions.\n\n`;
+      }
+    } catch (error) {
+      console.warn('[CHAT] Failed to load patterns/memories (graceful degradation):', error);
+      // Continue without patterns - don't break the flow
+    }
+    
+    // Retrieve semantic context from past conversations
+    // Note: threadId will be available after getOrCreateThreadId is called
+    // For now, we'll retrieve context without threadId filter
+    let semanticContext = '';
+    try {
+      const semanticResults = await retrieveRelevantContext(agentRecordId, incomingMessage, {
+        limit: 5,
+        similarityThreshold: 0.7,
+        // threadId will be passed when available
+        includeMemories: false, // Already included above
+        includePatterns: false, // Already included above
+      });
+      
+      if (semanticResults.similarMessages.length > 0) {
+        semanticContext = `=== RELEVANT PAST CONVERSATIONS ===\n`;
+        semanticContext += `Based on semantic similarity, here are relevant past conversations:\n\n`;
+        semanticResults.similarMessages.forEach((msg, idx) => {
+          const similarityPercent = (msg.similarity * 100).toFixed(1);
+          semanticContext += `${idx + 1}. [${similarityPercent}% similar] ${msg.content}\n`;
+        });
+        semanticContext += `\nUse these past conversations to provide context-aware responses and avoid repeating information.\n\n`;
+      }
+    } catch (error) {
+      console.warn('[CHAT] Failed to retrieve semantic context (graceful degradation):', error);
+      // Continue without semantic context - don't break the flow
+    }
+    
     // Build chat system prompt (separate from phone call prompt)
     let chatSystemPrompt = buildChatSystemPrompt({
       kendallName: String(kendallName),
@@ -370,6 +500,11 @@ async function generateChatResponse(
       fileUsageInstructions: fileUsageInstructions ? String(fileUsageInstructions) : undefined,
       ownerPhoneNumber: mobileNumber ? String(mobileNumber) : undefined,
     });
+    
+    // Inject patterns, memories, and semantic context into system prompt
+    if (patternsContext || memoriesContext || semanticContext) {
+      chatSystemPrompt += patternsContext + memoriesContext + semanticContext;
+    }
     
     // Add first message greeting instructions if this is the first message
     if (isFirstMessage) {
@@ -406,6 +541,59 @@ async function generateChatResponse(
       apiKey: process.env.OPENAI_API_KEY,
     });
     
+    // Optional: Use LangGraph if enabled (feature flag)
+    const useLangGraph = process.env.USE_LANGGRAPH === 'true';
+    if (useLangGraph) {
+      try {
+        const functionRegistry = getFunctionRegistry();
+        const availableFunctions = functionRegistry.getAll();
+        const { AIMessage } = await import('@langchain/core/messages');
+        
+        // Convert conversation history to LangChain messages
+        const langchainMessages = [
+          ...conversationHistory.map(msg => 
+            msg.role === 'user' 
+              ? new HumanMessage(msg.content)
+              : new AIMessage(msg.content)
+          ),
+          new HumanMessage(incomingMessage),
+        ];
+
+        // Get threadId (would need to be passed in, for now use empty string)
+        const threadId = ''; // This should be passed from the caller
+
+        const agentState: AgentState = {
+          messages: langchainMessages,
+          context: {},
+          functionCalls: [],
+          functionResults: [],
+          response: '',
+          recordId: agentRecordId,
+          threadId,
+          systemPrompt: chatSystemPrompt,
+          availableFunctions: availableFunctions.map(f => ({
+            name: f.name,
+            description: f.description,
+          })),
+        };
+
+        const result = await runAgent(agentState);
+        
+        // Extract function calls from result
+        const functionCalls = result.functionCalls || [];
+        
+        return {
+          response: result.response || 'I apologize, but I couldn\'t generate a response.',
+          functionCalls: functionCalls.length > 0 ? functionCalls : undefined,
+          kendallName: String(kendallName),
+        };
+      } catch (langGraphError) {
+        console.error('[CHAT] LangGraph execution failed, falling back to OpenAI function calling:', langGraphError);
+        // Fall through to OpenAI function calling
+      }
+    }
+    
+    // Default: Use OpenAI function calling (existing implementation)
     // Build conversation messages
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
       { role: 'system', content: chatSystemPrompt },
@@ -527,14 +715,64 @@ export async function POST(request: NextRequest) {
       userRecord = await getUserRecord(recordId);
     } catch (airtableError) {
       console.error('[API ERROR] Failed to fetch user record:', airtableError);
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Failed to fetch user record. Please check your recordId.',
-          details: airtableError instanceof Error ? airtableError.message : 'Unknown Airtable error',
-        },
-        { status: 500 }
-      );
+      
+      // If user doesn't exist, create a minimal test user
+      const errorMessage = airtableError instanceof Error ? airtableError.message : 'Unknown error';
+      if (errorMessage.includes('not found')) {
+        console.log(`[API] User record not found in PostgreSQL, fetching from Airtable: ${recordId}`);
+        try {
+          // Try to fetch from Airtable first to get real user data
+          let airtableUser = null;
+          try {
+            const { getUserRecord: getAirtableUser } = await import('@/lib/airtable');
+            airtableUser = await getAirtableUser(recordId);
+            console.log(`[API] Found user in Airtable, migrating to PostgreSQL: ${recordId}`);
+          } catch (airtableError) {
+            console.log(`[API] User not found in Airtable either, creating minimal user: ${recordId}`);
+          }
+          
+          const { createUserRecord } = await import('@/lib/database');
+          // Use Airtable data if available, otherwise minimal defaults
+          await createUserRecord({
+            recordId: recordId,
+            fullName: airtableUser?.fields?.fullName || 'User',
+            nickname: airtableUser?.fields?.nickname,
+            email: airtableUser?.fields?.email,
+            mobileNumber: airtableUser?.fields?.mobileNumber,
+            kendallName: airtableUser?.fields?.kendallName || 'Kendall',
+            selectedTraits: airtableUser?.fields?.selectedTraits || [],
+            useCaseChoice: airtableUser?.fields?.useCaseChoice,
+            boundaryChoices: airtableUser?.fields?.boundaryChoices || [],
+            userContextAndRules: airtableUser?.fields?.userContextAndRules,
+            analyzedFileContent: airtableUser?.fields?.analyzedFileContent,
+            fileUsageInstructions: airtableUser?.fields?.fileUsageInstructions,
+            vapi_agent_id: airtableUser?.fields?.vapi_agent_id,
+            timeZone: airtableUser?.fields?.timeZone || airtableUser?.fields?.['Time Zone'] || 'UTC',
+          });
+          // Retry fetching the user
+          userRecord = await getUserRecord(recordId);
+          console.log(`[API] Successfully created and fetched user: ${recordId}`);
+        } catch (createError) {
+          console.error('[API ERROR] Failed to create test user:', createError);
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'User record not found and could not be created. Please run the migration script or check your recordId.',
+              details: createError instanceof Error ? createError.message : 'Unknown error',
+            },
+            { status: 500 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Failed to fetch user record. Please check your recordId.',
+            details: errorMessage,
+          },
+          { status: 500 }
+        );
+      }
     }
 
     if (!userRecord || !userRecord.fields) {
@@ -548,19 +786,13 @@ export async function POST(request: NextRequest) {
     }
 
     const agentId = userRecord.fields.vapi_agent_id;
+    // For testing: allow chat to work without agentId (will use default model)
     if (!agentId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Agent not found for this user. Please ensure your Kendall agent has been created.',
-        },
-        { status: 404 }
-      );
+      console.warn(`[API WARNING] No vapi_agent_id found for user ${recordId}. Chat will work but voice features may be limited.`);
     }
 
     const storedTimeZone =
       (typeof userRecord.fields.timeZone === 'string' && userRecord.fields.timeZone) ||
-      (typeof userRecord.fields['Time Zone'] === 'string' && userRecord.fields['Time Zone']) ||
       undefined;
     const preferredTimeZone = sanitizeTimeZoneInput(
       (typeof clientTimeZone === 'string' && clientTimeZone) || storedTimeZone
@@ -658,7 +890,7 @@ export async function POST(request: NextRequest) {
       if (!process.env.AIRTABLE_BASE_ID || !process.env.AIRTABLE_CHAT_MESSAGES_TABLE_ID) {
         console.warn('[CHAT API] Chat messages table not configured. Set AIRTABLE_BASE_ID and AIRTABLE_CHAT_MESSAGES_TABLE_ID to enable message storage.');
       } else {
-        await createChatMessage({
+        const userMessage = await createChatMessage({
           recordId,
           agentId: String(agentId),
           threadId,
@@ -666,9 +898,44 @@ export async function POST(request: NextRequest) {
           role: 'user',
         });
         console.log('[CHAT API] User message saved to Airtable:', { recordId, threadId, messageLength: message.trim().length });
+        
+        // Index user message with embeddings using Trigger.dev (async, don't block)
+        if (process.env.TRIGGER_API_KEY && process.env.TRIGGER_PROJECT_ID) {
+          try {
+            const { indexMessageTask } = await import('@/trigger/embedding-tasks');
+            await indexMessageTask.trigger({
+              recordId,
+              threadId,
+              messageId: userMessage.id,
+              content: message.trim(),
+              metadata: {
+                role: 'user',
+                timestamp: new Date().toISOString(),
+              },
+            });
+            console.log('[TRIGGER] Message indexing task queued');
+          } catch (triggerError) {
+            console.warn('[TRIGGER] Failed to queue message indexing, falling back to synchronous:', triggerError);
+            // Fallback to synchronous indexing
+            indexMessage(recordId, threadId, userMessage.id, message.trim(), {
+              role: 'user',
+              timestamp: new Date().toISOString(),
+            }).catch(err => {
+              console.warn('[SEMANTIC MEMORY] Failed to index user message:', err);
+            });
+          }
+        } else {
+          // Fallback to synchronous indexing if Trigger.dev not configured
+          indexMessage(recordId, threadId, userMessage.id, message.trim(), {
+            role: 'user',
+            timestamp: new Date().toISOString(),
+          }).catch(err => {
+            console.warn('[SEMANTIC MEMORY] Failed to index user message:', err);
+          });
+        }
       }
 
-      // Extract patterns from user message (async, don't block)
+      // Extract patterns from user message using Trigger.dev (async, don't block)
       const timestamp = new Date().toISOString();
       
       // NOTE: Automatic contact extraction is disabled - let AI handle contact recognition
@@ -677,7 +944,41 @@ export async function POST(request: NextRequest) {
       // 1. User provides complete info (name + phone/email) - handled by explicit extraction
       // 2. User provides info after AI asks for it - handled by contact update logic below
       
-      Promise.all([
+      // Use Trigger.dev for async pattern extraction
+      if (process.env.TRIGGER_API_KEY && process.env.TRIGGER_PROJECT_ID) {
+        try {
+          const { extractPatternsTask } = await import('@/trigger/learning-loops');
+          await extractPatternsTask.trigger({
+            recordId,
+            message: message.trim(),
+            role: 'user',
+            timestamp,
+            previousMessages: conversationHistory.map(m => ({
+              message: m.content,
+              role: m.role,
+              timestamp: new Date().toISOString(),
+            })),
+          });
+          console.log('[TRIGGER] Pattern extraction task queued for message:', message.substring(0, 50));
+        } catch (triggerError) {
+          console.warn('[TRIGGER] Failed to queue pattern extraction task, falling back to synchronous:', triggerError);
+          // Fallback to synchronous extraction
+          extractPatternsFromMessage(
+            recordId,
+            message.trim(),
+            'user',
+            timestamp,
+            conversationHistory.map(m => ({
+              message: m.content,
+              role: m.role,
+              timestamp: new Date().toISOString(),
+            }))
+          ).catch(err => {
+            console.error('[PATTERN EXTRACTION] Failed to extract patterns:', err);
+          });
+        }
+      } else {
+        // Fallback to synchronous extraction if Trigger.dev not configured
         extractPatternsFromMessage(
           recordId,
           message.trim(),
@@ -688,17 +989,12 @@ export async function POST(request: NextRequest) {
             role: m.role,
             timestamp: new Date().toISOString(),
           }))
-        ).then(() => {
-          console.log('[PATTERN EXTRACTION] Successfully extracted patterns for message:', message.substring(0, 50));
-        }).catch(err => {
+        ).catch(err => {
           console.error('[PATTERN EXTRACTION] Failed to extract patterns:', err);
-          console.error('[PATTERN EXTRACTION] Error details:', {
-            recordId,
-            messageLength: message.trim().length,
-            error: err instanceof Error ? err.message : String(err),
-            stack: err instanceof Error ? err.stack : undefined,
-          });
-        }),
+        });
+      }
+      
+      Promise.all([
         // Extract contacts only if we have high confidence (name + phone/email both present)
         // Check if message contains both a name pattern AND phone/email
         (async () => {
@@ -913,6 +1209,46 @@ export async function POST(request: NextRequest) {
           role: 'assistant',
         });
         console.log('[CHAT API] Agent message saved to Airtable:', { recordId, threadId, messageLength: agentResponse.length });
+        
+        // Index assistant message with embeddings using Trigger.dev (async, don't block)
+        if (agentMessage?.id) {
+          if (process.env.TRIGGER_API_KEY && process.env.TRIGGER_PROJECT_ID) {
+            try {
+              const { indexMessageTask } = await import('@/trigger/embedding-tasks');
+              await indexMessageTask.trigger({
+                recordId,
+                threadId,
+                messageId: agentMessage.id,
+                content: agentResponse,
+                metadata: {
+                  role: 'assistant',
+                  timestamp: new Date().toISOString(),
+                  kendallName: kendallName,
+                },
+              });
+              console.log('[TRIGGER] Assistant message indexing task queued');
+            } catch (triggerError) {
+              console.warn('[TRIGGER] Failed to queue assistant message indexing, falling back to synchronous:', triggerError);
+              // Fallback to synchronous indexing
+              indexMessage(recordId, threadId, agentMessage.id, agentResponse, {
+                role: 'assistant',
+                timestamp: new Date().toISOString(),
+                kendallName: kendallName,
+              }).catch(err => {
+                console.warn('[SEMANTIC MEMORY] Failed to index assistant message:', err);
+              });
+            }
+          } else {
+            // Fallback to synchronous indexing if Trigger.dev not configured
+            indexMessage(recordId, threadId, agentMessage.id, agentResponse, {
+              role: 'assistant',
+              timestamp: new Date().toISOString(),
+              kendallName: kendallName,
+            }).catch(err => {
+              console.warn('[SEMANTIC MEMORY] Failed to index assistant message:', err);
+            });
+          }
+        }
       }
     } catch (agentMsgError) {
       // Log but don't fail - we still want to return the response
@@ -929,6 +1265,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ✅ Handle function calls (e.g., outbound call requests, Google Calendar/Gmail)
+    // Store user's original message for date correction logic
+    const userOriginalMessage = message.trim();
     let callRequestId: string | undefined;
     let callStatus: { success: boolean; message: string } | undefined;
     let functionResults: Array<{ name: string; result: any }> = [];
@@ -1032,8 +1370,100 @@ export async function POST(request: NextRequest) {
               continue;
             }
 
-            const startParseResult = parseDateTimeWithTimeZone(startDateTime, preferredTimeZone);
-            const startDate = startParseResult.date;
+            // Handle relative date terms and correct wrong dates
+            let processedStartDateTime = startDateTime;
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const userMessageLower = userOriginalMessage.toLowerCase();
+            
+            // Check if user said "tomorrow" or similar relative terms
+            const hasTomorrow = /tomorrow|tmr|next day/i.test(userMessageLower);
+            const hasToday = /today|this day/i.test(userMessageLower);
+            
+            // Check if date is clearly wrong (wrong year, far in past)
+            if (typeof processedStartDateTime === 'string' && /^\d{4}-\d{2}-\d{2}/.test(processedStartDateTime)) {
+              const parsedDate = new Date(processedStartDateTime.split('T')[0]);
+              const year = parsedDate.getFullYear();
+              const daysDiff = Math.floor((now.getTime() - parsedDate.getTime()) / (1000 * 60 * 60 * 24));
+              
+              // If year is wrong (2023 when we're in 2024+) or date is far in past, try to correct it
+              if ((year < currentYear || daysDiff > 60) && (hasTomorrow || hasToday)) {
+                console.warn('[CHAT] Detected wrong date, correcting based on user message:', {
+                  provided: processedStartDateTime,
+                  currentYear,
+                  parsedYear: year,
+                  daysAgo: daysDiff,
+                  userSaidTomorrow: hasTomorrow,
+                  userSaidToday: hasToday
+                });
+                
+                // Calculate correct date based on what user said
+                if (hasTomorrow) {
+                  const tomorrow = new Date(now);
+                  tomorrow.setDate(tomorrow.getDate() + 1);
+                  if (allDay) {
+                    processedStartDateTime = tomorrow.toISOString().split('T')[0];
+                  } else {
+                    // Preserve time if it was provided, otherwise use start of day
+                    const timePart = processedStartDateTime.includes('T') ? processedStartDateTime.split('T')[1] : '09:00:00';
+                    const timezonePart = processedStartDateTime.match(/[+\-]\d{2}:?\d{2}$|Z$/)?.[0] || '';
+                    processedStartDateTime = `${tomorrow.toISOString().split('T')[0]}T${timePart}${timezonePart || ''}`;
+                  }
+                  console.log('[CHAT] Corrected date to tomorrow:', processedStartDateTime);
+                } else if (hasToday) {
+                  const today = new Date(now);
+                  if (allDay) {
+                    processedStartDateTime = today.toISOString().split('T')[0];
+                  } else {
+                    const timePart = processedStartDateTime.includes('T') ? processedStartDateTime.split('T')[1] : '09:00:00';
+                    const timezonePart = processedStartDateTime.match(/[+\-]\d{2}:?\d{2}$|Z$/)?.[0] || '';
+                    processedStartDateTime = `${today.toISOString().split('T')[0]}T${timePart}${timezonePart || ''}`;
+                  }
+                  console.log('[CHAT] Corrected date to today:', processedStartDateTime);
+                }
+              }
+            }
+            
+            const startParseResult = parseDateTimeWithTimeZone(processedStartDateTime, preferredTimeZone);
+            let startDate = startParseResult.date;
+            
+            // Final validation: if date is still clearly in the past (more than 1 day ago), reject it
+            const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            if (startDate < oneDayAgo && !allDay) {
+              // For timed events, past dates are definitely wrong
+              console.error('[CHAT] Date is still in the past after correction attempt:', {
+                provided: startDateTime,
+                corrected: processedStartDateTime,
+                parsed: startDate.toISOString(),
+                now: now.toISOString()
+              });
+              functionResults.push({
+                name: 'create_calendar_event',
+                result: { success: false, error: 'Date is in the past. Please calculate relative dates from current date.' },
+              });
+              agentResponse = "The date you provided is in the past. When you say 'tomorrow', I need to calculate it from today's date. Can you try again?";
+              continue;
+            }
+            
+            // For all-day events, if the date is more than 30 days in the past, it's likely wrong
+            if (allDay && startDate < oneDayAgo) {
+              const daysDiff = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+              if (daysDiff > 30) {
+                console.error('[CHAT] All-day event date is too far in the past:', {
+                  provided: startDateTime,
+                  corrected: processedStartDateTime,
+                  parsed: startDate.toISOString(),
+                  daysAgo: daysDiff
+                });
+                functionResults.push({
+                  name: 'create_calendar_event',
+                  result: { success: false, error: 'Date is too far in the past. Please calculate relative dates from current date.' },
+                });
+                agentResponse = "The date you provided is in the past. When you say 'tomorrow', I need to calculate it from today's date. Can you try again?";
+                continue;
+              }
+            }
+            
             let endDate: Date;
             let endParseResult: ParsedDateWithZone | null = null;
             
@@ -1259,10 +1689,12 @@ export async function POST(request: NextRequest) {
         if (fc.name === 'get_gmail_messages') {
           try {
             const { unread, maxResults } = fc.arguments || {};
-            const unreadFlag = typeof unread === 'boolean' ? unread : Boolean(unread);
+            // Default to unread=false for vague queries (unless explicitly requested)
+            // The AI will set unread=true only when user explicitly asks for "unread emails"
+            const unreadFlag = typeof unread === 'boolean' ? unread : false;
             const messages = await fetchGmailMessages(recordId, {
               unread: unreadFlag,
-              maxResults: maxResults ? Number(maxResults) : undefined,
+              maxResults: maxResults ? Number(maxResults) : 30, // Default to 30 for better analysis
             });
 
             functionResults.push({
@@ -1357,36 +1789,54 @@ export async function POST(request: NextRequest) {
                 }
               }
               
-              // Build intelligent response
-              const responseParts: string[] = [];
+              // Build intelligent response with insights and patterns (not categories)
+              const insights: string[] = [];
               
-              if (urgentEmails.length > 0) {
-                responseParts.push(
-                  `⚠️ **Urgent items that need attention:**\n\n` +
-                  urgentEmails.map(e => 
-                    `• **${e.msg.from}**: "${e.msg.subject}" - ${e.reason}`
-                  ).join('\n')
-                );
+              // Notice patterns across emails
+              const projectEmails = importantEmails.filter(e => {
+                const subject = e.msg.subject.toLowerCase();
+                return subject.includes('project') || subject.includes('meeting') || subject.includes('deadline');
+              });
+              
+              if (projectEmails.length >= 3) {
+                insights.push(`You have ${projectEmails.length} emails about the same project/meeting - might want to batch respond.`);
               }
               
+              // Surface urgent items with context
+              if (urgentEmails.length > 0) {
+                urgentEmails.forEach(e => {
+                  insights.push(`${e.msg.from} sent "${e.msg.subject}" - ${e.reason.toLowerCase()}.`);
+                });
+              }
+              
+              // Surface important items with context
               if (importantEmails.length > 0) {
-                responseParts.push(
-                  `📧 **Important emails:**\n\n` +
-                  importantEmails.slice(0, 8).map(e => 
-                    `• ${e.msg.from}: "${e.msg.subject}"`
-                  ).join('\n') +
-                  (importantEmails.length > 8 ? `\n\n...and ${importantEmails.length - 8} more important emails` : '')
-                );
+                const contactEmails = importantEmails.filter(e => e.reason.includes('contact'));
+                const timeSensitiveEmails = importantEmails.filter(e => e.reason.includes('Time-sensitive'));
+                
+                if (contactEmails.length > 0) {
+                  insights.push(`${contactEmails.length} email${contactEmails.length > 1 ? 's' : ''} from your contacts that might need replies.`);
+                }
+                
+                if (timeSensitiveEmails.length > 0) {
+                  insights.push(`${timeSensitiveEmails.length} time-sensitive item${timeSensitiveEmails.length > 1 ? 's' : ''} that might need attention.`);
+                }
+                
+                // Add specific examples
+                importantEmails.slice(0, 3).forEach(e => {
+                  const context = e.reason.includes('contact') ? 'from your contact' : e.reason.includes('Time-sensitive') ? 'time-sensitive' : '';
+                  insights.push(`${e.msg.from}: "${e.msg.subject}"${context ? ` (${context})` : ''}`);
+                });
               }
               
               // Only mention promotional if not specifically asking for unread
               if (promotionalEmails.length > 0 && !unreadFlag) {
-                responseParts.push(`\n${promotionalEmails.length} promotional/marketing emails (hidden unless you want to see them)`);
+                // Don't add to insights - filter them out
               }
               
-              agentResponse = responseParts.length > 0 
-                ? responseParts.join('\n\n')
-                : `Here are your ${unreadFlag ? 'unread ' : ''}emails:\n\n${messages.map(m => `- From: ${m.from} | Subject: ${m.subject} | ${m.date}`).join('\n')}`;
+              agentResponse = insights.length > 0 
+                ? insights.join('\n\n')
+                : `You don't have any ${unreadFlag ? 'unread ' : ''}emails that need attention right now.`;
             } else {
               agentResponse = `You don't have any ${unreadFlag ? 'unread ' : ''}emails.`;
             }
@@ -2232,12 +2682,12 @@ export async function POST(request: NextRequest) {
                   // No contact name, but we have phone - try to find existing contact by phone
                   // If found, update it; if not, create with phone number as name placeholder
                   try {
-                    const existingContacts = await getContactByName(recordId, normalizedPhone);
-                    if (existingContacts && existingContacts.length > 0) {
+                    const existingContact = await getContactByName(recordId, normalizedPhone);
+                    if (existingContact) {
                       // Found existing contact, update it
                       await upsertContact({
                         recordId,
-                        name: existingContacts[0].name,
+                        name: existingContact.name,
                         phone: normalizedPhone,
                         lastContacted: lastContactedTimestamp,
                       });

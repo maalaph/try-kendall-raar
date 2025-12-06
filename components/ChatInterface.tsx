@@ -46,6 +46,8 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const chatInterfaceRef = useRef<HTMLDivElement>(null);
+  const inputAreaRef = useRef<HTMLDivElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const callStatusPollingRef = useRef<NodeJS.Timeout | null>(null);
   const isTabVisibleRef = useRef(true);
@@ -689,6 +691,30 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
     }
   }, [messages, scrollToBottom]);
 
+  // Update input area position to match chat interface container
+  useEffect(() => {
+    const updateInputPosition = () => {
+      if (chatInterfaceRef.current && inputAreaRef.current) {
+        const rect = chatInterfaceRef.current.getBoundingClientRect();
+        inputAreaRef.current.style.left = `${rect.left}px`;
+        inputAreaRef.current.style.width = `${rect.width}px`;
+      }
+    };
+
+    updateInputPosition();
+    window.addEventListener('resize', updateInputPosition);
+    window.addEventListener('scroll', updateInputPosition);
+    
+    // Also update when sidebar might resize (check periodically)
+    const interval = setInterval(updateInputPosition, 100);
+
+    return () => {
+      window.removeEventListener('resize', updateInputPosition);
+      window.removeEventListener('scroll', updateInputPosition);
+      clearInterval(interval);
+    };
+  }, []);
+
   // Keyboard shortcuts for search
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -708,7 +734,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
   }, [showSearch]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div ref={chatInterfaceRef} className="flex flex-col h-full relative">
       {/* Search Bar */}
       {showSearch && (
         <SearchBar
@@ -765,15 +791,16 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
         }))}
       />
 
-      {/* Messages Container */}
+      {/* Messages Container - Scrollable */}
       <div
         ref={messagesContainerRef}
         data-messages-container
-        className="flex-1 overflow-y-auto pb-4 lg:pb-6 pt-8"
+        className="flex-1 overflow-y-auto pt-8"
         style={{
           backgroundColor: colors.primary,
           paddingLeft: 'clamp(1rem, 4vw, 2rem)',
           paddingRight: 'clamp(1rem, 4vw, 2rem)',
+          paddingBottom: '280px', // Space for fixed input area (QuickActions + ChatInput + padding)
         }}
       >
         {/* Active Call Banner */}
@@ -888,12 +915,15 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
         )}
       </div>
 
-      {/* Input Area - Floating */}
+      {/* Input Area - Fixed at Bottom of Viewport */}
       <div 
-        className="sticky bottom-0"
+        ref={inputAreaRef}
+        className="fixed bottom-0 z-10"
         style={{ 
-          background: `linear-gradient(to top, ${colors.primary} 0%, ${colors.primary} 60%, transparent 100%)`,
+          backgroundColor: colors.primary,
+          background: `linear-gradient(to top, ${colors.primary} 0%, ${colors.primary} 80%, ${colors.primary}dd 90%, transparent 100%)`,
           paddingTop: '24px',
+          paddingBottom: '20px',
         }}
       >
         {/* Quick Actions */}
