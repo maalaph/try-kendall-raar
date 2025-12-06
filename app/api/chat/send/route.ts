@@ -1952,9 +1952,14 @@ export async function POST(request: NextRequest) {
         // Handle outbound call requests
         if (fc.name === 'make_outbound_call' || fc.name === 'schedule_outbound_call') {
           try {
+            // Derive the message to deliver: prefer function arg, fallback to user message
+            const functionCallMessage = typeof fc.arguments.message === 'string' ? fc.arguments.message.trim() : '';
+            const inboundUserMessage = typeof message === 'string' ? message.trim() : '';
+            const resolvedMessage = functionCallMessage || inboundUserMessage;
+
             // Check if user just provided phone number without message
             // If message is missing or generic, ask for it before making call
-            const callMessage = fc.arguments.message || '';
+            const callMessage = resolvedMessage;
             const rawPhoneNumber = fc.arguments.phone_number;
             const normalizedPhone = formatPhoneNumberToE164(rawPhoneNumber);
             
@@ -2186,7 +2191,7 @@ export async function POST(request: NextRequest) {
               },
               body: JSON.stringify({
                 phone_number: normalizedPhone, // Use normalized phone number
-                message: fc.arguments.message,
+                message: callMessage,
                 scheduled_time: fc.arguments.scheduled_time,
                 owner_agent_id: String(agentId),
                 recordId: recordId, // Pass recordId for chat relay

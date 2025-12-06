@@ -13,7 +13,7 @@ export default function PersonalSetupNavbar() {
     >
       <div className="w-full flex items-center justify-between relative">
         {/* 1. Raar logo - left */}
-        <a
+        <Link
           href="/"
           className="inline-block transition-all duration-300 flex-shrink-0"
           style={{
@@ -32,7 +32,7 @@ export default function PersonalSetupNavbar() {
           }}
         >
           raar.
-        </a>
+        </Link>
 
         {/* 2. Talk to Us - absolutely centered */}
         <Link

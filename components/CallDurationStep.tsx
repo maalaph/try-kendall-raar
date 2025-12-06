@@ -56,6 +56,18 @@ export default function CallDurationStep({
     localValueRef.current = localValue;
   }, [localValue]);
 
+  const updateSliderVisual = (value: number) => {
+    if (!thumbRef.current || !trackFillRef.current) return;
+    let percentage: number;
+    if (value >= 5) {
+      percentage = 100;
+    } else {
+      percentage = (value / 5) * 100;
+    }
+    thumbRef.current.style.left = `${percentage}%`;
+    trackFillRef.current.style.width = `${percentage}%`;
+  };
+
   useEffect(() => {
     if (selectedDuration && !isDragging && !isTyping) {
       const directNumber = parseFloat(selectedDuration);
@@ -73,18 +85,6 @@ export default function CallDurationStep({
       }
     }
   }, [selectedDuration, isDragging, isTyping]);
-
-  const updateSliderVisual = (value: number) => {
-    if (!thumbRef.current || !trackFillRef.current) return;
-    let percentage: number;
-    if (value >= 5) {
-      percentage = 100;
-    } else {
-      percentage = (value / 5) * 100;
-    }
-    thumbRef.current.style.left = `${percentage}%`;
-    trackFillRef.current.style.width = `${percentage}%`;
-  };
 
   const getValueFromPosition = (clientX: number): number => {
     if (!sliderRef.current) return 0;
@@ -406,7 +406,7 @@ export default function CallDurationStep({
               targetValue = index;
             }
 
-            let adjustedTop = 'calc(50% + 28px)';
+            const adjustedTop = 'calc(50% + 28px)';
 
             return (
               <div

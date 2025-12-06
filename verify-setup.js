@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Setup Verification Script
  * Checks if all required environment variables and dependencies are configured

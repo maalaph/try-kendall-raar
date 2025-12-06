@@ -70,6 +70,16 @@ export default function CallVolumeStep({
     localValueRef.current = localValue;
   }, [localValue]);
 
+  const updateSliderVisual = (value: number) => {
+    if (!thumbRef.current || !trackFillRef.current) return;
+    // Linear mapping for 0-50 across full slider track
+    const maxValue = 50;
+    const clampedValue = Math.max(0, Math.min(maxValue, value));
+    const percentage = (clampedValue / maxValue) * 100;
+    thumbRef.current.style.left = `${percentage}%`;
+    trackFillRef.current.style.width = `${percentage}%`;
+  };
+
   useEffect(() => {
     if (selectedVolume && !isDragging && !isTyping) {
       const directNumber = parseInt(selectedVolume);
@@ -88,16 +98,6 @@ export default function CallVolumeStep({
       }
     }
   }, [selectedVolume, isDragging, isTyping]);
-
-  const updateSliderVisual = (value: number) => {
-    if (!thumbRef.current || !trackFillRef.current) return;
-    // Linear mapping for 0-50 across full slider track
-    const maxValue = 50;
-    const clampedValue = Math.max(0, Math.min(maxValue, value));
-    const percentage = (clampedValue / maxValue) * 100;
-    thumbRef.current.style.left = `${percentage}%`;
-    trackFillRef.current.style.width = `${percentage}%`;
-  };
 
   const getValueFromPosition = (clientX: number): number => {
     if (!sliderRef.current) return 0;

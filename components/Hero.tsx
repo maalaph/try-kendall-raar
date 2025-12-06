@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import VideoFrame from './VideoFrame';
-import { heroContent, colors, kendallPhoneNumber } from '@/lib/config';
+import { colors } from '@/lib/config';
 
 interface Sparkle {
   id: number;
@@ -16,37 +16,35 @@ interface Sparkle {
   color: string;
 }
 
+const createSparkles = () => {
+  const sparkleColors = [
+    { bg: 'rgba(255, 255, 255, 1)', glow: 'rgba(255, 255, 255, 0.9)' }, // White
+    { bg: 'rgba(168, 85, 247, 1)', glow: 'rgba(168, 85, 247, 0.9)' }, // Purple
+    { bg: 'rgba(192, 132, 252, 1)', glow: 'rgba(192, 132, 252, 0.9)' }, // Light purple
+  ];
+
+  return Array.from({ length: 12 }, (_, i) => {
+    const intensity = Math.random();
+    const isBright = intensity > 0.6;
+    const colorIndex = Math.floor(Math.random() * sparkleColors.length);
+    const starColor = sparkleColors[colorIndex];
+
+    return {
+      id: i,
+      x: Math.random() * 100, // Percentage position within button
+      y: Math.random() * 100,
+      size: isBright ? Math.random() * 2 + 1 : Math.random() * 1.5 + 0.5,
+      opacity: isBright ? Math.random() * 0.8 + 0.4 : Math.random() * 0.6 + 0.2,
+      duration: Math.random() * 4 + 2,
+      delay: Math.random() * 3,
+      intensity,
+      color: starColor.bg,
+    };
+  });
+};
+
 export default function Hero() {
-  const [buttonSparkles, setButtonSparkles] = useState<Sparkle[]>([]);
-
-  useEffect(() => {
-    // Create sparkles for the button - purple/white stars
-    const sparkleColors = [
-      { bg: 'rgba(255, 255, 255, 1)', glow: 'rgba(255, 255, 255, 0.9)' }, // White
-      { bg: 'rgba(168, 85, 247, 1)', glow: 'rgba(168, 85, 247, 0.9)' }, // Purple
-      { bg: 'rgba(192, 132, 252, 1)', glow: 'rgba(192, 132, 252, 0.9)' }, // Light purple
-    ];
-
-    const initialSparkles: Sparkle[] = Array.from({ length: 12 }, (_, i) => {
-      const intensity = Math.random();
-      const isBright = intensity > 0.6;
-      const colorIndex = Math.floor(Math.random() * sparkleColors.length);
-      const starColor = sparkleColors[colorIndex];
-
-      return {
-        id: i,
-        x: Math.random() * 100, // Percentage position within button
-        y: Math.random() * 100,
-        size: isBright ? Math.random() * 2 + 1 : Math.random() * 1.5 + 0.5,
-        opacity: isBright ? Math.random() * 0.8 + 0.4 : Math.random() * 0.6 + 0.2,
-        duration: Math.random() * 4 + 2,
-        delay: Math.random() * 3,
-        intensity: intensity,
-        color: starColor.bg,
-      };
-    });
-    setButtonSparkles(initialSparkles);
-  }, []);
+  const [buttonSparkles] = useState<Sparkle[]>(() => createSparkles());
 
   const scrollToBooking = () => {
     const bookingSection = document.getElementById('booking-section');
@@ -64,7 +62,7 @@ export default function Hero() {
 
   // On mount, if there's no hash, ensure we're at the top
   useEffect(() => {
-    if (!window.location.hash) {
+    if (typeof window !== 'undefined' && !window.location.hash) {
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, []);

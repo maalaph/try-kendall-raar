@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { colors } from '@/lib/config';
 import { Search, Command, Phone, Calendar, MessageSquare, File, Clock } from 'lucide-react';
 
@@ -15,19 +15,15 @@ interface CommandItem {
 }
 
 interface CommandPaletteProps {
-  recordId: string;
-  onActionSelect: (action: string, data?: Record<string, any>) => void;
+  onActionSelect: (action: string, data?: Record<string, unknown>) => void;
   conversations?: Array<{ id: string; preview: string; timestamp: string }>;
   contacts?: Array<{ id: string; name: string; phone?: string }>;
-  assistantName?: string;
 }
 
 export default function CommandPalette({
-  recordId,
   onActionSelect,
   conversations = [],
   contacts = [],
-  assistantName = 'Kendall',
 }: CommandPaletteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -184,10 +180,10 @@ export default function CommandPalette({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, filteredCommands, selectedIndex]);
 
-  // Reset selected index when search changes
-  useEffect(() => {
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
     setSelectedIndex(0);
-  }, [searchQuery]);
+  };
 
   // Scroll selected item into view
   useEffect(() => {
@@ -241,7 +237,7 @@ export default function CommandPalette({
             ref={inputRef}
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Search commands, contacts, conversations..."
             className="flex-1 bg-transparent outline-none"
             style={{

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Quick verification script to check if environment variables are loaded
  * Run this after starting your dev server to verify .env.local is working

@@ -1,3 +1,5 @@
+import { generateVoiceSampleText } from './voiceSampleTemplates';
+
 /**
  * Universal voice description enhancer - works for ANY description
  * Extracts elements dynamically and structures them without hardcoding scenarios
@@ -414,9 +416,6 @@ export function generateStyleAppropriateText(
   description: string,
   elements: ExtractedElements
 ): string {
-  // Import template function
-  const { generateVoiceSampleText } = require('./voiceSampleTemplates');
-  
   // Extract voice characteristics (NOT personality)
   const ageGroup = elements.age === 'young' || elements.age?.includes('young') ? 'young' :
                    elements.age === 'older' || elements.age?.includes('old') || elements.age?.includes('elder') ? 'older' :

@@ -729,7 +729,7 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
             ) : filteredThreads.length === 0 && searchQuery ? (
               <div className="text-center py-12 px-4" style={{ color: colors.text, opacity: 0.6 }}>
                 <p className="text-sm" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
-                  No chats found matching "{searchQuery}"
+                  No chats found matching &quot;{searchQuery}&quot;
                 </p>
               </div>
             ) : (

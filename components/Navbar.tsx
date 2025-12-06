@@ -66,7 +66,7 @@ export default function Navbar() {
       {/* All items evenly spaced: Raar | Talk to Us | CTA | Pricing | Call Kendall */}
       <div className="w-full flex items-center justify-between">
         {/* 1. Raar logo */}
-        <a
+        <Link
           href="/"
           className="inline-block transition-all duration-300 flex-shrink-0"
           style={{
@@ -85,7 +85,7 @@ export default function Navbar() {
           }}
         >
           raar.
-        </a>
+        </Link>
 
         {/* 2. Talk to Us */}
         <Link
