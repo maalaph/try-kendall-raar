@@ -1,0 +1,174 @@
+{
+  "contentHash": "85059705c8c8a94980298df29c8c8e6a",
+  "runtime": "node",
+  "environment": "dev",
+  "packageVersion": "4.2.0",
+  "cliPackageVersion": "4.2.0",
+  "target": "dev",
+  "files": [
+    {
+      "entry": "lib/vapiVoices.ts",
+      "out": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/vapiVoices-QJGUXJSY.mjs"
+    },
+    {
+      "entry": "lib/vapiElevenLabsVoices.ts",
+      "out": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/vapiElevenLabsVoices-O366MS6S.mjs"
+    },
+    {
+      "entry": "lib/voiceConfigHelper.ts",
+      "out": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/voiceConfigHelper-PPHKXL3L.mjs"
+    },
+    {
+      "entry": "trigger/embedding-tasks.ts",
+      "out": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "entry": "trigger/index.ts",
+      "out": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/index.mjs"
+    },
+    {
+      "entry": "trigger/learning-loops.ts",
+      "out": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/learning-loops.mjs"
+    },
+    {
+      "entry": "trigger/scheduled-tasks.ts",
+      "out": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/scheduled-tasks.mjs"
+    }
+  ],
+  "sources": {
+    "lib/vapiVoices.ts": {
+      "contents": "eJy9mE1v4zYQhu/6FQNf5AR2vECBHhy4gPOxWxfpYtEUuQQ50OJIYkGRKkl5azT73xekZIlUZCdxvc0l1nBIjh69Q3I4Oz+P4Bwell9W8JkYtkF4kCxBuCaGcJnZxutKEYMUONMGZAo/fZj+/AFyluXTvyvCmdnW/Te2o7Y9/sxRIxCFwOVXVLBzMzkRcMtxg+KOrDWsKwNrNAYVpFIBJwZFso3gfBZF+E8plQEmDKqUJOjmqGP7NwJgdA7aKCayS5jNvABAkAJnqxsY40V2MYHRLedMmtEERndI8tFZBM4l6H7DdMnJ1jVEABtSMjfVau8sjKIwLGWoIgCSJChM4Lp0JjDb0g6YoaCo5hAXhGMMzxCn2P4UWBlFeHxpR8rwk5JVOYd4KyuROYeCUcpxSjKk7llyisq5G5Lp3bSPT3WMLrwkJ4okBhXThiV6DiOKWFoIiuhya38khBf2PwpUGRqWjCaAJrmIACjqRLHSMCmCl/q1KoiYKiSUrDn6bhHsPvIcYm2IoETRuAdNO0nsWltVjGuR9MRxFn2Lolktz50C3VAv9HnHCmZbjRyQ5gQSWRRS8C1UGqkn0o8yqTRIARuiGNrAKUtTVPaz1R9UT5oPpyf2w2gnzEaXiRTadEJpwpl3Kn18ggU8RmAR/E44tjM7+dYCjm3/KTqBxhNnrqUZ3/q2QI5x4L5TXrwsULGEiMYeCq7x7bTlK6purJX0GCcciYonEJdKpqg1k4Lw+Kl2CnTRxAhTuLZ9YBcBFO3bTsAfBYwUu1gGxGIbvk0G+PwldR7S+a2zhGw81yPJ1FkXMlkrluXGQmlzZZiIjQumcOX8h4G0IxxLgyghOQ15LH1bSCRwP5JJvd6ETOxyYonYVWQYRh0UTOEGsRyGYTsDERQKYip1FA1Kih6LztIj0TW0HK4UM6yVzP+RNDa8NmWa6U+eMUQYKViPi2/rkfGbTpg3upDS5JbLV6L2qcTNDVO4d87DOrHdj2Wh+wK536MP/VIep1pUdzu8zRcnlUEU904Zn2vfPQnjZFMqKSqRMGI7vgFJvQl9xOLgNsSR9JbZu84SovJcX2XVHHTeudAewGSjGlhkU3wJyi4t3ZL9fu1wxrc9JJ2lh6RrOCmSt+SQDWogg0IiLocskFQxFLSN9j08qCx6q8pNZwl5eK5H89ifUME6e1guNkKYwhd/WT0omvdmVx/SGjknIaUrzxRi8p1PqhtP9rDLq0E+LjaYwm17MNlDpx7ESYizDR4pICVNvu1ryDf2ZeS3HU1o6ATjTi4H86oJzG7X9qDyWmIdfYhRJMmRh1D+8G0hk8D9taPMD82tOsh+du1ONT8iuWxdy6UxGNK67plDYP1OxzL7T7VBG2K3dw2DeneFUG/vS0qhkArbUluDQKR1XayQJHlTHRtpCG+OBG8pgW3lO2luPXrXCtHTZVujf0IDhPPeVVBbL6eVSCwJyNAsOW/LZD0+C4tm+8UVmkqJF9X1pXclYKfzrmPWW1jd7JuvHf5qu6Lj7ubInxmeoRIUUyaQHorhImWCjutJF7/Us18wCovFAhiF5+fG5CmwaTs7HL739KY3eSAlW9HxwFXVyV6r/w7ec/0y/t93xFg8Iw==",
+      "contentHash": "3b05a4ea28ca32de7c43054c95700836"
+    },
+    "lib/vapiElevenLabsVoices.ts": {
+      "contents": "eJy9VU1v4zYQvetXTPewko1YuRYOtNs067Yu0mTRBLks9kBRI5tbmhTIkbNGnf9ekJRkyXLWbVH0EEQeDufxvfm6nE4jmMLT9cclLCRuUd2y3MKTFhwt/IKyQuMc3N/jrsIHbkRFQLsKLTBVwNq7QFkrTkIrC6U2IDUrhFp5h9oKtWoxZls0ohRY9MG2Aaw0egO0RlihQsMIC/j14f4OSiExjWB6GUViU2lDMAVmoWxuxKWNrwYnFaN1c+Y+46sowq/+WChCUzKOPXhPFf6MABTb4BwsGaFWVxGEdy2Lg+nlRCB//Vbkhpndb0isYMR8tBKJr7G4pn5Iq2vDByCkickg9xxUvcnRnAf60IJsGsT5yXd0JOz8mPCnzx7lMqT/VrNiVAPHaemS4W78YJBqo+z4WdqAqqUEUXpnKDRaFRPgV2HJp7Gh1paMrxYHfvREm0zm4/D7EN2RJ7Pz/wG4VpY83EeX+8yXQGrQarnFpDKao7Upfy6SyQXEUuTxBcRbVoljyPSL1SqeXB1FvdGKUJGFDEqbGmTFT0Liw07xpAW9gLimcvb98PI4N55E5sVMK2YsJn2A5nIQF9ocvgBnxNeQoDHaTBrSomwMIJQlpjjqEhbe8PYtxFwXGINQgK3Jf6TODlmWQby4u1/cPcZtvPBmLTF9ZkYl8SdfEE/3y5vFw2d4VS1QmqDUtSpS+L1W8EZVGzC1Cg0wc/dmoZTeAOmuuUFQ2mrVEXapDaaXqP8g//LjFwWq7ahp6jy+CDSHQrZxX3o1/zMSMCnPjaVBsV8bw3bgZD4aHzr/gpzsyfJeIV1L+VqBj/rSZ+NQPZB9oz8cp16tvE+bnt3vYdjgnmxgBPkOBNl2unl+FTNs01rgcY2N6/KDS5lFZvjaDfaBGCMNDNSqwFIoLFxxdnXxmionOP24WxbJ0dwdiwT7HtJBroZ89k3Fe5IF/7QUqsGE7F0wpq0Urk+a78kZPd32gIQzizOhLCorSGxx0tPXexzE9T//b3nv2AaT/qL779UN7lI/o3FokHmmKelbZ7phFv9uFsb3fEK60KOUtOsQWK5r8lsrhJRh+L66ubrN/c+312mlbRvxeIl1SL1F9m+7vaO73zcj7iDHzRr5H44GO/SysG4fOFWGQ08GbufmAHchBxKSqdFhHIQWFrqw+c7jnFRNWHf01Lh6hif6PtdaIlNepIb5+bkxge+y7FDCXpS/AN54p+o=",
+      "contentHash": "ac3c4d4554df2bdee87cfad442ab9d1a"
+    },
+    "lib/voiceConfigHelper.ts": {
+      "contents": "eJydVmFv4kYQ/e5fMUEVhhRwSFVVDeFaQkiLmlyi0zWVerpKiz2GVda71u6aHHfhv1e7azu2gUQXfwLvzJuZN2/GGxwfe3AMfyJLUYIWEAq+RqlhLWiIoJBhqKng5uh+cjfP34eCx3SZSWLOLADhEUMFC6FXMGO4Rn5NFgoIj5wfJ5qu0bkrD44Dz6NJKqSGb7BE/exyQ9KU8iVsIZYiAX8QWJ/8tT+quU1NChjdG4uLzTzqAeVUU8LoV7Qvr+lCErnpGeMJY1V71QyR2/ojz8MvNgblGmVMQgTrMbVVwzcPIJViTSOUZ+APh4wslA9P4K9JSv2RB67MeXQGSkvKlyNv63mBo3r6NoJ/T4kkiTudrqxN32UF80tXR+iKA+bqgA4OloMetP666U8upsPTn1ogJLRMkn1kjArd6lpoiTqTXOVwtdAQC+nymtzNbdtyaoja8BDijLvsl6grFF0JaXw6lWwLKrpncCdFQhWeVzl9goxHGFOO0TtLMI2hc1St9ukJ9CZFEdc4OBqPwXfIvjGpugy0pEmn27V4AK7K5zimT1vPA1Ow0mCME4xy3DHsAhkHDyAIYMZVJnMxl3RTVRFfBAuMhURgQjwYOWdpqX1gqItm5Uoc79Oni2iIqBkPGPKlXsF4PIaTorgmHHkkVB8YBoe7LauZrjB8MHGo9hWQUkfrXF0lRdUgLuXm/HVqLBaMNUsokg4C+AdhRda4E7UPmUKgWoESmQzR2jdxBu7MMuGj3SBuFNvtWq4DLLfLvRvMIoNSFcXffZPdK8/KsX4ZvXDYjuyPLSAzxbyUvd0cO3mbt9+VsYV5Ld8KajPTmi6uCGMLEj6cNRXCqxu+UAlEVGKo2QY6ShOpFTxSvTJa1yhVwLNkgVL1gIt8BbUglRjTL10X7VZC2BBiZR9ykiCsKYHEfQdKTeb/nRx3viJ79GjakDv9dlgYDZIPi6KkOMc8pIZtfebmN3e3Hz5O3n8syDV7tsLq/BIuZle3H2ZAlMoSU+F+UvKFtNsPBUSiWZk0JIxtYPhL//QEwhWRJNS2E4SlK8KzBCUNbV8iolZ2QQVBM4xDUyuz+juZyizkOQx/toiqaz/0CdmYrmhCOaiUhKiCEtJ1i6rnTOcRjOtbt9hs78YGuN2GUsg7z16/8zGcvuIX/PeJ9L9O+v+e9H/9/OMPwUCj0g2VQLt9GOCoHpnykGURqo7f99/oCH53dNgtV2yduLertJbEfmXGRgrFWMUi45FtLhe6Mfnzy55TJ76ozf1KoknKML8TKGD0AaE1c5eSHrSukaxaPUAdDnIC9gsFTky7X+rJ61TVduZ3EPU3f+Di0d6QEqKhv3PByFUvGA4eieQd/9P97Xw6g+nt+6v5H59LgPzG5y4eDu3M78Hu6tq9wWw9+/wPbJazhA==",
+      "contentHash": "b2d48d785cf19a3bf7ae8a089020061f"
+    },
+    "trigger/embedding-tasks.ts": {
+      "contents": "eJzVWFtv2zYUfvevOAgGSC4cO8PelLpZGqRFsBUD2uypKFpaOpaIUJJHUkmE1P99IClK1M1JbGPAnhKT5374fTzU4s2bCbyBW07jGPk8wnu4TlcYRTSL4ZaIO6G2L0WZhSDVT1jnHGLMkBOpZEgWAc0ifFQ/0KoqrcVkQtNNziU8aVXYwprnKZz8LhtvCxHdLe5/OzlvZLW1TygEiXEGKyLD5MZZEjMrkea8bIwuGF0tBKYkkzQ0m67VGOVVQqQ10tGLiCQrIrCj8bdArk3RXRqThSmijhIICJrFDCE1ruCByqRbGXzUTsI8E7KVsCo5LHW9/KcJAI0CONECp5W9k9kEgBdZAER3xd+QkuUkCkDJA3AMcx7dRAEIyWkWn+tVmXAkvdXKZHc5zDOJmezKSqKSvgjgs3bx1uzOgGTlOyWzncLyXRWF5GX1nzYncoZzlse+9/X2883Hj9efv8EXSbg+QrZQ9hgF3qzWdfOpEp3blVkt4+RhheqlRqpK60/MYpk0ktXynOl1K76dnk+c+CVwFAWTsATyQGi7aX7tYjxEu2Mb0d8ZiLgT4pCOaUq10cRM1+CbiKdOLUc68cltAEYgijBEIdYFY2W7GdAcZFVs42FOnZBV3ZrWyYJn8GQNBiB5gbMRG7C1mltAJnAg7gfCs9HA1VEyHjGCrGAMfEw3srR9v5h6O2NbEyZwBhyJyLMAPK38vVL2nOgmJsZQMRP4yHnOp73Drpd3xromlGGk6mtMWPsy4fmDWTNLyuF2NtEnsqKa99q3NgVpwSTdNIQzwDB9Eh3kGS122mIb8RzdWLkALjkn5Vtbh2EaGiOiUSoaIaOX0BHA9iBa0tV4hpyq3au8UBF2kCxeRimi5pR+m/yuybaJgfCdk6GSCPN0w1Cac9bELXNJ2LMBg2UEi9IdGVk81aptzB/bM9j1RiAlG5+rVvtP+jhzxUvOOeQ1K8N2Oq1TON8Pzu8HT8dBoK7mB8ZqUOlhi0AhkIO/IuHdmjI2HcK32VLzSj2+jWHciJ4qo6fNWLLfWMFoSuVFAFmRrpAfgrY6kjqZ148BOppGQP+Enz/h17OzUQxaPqpByPGfgnL0vfac503nMcq/+BVHIvG20vK7wUzPW9brRlrrnTHUdyDZGwxel4668Ws0dWAFy+USzqatcg5fzTXszmYWqmfu1Vf9s1jAB8okcsgLJ0uZEAkpjRMJhKl0SljVY0Wj6t9ksOF5VISS5tkMyrzwIggTDO9AJugMyyDJiuF0sKa3uQHMEvppKy5IRWzY4FVnqN8G52ZKRdwaduq7SW1Ucq6iuaKC1gDFc4ZGQf03c3YkTVFIkm7Mdv3TlbHgUC1qE+u2ORN73DOdoj57zVz34PrMVTN2NP+Du+Zw13veEQNFOsL9AKl5+b70XamEdz4r9VN5L/o3us35ptFFd04bmwON6m25wQC8NQmlBz/B23BcI8csRP2TIyOKIkRCN9VCqqLm+od5qZNMfo+INAo0E5IbWvGspzssu87vCStwcNB8lL0MrJsQLwLwWP6gPaUY0SLV/yY0Tmpv+LihHMVl1872sBey7vghD2Rl4A9ViWbyUkvzOyxf+eRVar17b9axu/dLtEn0//UQbTWo/Q59wbPzCK/LdgDHmkOrb1/NHDpCM5eM2Q9lO7iGMHZqbe7DOEfCj05HJfNaIPUQUhfIme/cj4bj8+HIBf31mxVQMfqOlxLyde3PhZJbiD2xW2O2sTIMW2geXvNNIRK/BymHaRyGGUVay2cPbrvcVZ9rRvzVX3Fsz78bRHhdlw1fjECuD7sfzQn7oI2CzO23GNOpX56aWLbBjy4I909L2wnMH1CXnbqW8jVc64ULs2HnHAjgi4aOTclNfVvzzW4MdYnluSnPnM/ehNUweTNkrfULwrzZ+bySmB5x7Dt2LHXXDh0Mj8LW/wLfqer1",
+      "contentHash": "acfa5bd1c7fc1e1e8bd1996224518ef2"
+    },
+    "trigger/index.ts": {
+      "contents": "eJx1jEsOgjAQhvc9xb8jaQI9gGsX7rlAZUZo7IN0kHB8U1CUBevvYbRW0Giz63vODfGM1spTcIvES0HXZUx5EljvMa1I0sHvbAQ56dLMGdPAQUEbpYz5pPBsc3Sxh09p3B6KN6TxyCmgasxXqosk1eV/wOHOROVwEu9CvQrHWrqB6eWZzupd+NVvlXldEA==",
+      "contentHash": "93407eefd41f42478741bce8a5737d6e"
+    },
+    "trigger/learning-loops.ts": {
+      "contents": "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",
+      "contentHash": "ade03b309b34f2304b7104d3fd9665d9"
+    },
+    "trigger/scheduled-tasks.ts": {
+      "contents": "eJzVlktv2zgUhff6FQfa+AE76jRZOehgMplOkUUGQepiFoNZ0OK1RZgiBV7Kiabwfx+QetgOUi8aoEBhQDBInfs4/Egqm04TTLF0arMhdyFph895QbLWJLEUvOUw/UBOWaly+DCCtXXQJJxRZgNhJHJr2GolhVfWJJhmSaLKyjqPr+AuHGOPtbMl0t/8IVvGcpvtLtPrg+AQjO6ptE4Rh0JmqKsw9iC8J2durVkrSSanMDnEvsj6wuba2oqPA69Evl0rrb8wuY/liqRUZsMv5NRPzGOvx/oN+SB9pNw6eegm02qVSeHFSjCl10mStZ7+IZRuULXlQhihG1YcLQzTj7Vh0I5cAykaCI/3uLnHl+UtvG1f/496OUebWwOCQV3r4Nw64ug4Pccyg3seMuTunLrpM384rMVF7kh4Gn9NACUXSKNg3mWb98WmswTInTULpO/wHtPwS2fIskOxUZkg9rWA4MbkGFei0VbIWVhO/4z9BB9+RUiGbnnpQtvNePTP8vHu06ePj/9+yy32wnmSo8l1FMdHluEv62mBOwMBR0JDlZWmkoyPBM7Q2HoksSafFxBao2Zy3Iv/tA7GPs3gC8VQDIFKi5wKqyU5+EJ45MJgRehIJYlSmFro2GkMYh3o2ZORJMN6KU8urI3dkXuRMT4c+dqZzgKA6zwn5gW8q2nWDZbELDa0QPotM4adOR4ajom69MqaSdpG2we/9rNkPzkA+TfRVjcow6ZqTvfsa1TeW9OBeXkE5tHubLe+JmFQV21Y9RqMTzFv3MvN7UnWc0S2qnlb7fyk2lMsLyOWv7RYDqUe9/B2Os9Z9+MR/V6sznbxNraGG2I4P4fj9jW2Ptc9W1dHbA2KIUh713TWvOSq6nIOZ/nvvf4cV71qfjjp+7ynXF1Frt61XF2dctXW/3auztn283B1tovv5arv9OVKhvt6PIG0xGbkQc+KPZTB7go3D3dBtyyIqftU6c7xXOhQglSOcq+b9uq2vgjHfXzPOuyUgC9aIRxtFHvXJMemPdEowNky2L/K4V/JpHfEeCpUXvRJldnZ7VHWJPkfU9MVtQ==",
+      "contentHash": "6cd1b4202b3bfe1cc1cd805d52c1dae4"
+    },
+    "trigger.config.ts": {
+      "contents": "eJxdj09rwkAQxe/7KR57akESwfYSkRZMEIvVItJLKZJmJ+nWZDed3aSK+t1L/HNoL8Mw8+a93+iqtuzhdzVhjxXroiAeW5PrAkfkbCvIR38eB4ra0KlN2A7kUAjank4za9yp5rqI/jmMsBdAzfaLMh91TUbOBWTaYLWcTibJcv2yXDwl49V6GuNwgJQ9AYQhYs2Uecs7/HwSE3a2YfjUbRxSJpQ2Sz0pASjNLsKbDMILpXy/WMxsgZJaKpFbvoJ1PwigtMWsW/1lmi/iZJ3MXzEajSBrtqrJvLZG4gFSm9xKRJCKPpriyvmcbnXVVFANp530lHXmvGH6bjSTgjZo724FUKXb+CKMMOj3e53FPSptGk+u0znKrFFOHIdC/AJHgobE",
+      "contentHash": "036e946fe53bed5a6006d0a4e41a6684"
+    },
+    "tsconfig.json": {
+      "contents": "eJxtUU1Lw0AQvedXLHMMbaJehJ4E6cFiEfRYimyyQ7t2v9id1EjJf5fdJNVET8O892b2vdlLxhjUVjup0L84ktYEWLFLxhhjQNwfkGDFYP12d3N7D4seV7KCFduBsBoWLJZCEnpeKYw9BoMtwX5Qc6Xs5yauJd/gAIaTdM+yejxifZox5GVNU8zYtZYzDMPWikbhkyH01k1JnajofDAzwV8xWNXEsFFRNUYo9KPER/KMm2DNdtzya7MMVnFC0XOzVB+hjRs98pqWsRmHTO1RoyGupgNONQeZTr5LABtO36fmOkVIAQa4S3U8reN0/PkvxuChzNPPFGUO+2wc6KI8mlCNwOtbae8SzbkQBYXRap6X+d/2mqSIQyV9OQzlTNpTAs//06nVFGKS5B+wvRoCYwW+6+Gm+6zLvgEbXbUJ",
+      "contentHash": "02fc19ad21338c2ab820a70136310db4"
+    },
+    "package.json": {
+      "contents": "eJx9VD1v2zAQ3f0rBM0hJdqyHXtqgXYo0KFTxgAUeZaZUCRB0qqDIP+94Icl2XG6ke/dHe+9O+l9URSloj2U+6KUVHGhOmRoB+VDYAawTmgVyBoTXCfUWDFQH1K8PUGEHLPCeFfui/dFURRFyWEIWQrOvgjnhwS3JyH5SKRbppyn1o9UumVKChUZcPGUUQ/O7wctGIR3S+/ORW6jCtRTZLB3l/gDeHZEAzUC3c+KAU/f//z6KWEA9Zu2biqyKIqPKJWDAcVBMQEzvd8kVR07UqEqpm2087nGq2zZdUA4dZaaY45a/j8KsSOwV6OF8sho5zubWn8OI1neydQGFBV3WnAnQ1vqoLoc0EuqtMSPm1kpb0XXgcUchsrx1xjSXLXp3wy4ilE1UIeYVgfwPr1I8O5TnNIceiok2BiyxTVubkJMF6lHTNZ4M3IDWAayaqVuc5/1VPyr18fSndadBGpEEkmaZp4uT0xwQBYo89mr9bqZ+J72vfbHXJaQiQkLGmCywTVejehnkWRMmY1kg3eYXHDDD8hQ6yDLa/B6Rr04xIWLb61CB2Q7apv82kwtjFrIbj6tCCNGJSgu3/I0m1ue636WOlv34cf9jfdUyL9CceZcFfaSueTz7WiDMUne7V5M3pPdPerS04zm2oMaErjBq8nJ/G8IxO4aixsiOvTF2Dqr04avw3agFjydPoWZxmtt3p2zkdvJyNh6/JmkgtHFxcfiH3wadCM=",
+      "contentHash": "f7db8f95b5e89e09c078639a86c1b203"
+    }
+  },
+  "externals": [
+    {
+      "name": "import-in-the-middle",
+      "version": "1.11.0"
+    }
+  ],
+  "config": {
+    "project": "proj_hsneehqxymxjwpkwntec",
+    "dirs": [
+      "./trigger"
+    ]
+  },
+  "outputPath": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF",
+  "indexWorkerEntryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/.npm/_npx/9327320c903ff367/node_modules/trigger.dev/dist/esm/entryPoints/dev-index-worker.mjs",
+  "runWorkerEntryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/.npm/_npx/9327320c903ff367/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs",
+  "configPath": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger.config.mjs",
+  "customConditions": [],
+  "deploy": {
+    "env": {}
+  },
+  "build": {},
+  "otelImportHook": {
+    "include": []
+  },
+  "outputHashes": {
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/esm-EV6JUIFW.mjs.map": "VON93E1In1A",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/esm-EV6JUIFW.mjs": "L90YDEusR8g",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/crypto.node-K6UNIYK4.mjs.map": "0b4tlwmkM3g",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/crypto.node-K6UNIYK4.mjs": "GGjPfvYk568",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/dist-MKVA334D.mjs.map": "eOYmS1PMR08",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/dist-MKVA334D.mjs": "q7XPiDc4VfI",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/vapiVoices-QJGUXJSY.mjs.map": "PRsmPW0Vbs8",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/vapiVoices-QJGUXJSY.mjs": "v9AsKR/Suhk",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/vapiElevenLabsVoices-O366MS6S.mjs.map": "cHpM8gfeHqo",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/vapiElevenLabsVoices-O366MS6S.mjs": "z3DSaBebfuU",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/voiceConfigHelper-PPHKXL3L.mjs.map": "6mSd5gUafvs",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/voiceConfigHelper-PPHKXL3L.mjs": "Mh+Qvlz0Xjc",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/crypto.node-LKQGP6DF.mjs.map": "pvy194ty94Y",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/crypto.node-LKQGP6DF.mjs": "zDmn3ryHdjs",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/dist-ACNRXWLL.mjs.map": "/c+bIB8+Bds",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/dist-ACNRXWLL.mjs": "raabp6x/eEU",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/getMachineId-darwin-KPHJJCKJ.mjs.map": "cm7acfpRolg",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/getMachineId-darwin-KPHJJCKJ.mjs": "b95WJ5ITiJw",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/getMachineId-linux-VJVE5WFU.mjs.map": "fJDwhnOrxvI",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/getMachineId-linux-VJVE5WFU.mjs": "ABUYzr/90+8",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/getMachineId-bsd-4MITCLWB.mjs.map": "wX5zkkuqDGc",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/getMachineId-bsd-4MITCLWB.mjs": "A248E7NXFM0",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/getMachineId-win-ESR5BA4X.mjs.map": "/4AxL8e/F1g",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/getMachineId-win-ESR5BA4X.mjs": "sWACautRGoA",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-EGCVDRQH.mjs.map": "ScWHznnP2Cg",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-EGCVDRQH.mjs": "MSWCY0vC/30",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/getMachineId-unsupported-RSVBCIY3.mjs.map": "luhKseZlw04",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/getMachineId-unsupported-RSVBCIY3.mjs": "0n3fW1FGySk",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/s2s-TS63NXQD.mjs.map": "+9IByjYJWsY",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/s2s-TS63NXQD.mjs": "mOe7go0dQds",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/.npm/_npx/9327320c903ff367/node_modules/trigger.dev/dist/esm/entryPoints/dev-index-worker.mjs.map": "KYU8hlijMwI",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/.npm/_npx/9327320c903ff367/node_modules/trigger.dev/dist/esm/entryPoints/dev-index-worker.mjs": "eaZBi1WfzLA",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/.npm/_npx/9327320c903ff367/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs.map": "tsWGCOSO2Yo",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/.npm/_npx/9327320c903ff367/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs": "9PWWcoq1f2Q",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-GKRPW3O7.mjs.map": "/v/CvwmF6e4",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-GKRPW3O7.mjs": "RmVffQATkUg",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-KXJWTIM4.mjs.map": "ntF0Br2xcXU",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-KXJWTIM4.mjs": "nf2YmZkNfWs",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-POA6HR3Y.mjs.map": "bN5vIp90faQ",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-POA6HR3Y.mjs": "kzwwdN8sqXc",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/Desktop/landing_page/trigger.config.mjs.map": "0TJkiZtmhho",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/Desktop/landing_page/trigger.config.mjs": "E2Xl7CrnFFk",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/Desktop/landing_page/trigger/embedding-tasks.mjs.map": "0b4tlwmkM3g",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/Desktop/landing_page/trigger/embedding-tasks.mjs": "ufKwJ7zTQPE",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/Desktop/landing_page/trigger/index.mjs.map": "jJ3J0+vLRcI",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/Desktop/landing_page/trigger/index.mjs": "jtTiLHPnDE8",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-W35DMXCS.mjs.map": "8u4KVtDOzHQ",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-W35DMXCS.mjs": "oyR9++cNJqY",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/Desktop/landing_page/trigger/learning-loops.mjs.map": "0b4tlwmkM3g",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/Desktop/landing_page/trigger/learning-loops.mjs": "/BwtkUUYfsc",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-XTNBJH3H.mjs.map": "rMvqyqV0Ak0",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-XTNBJH3H.mjs": "7Fg6gO1iNuw",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-RHWPXOM4.mjs.map": "uyx5935gbNo",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-RHWPXOM4.mjs": "dtIa6y+lIko",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-OP6AZBK3.mjs.map": "uzdJi6PXCTg",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-OP6AZBK3.mjs": "SMS//z0ltZk",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/Desktop/landing_page/trigger/scheduled-tasks.mjs.map": "0b4tlwmkM3g",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/Desktop/landing_page/trigger/scheduled-tasks.mjs": "glSFv5ftVaI",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-6XT7NOOF.mjs.map": "oMnNS/60Quo",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-6XT7NOOF.mjs": "A28+khMWxhI",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-CY2WMQQT.mjs.map": "tGoHED2qKgE",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-CY2WMQQT.mjs": "LyvTvvInIGQ",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-OLUMO527.mjs.map": "LMPzUuAiOIM",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-OLUMO527.mjs": "a3axOYr3fdQ",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/esm-CHT6X7TS.mjs.map": "BV0IJFqJTOc",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/esm-CHT6X7TS.mjs": "xW9exhVY+TE",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-HXW2Z2VN.mjs.map": "m/ykv9BuIUY",
+    "/Users/rm/Desktop/landing_page/.trigger/tmp/build-w0qZNk/chunk-HXW2Z2VN.mjs": "rDjjE5tWnX4"
+  }
+}

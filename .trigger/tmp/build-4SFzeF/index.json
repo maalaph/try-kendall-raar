@@ -1,0 +1,73 @@
+{
+  "configPath": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger.config.mjs",
+  "tasks": [
+    {
+      "id": "index-message",
+      "maxDuration": 300,
+      "filePath": "trigger/embedding-tasks.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "id": "batch-index-messages",
+      "maxDuration": 300,
+      "filePath": "trigger/embedding-tasks.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "id": "backfill-user-embeddings",
+      "maxDuration": 300,
+      "filePath": "trigger/embedding-tasks.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "id": "index-memory",
+      "maxDuration": 300,
+      "filePath": "trigger/embedding-tasks.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "id": "index-all-memories",
+      "maxDuration": 300,
+      "filePath": "trigger/embedding-tasks.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/embedding-tasks.mjs"
+    },
+    {
+      "id": "extract-patterns",
+      "maxDuration": 300,
+      "filePath": "trigger/index.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/index.mjs"
+    },
+    {
+      "id": "batch-extract-patterns",
+      "maxDuration": 300,
+      "filePath": "trigger/index.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/index.mjs"
+    },
+    {
+      "id": "consolidate-memories",
+      "maxDuration": 300,
+      "filePath": "trigger/index.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/index.mjs"
+    },
+    {
+      "id": "update-pattern-confidence",
+      "maxDuration": 300,
+      "filePath": "trigger/index.ts",
+      "entryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/Desktop/landing_page/trigger/index.mjs"
+    }
+  ],
+  "queues": [],
+  "workerEntryPoint": "/Users/rm/Desktop/landing_page/.trigger/tmp/build-4SFzeF/.npm/_npx/9327320c903ff367/node_modules/trigger.dev/dist/esm/entryPoints/dev-run-worker.mjs",
+  "runtime": "node",
+  "runtimeVersion": "22.20.0",
+  "customConditions": [],
+  "timings": {
+    "lib/vapiVoices.ts": 0.9896669999999972,
+    "lib/vapiElevenLabsVoices.ts": 0.5721659999999815,
+    "lib/voiceConfigHelper.ts": 0.8179170000000227,
+    "trigger/embedding-tasks.ts": 39.52583299999998,
+    "trigger/index.ts": 4.2177090000000135,
+    "trigger/learning-loops.ts": 27.24512500000003,
+    "trigger/scheduled-tasks.ts": 0.3440830000000119
+  }
+}
