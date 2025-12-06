@@ -78,7 +78,8 @@ async function makeVAPICall(
   assistantId: string,
   message: string,
   callerName?: string,
-  phoneNumberId?: string
+  phoneNumberId?: string,
+  voicemailOnly: boolean = false
 ): Promise<{ callId: string; status: string }> {
   let owner = await getOwnerInfoByAgentId(assistantId);
   if (!owner) {
@@ -95,26 +96,38 @@ async function makeVAPICall(
     ownerPhone,
     recipientName,
   });
-  const startSpeakingPlan = getStartSpeakingPlan();
+  const startSpeakingPlan = voicemailOnly
+    ? { waitSeconds: 0, smartEndpointingEnabled: false }
+    : getStartSpeakingPlan();
   const voicemailDetection = getVoicemailDetectionConfig();
 
   const assistantOverrides: Record<string, any> = {
+    firstMessage: null, // Belt-and-suspenders: block any stored greeting
     firstMessageMode: 'assistant-waits-for-user',
     variableValues: {
       isOutboundCall: true,
-      greeting,
+      greeting: '',
       recipientName: recipientName || '',
       message,
       ownerName: owner.fullName,
       kendallName: owner.kendallName,
       voicemailMessage,
       ownerPhone: ownerPhone || '',
+      voicemailOnly,
     },
     voicemailDetection,
     voicemailMessage,
   };
   if (startSpeakingPlan) {
     assistantOverrides.startSpeakingPlan = startSpeakingPlan;
+  }
+
+  // Guardrail: prevent accidental greetings on outbound
+  if (assistantOverrides.firstMessage !== null) {
+    throw new Error('assistantOverrides.firstMessage must stay null for outbound calls');
+  }
+  if ((assistantOverrides.variableValues?.greeting || '').trim().length > 0) {
+    throw new Error('assistantOverrides.variableValues.greeting must be empty for outbound calls');
   }
 
   const callPayload: any = {
@@ -168,7 +181,7 @@ async function makeVAPICall(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { phone_number, message, scheduled_time, caller_name, owner_agent_id, caller_phone_number, recordId, threadId } = body;
+    const { phone_number, message, scheduled_time, caller_name, owner_agent_id, caller_phone_number, recordId, threadId, voicemail_only } = body;
 
     // Validate required fields
     if (!phone_number || !message || !String(message).trim()) {
@@ -288,7 +301,8 @@ export async function POST(request: NextRequest) {
           owner_agent_id,
           message,
           caller_name,
-          phoneNumberId
+          phoneNumberId,
+          Boolean(voicemail_only)
         );
 
         return NextResponse.json({

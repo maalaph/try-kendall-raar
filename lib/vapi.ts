@@ -1090,6 +1090,37 @@ export async function updateAgentFromTemplate({
       voiceId: result.voice?.voiceId,
       voiceProvider: result.voice?.provider,
     });
+
+    // Post-update verification: ensure firstMessage remains null
+    try {
+      const verifyResp = await fetch(`${VAPI_API_URL}/assistant/${agentId}`, {
+        method: 'GET',
+        headers: getHeaders(),
+      });
+      if (verifyResp.ok) {
+        const verifyBody = await verifyResp.json();
+        const returnedFirstMessage = verifyBody?.firstMessage;
+        if (returnedFirstMessage !== null && typeof returnedFirstMessage !== 'undefined') {
+          console.error('[VAPI ERROR] firstMessage is not null after updateAgentFromTemplate', {
+            agentId,
+            returnedFirstMessage,
+          });
+          throw new Error('firstMessage must be null; VAPI returned a non-null firstMessage');
+        }
+      } else {
+        console.warn('[VAPI WARNING] Unable to verify assistant firstMessage after update', {
+          agentId,
+          status: verifyResp.status,
+          statusText: verifyResp.statusText,
+        });
+      }
+    } catch (verifyError) {
+      console.error('[VAPI ERROR] Post-update verification failed', {
+        agentId,
+        error: verifyError,
+      });
+      throw verifyError;
+    }
     
     return result;
   } catch (error) {
@@ -1390,6 +1421,37 @@ End of System Prompt`;
       voiceId: result.voice?.voiceId,
       voiceProvider: result.voice?.provider,
     });
+
+    // Post-update verification: ensure firstMessage remains null
+    try {
+      const verifyResp = await fetch(`${VAPI_API_URL}/assistant/${agentId}`, {
+        method: 'GET',
+        headers: getHeaders(),
+      });
+      if (verifyResp.ok) {
+        const verifyBody = await verifyResp.json();
+        const returnedFirstMessage = verifyBody?.firstMessage;
+        if (returnedFirstMessage !== null && typeof returnedFirstMessage !== 'undefined') {
+          console.error('[VAPI ERROR] firstMessage is not null after updateAgent', {
+            agentId,
+            returnedFirstMessage,
+          });
+          throw new Error('firstMessage must be null; VAPI returned a non-null firstMessage');
+        }
+      } else {
+        console.warn('[VAPI WARNING] Unable to verify assistant firstMessage after update', {
+          agentId,
+          status: verifyResp.status,
+          statusText: verifyResp.statusText,
+        });
+      }
+    } catch (verifyError) {
+      console.error('[VAPI ERROR] Post-update verification failed (updateAgent)', {
+        agentId,
+        error: verifyError,
+      });
+      throw verifyError;
+    }
     
     return result;
   } catch (error) {

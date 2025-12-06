@@ -147,10 +147,11 @@ async function makeVAPICall(
   const assistantOverrides: Record<string, any> = {
     // Note: prompt/systemPrompt/messages are NOT supported in assistantOverrides for /call
     // The base assistant prompt already references variableValues for outbound call handling
+    firstMessage: null, // Belt-and-suspenders: ensure no stored greeting is spoken
     firstMessageMode: 'assistant-waits-for-user',
     variableValues: {
       isOutboundCall: 'true',
-      greeting: greeting,
+      greeting: '',
       recipientName: recipientName || '',
       message: message,
       ownerName: owner.fullName,
@@ -165,6 +166,14 @@ async function makeVAPICall(
     assistantOverrides.startSpeakingPlan = startSpeakingPlan;
   }
 
+  // Guardrail: prevent accidental greetings on outbound
+  if (assistantOverrides.firstMessage !== null) {
+    throw new Error('assistantOverrides.firstMessage must stay null for outbound calls');
+  }
+  if ((assistantOverrides.variableValues?.greeting || '').trim().length > 0) {
+    throw new Error('assistantOverrides.variableValues.greeting must be empty for outbound calls');
+  }
+
   const callPayload: any = {
     customer: {
       number: phoneNumber,
@@ -177,7 +186,7 @@ async function makeVAPICall(
       isOutboundCall: true,
       ownerName: owner.fullName,
       kendallName: owner.kendallName,
-      greeting: greeting, // Greeting stored in metadata for the assistant to use
+      greeting: '', // Keep empty to avoid any auto-played greeting
       recipientName: recipientName, // Recipient name if extracted
       ownerPhone,
     },
