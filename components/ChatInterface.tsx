@@ -10,6 +10,7 @@ import SearchBar from './SearchBar';
 import TypingIndicator from './TypingIndicator';
 import ActiveCallBanner from './ActiveCallBanner';
 import { colors } from '@/lib/config';
+import { getCurrentPosition, isGeolocationSupported, getPermissionStatus } from '@/lib/location/browserGeolocation';
 import { Search } from 'lucide-react';
 
 interface ChatMessageType {
@@ -44,11 +45,19 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
   const [newMessageIds, setNewMessageIds] = useState<Set<string>>(new Set());
   const [activeCall, setActiveCall] = useState<{
     callId: string;
-    status: 'ringing' | 'in-progress' | 'ended' | 'cancelled' | 'failed';
+    status: 'ringing' | 'queued' | 'in-progress' | 'ended' | 'cancelled' | 'failed';
     startTime: string;
     phoneNumber: string;
     contactName?: string;
   } | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+    formatted_address?: string;
+    timestamp?: number;
+  } | null>(null);
+  const [pendingLocationMessage, setPendingLocationMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const chatInterfaceRef = useRef<HTMLDivElement>(null);
@@ -442,7 +451,11 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
 
   // Handle send message
   const handleSend = async (message: string) => {
-    if (!message.trim() || sending) return;
+    console.log('[ChatInterface] handleSend called with:', message, 'sending:', sending);
+    if (!message.trim() || sending) {
+      console.log('[ChatInterface] handleSend blocked - empty:', !message.trim(), 'already sending:', sending);
+      return;
+    }
 
     // Combine pending action with user message if exists
     let finalMessage = message.trim();
@@ -471,15 +484,200 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
     scrollToBottom();
 
     try {
+      // Build request body with optional location
+      const requestBody: Record<string, any> = { 
+        recordId, 
+        message: finalMessage, 
+        threadId, 
+        clientTimeZone,
+      };
+      
+      // Include location if available and fresh (less than 1 hour old)
+      if (userLocation && userLocation.timestamp && (Date.now() - userLocation.timestamp) < 60 * 60 * 1000) {
+        requestBody.location = {
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+          accuracy: userLocation.accuracy,
+          formatted_address: userLocation.formatted_address,
+        };
+      }
+
       const response = await fetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recordId, message: finalMessage, threadId, clientTimeZone }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) throw new Error('Failed to send message');
 
       const data = await response.json();
+      console.log('[ChatInterface] API response:', { 
+        success: data.success, 
+        needs_location: data.needs_location,
+        has_response: !!data.response 
+      });
+
+      // Handle location request from backend
+      if (data.needs_location) {
+        console.log('[ChatInterface] Backend needs location:', data.location_reason);
+        
+        // Store the pending message to resend with location
+        setPendingLocationMessage(finalMessage);
+        
+        // Add assistant message asking for location
+        setMessages(prev => {
+          const filtered = prev.filter(m => !m.id.startsWith('temp-'));
+          return [
+            ...filtered,
+            {
+              id: `msg-${Date.now()}`,
+              message: message.trim(),
+              role: 'user' as const,
+              timestamp: new Date().toISOString(),
+            },
+            {
+              id: `location-request-${Date.now()}`,
+              message: `📍 ${data.location_reason || "I need your location to help with that."} Allow location access?`,
+              role: 'assistant' as const,
+              timestamp: new Date().toISOString(),
+            },
+          ];
+        });
+        
+        // Request browser location
+        if (isGeolocationSupported()) {
+          // Check permission status first (informational only)
+          const permissionStatus = await getPermissionStatus();
+          console.log('[ChatInterface] Location permission status:', permissionStatus);
+          
+          // Only block if explicitly denied - otherwise try to request
+          if (permissionStatus === 'denied') {
+            console.log('[ChatInterface] Permission explicitly denied, showing error message');
+            setMessages(prev => [
+              ...prev,
+              {
+                id: `location-denied-${Date.now()}`,
+                message: "Location permission is blocked. Please enable it in your browser settings (look for the lock icon in the address bar), or tell me your location manually (e.g., 'near downtown LA').",
+                role: 'assistant' as const,
+                timestamp: new Date().toISOString(),
+              },
+            ]);
+            setPendingLocationMessage(null);
+            setSending(false);
+            scrollToBottom();
+            return;
+          }
+          
+          console.log('[ChatInterface] Attempting to get location...');
+          try {
+            const position = await getCurrentPosition({ enableHighAccuracy: true, timeout: 15000 });
+            console.log('[ChatInterface] ✅ Got location:', position.latitude, position.longitude);
+            
+            // Geocode the location
+            console.log('[ChatInterface] Geocoding location...');
+            let formattedAddress: string | undefined;
+            try {
+              const geocodeRes = await fetch(`/api/geocode?latitude=${position.latitude}&longitude=${position.longitude}&permanent=true&userId=${recordId}`);
+              console.log('[ChatInterface] Geocode response status:', geocodeRes.status);
+              if (geocodeRes.ok) {
+                const geocodeData = await geocodeRes.json();
+                formattedAddress = geocodeData.result?.formatted_address;
+              }
+            } catch (e) {
+              console.warn('[ChatInterface] Failed to geocode:', e);
+            }
+
+            // Save location to state
+            const newLocation = {
+              latitude: position.latitude,
+              longitude: position.longitude,
+              accuracy: position.accuracy,
+              formatted_address: formattedAddress,
+              timestamp: Date.now(),
+            };
+            setUserLocation(newLocation);
+            
+            // Resend the message with location
+            const retryResponse = await fetch('/api/chat/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                recordId,
+                message: finalMessage,
+                threadId,
+                clientTimeZone,
+                location: newLocation,
+              }),
+            });
+            
+            if (retryResponse.ok) {
+              const retryData = await retryResponse.json();
+              if (retryData.success && retryData.response) {
+                // Update messages with the actual response
+                setMessages(prev => {
+                  const filtered = prev.filter(m => !m.id.includes('location-request'));
+                  return [
+                    ...filtered,
+                    {
+                      id: `assistant-${Date.now()}`,
+                      message: retryData.response,
+                      role: 'assistant' as const,
+                      timestamp: new Date().toISOString(),
+                      emailConfirmation: retryData.emailConfirmation,
+                    },
+                  ];
+                });
+              }
+            }
+            
+            setPendingLocationMessage(null);
+          } catch (locationError: any) {
+            console.error('[ChatInterface] ❌ Location access error:', {
+              code: locationError?.code,
+              message: locationError?.message,
+              fullError: locationError
+            });
+            
+            // Provide specific error message based on error code
+            let errorMessage = "I couldn't access your location. ";
+            if (locationError?.code === 'PERMISSION_DENIED') {
+              errorMessage += "You denied location permission. Please allow location access in your browser settings, or tell me your location manually (e.g., 'near downtown LA').";
+            } else if (locationError?.code === 'TIMEOUT') {
+              errorMessage += "The location request timed out. Please try again or tell me your location manually.";
+            } else if (locationError?.code === 'POSITION_UNAVAILABLE') {
+              errorMessage += "Your location couldn't be determined. Please tell me your location manually (e.g., 'near downtown LA').";
+            } else {
+              errorMessage += `Error: ${locationError?.message || 'Unknown error'}. You can tell me your location manually (e.g., 'near downtown LA').`;
+            }
+            
+            setMessages(prev => [
+              ...prev,
+              {
+                id: `location-denied-${Date.now()}`,
+                message: errorMessage,
+                role: 'assistant' as const,
+                timestamp: new Date().toISOString(),
+              },
+            ]);
+            setPendingLocationMessage(null);
+          }
+        } else {
+          setMessages(prev => [
+            ...prev,
+            {
+              id: `location-unavailable-${Date.now()}`,
+              message: "Location isn't available in your browser. You can tell me your location manually (e.g., 'near downtown LA').",
+              role: 'assistant' as const,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+          setPendingLocationMessage(null);
+        }
+        
+        setSending(false);
+        scrollToBottom();
+        return;
+      }
       
       if (data.success) {
         // Update assistant name if provided
@@ -502,7 +700,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
             {
               id: assistantId,
               message: data.response || '',
-              role: 'assistant',
+              role: 'assistant' as const,
               timestamp: new Date().toISOString(),
               emailConfirmation: data.emailConfirmation || undefined,
             },
@@ -515,7 +713,7 @@ export default function ChatInterface({ recordId, threadId }: ChatInterfaceProps
             newMessages.push({
               id: callStatusId,
               message: data.callStatus.message,
-              role: 'assistant',
+              role: 'assistant' as const,
               timestamp: new Date().toISOString(),
             });
           }

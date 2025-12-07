@@ -6,6 +6,7 @@ import { getUserPatterns, getUserMemories } from '@/lib/database';
 // All functions now use Supabase PostgreSQL
 import { createOutboundCallRequest, upsertCalendarEventRecord } from '@/lib/database';
 import { buildChatSystemPrompt } from '@/lib/promptBlocks';
+import { buildLocationContext } from '@/lib/location/clustering';
 import { formatPhoneNumberToE164 } from '@/lib/vapi';
 import { extractPatternsFromMessage } from '@/lib/patternExtractor';
 import { extractContactFromMessage } from '@/lib/contactExtractor';
@@ -163,7 +164,7 @@ const CHAT_FUNCTIONS = [
   },
   {
     name: 'send_gmail',
-    description: 'Send an email via Gmail on behalf of the owner. ONLY call this when you already know the recipient's email address, subject, and full body text. IMPORTANT: If you found a contact using get_contact_by_name, you MUST ask the user to confirm: "I found [Name] in your contacts. Did you mean to email them?" Only proceed with preparing the email after the user confirms. Never assume which contact to email - always ask for confirmation first.',
+    description: 'Send an email via Gmail on behalf of the owner. ONLY call this when you already know the recipient email address, subject, and full body text. IMPORTANT: If you found a contact using get_contact_by_name, you MUST ask the user to confirm: "I found [Name] in your contacts. Did you mean to email them?" Only proceed with preparing the email after the user confirms. Never assume which contact to email - always ask for confirmation first.',
     parameters: {
       type: 'object',
       properties: {
@@ -221,6 +222,72 @@ const CHAT_FUNCTIONS = [
           description: 'Number of top artists/tracks to consider (1-20, defaults to 10).',
         },
       },
+    },
+  },
+  {
+    name: 'get_user_location',
+    description: 'Get the user\'s current location. Use this when the user asks about nearby places, restaurants, directions, recommendations based on location, "what\'s around me", "places near me", or any location-based query. This will request the user\'s browser location if not already known.',
+    parameters: {
+      type: 'object',
+      properties: {
+        reason: {
+          type: 'string',
+          description: 'Brief explanation of why location is needed (e.g., "find nearby restaurants", "get directions")',
+        },
+      },
+      required: ['reason'],
+    },
+  },
+  {
+    name: 'show_places_nearby',
+    description: 'Show nearby places on an interactive map. Use this after getting the user\'s location when they want to see restaurants, cafes, shops, or other points of interest near them. Displays an interactive Mapbox map with markers.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'What to search for (e.g., "restaurants", "coffee shops", "gyms")',
+        },
+        latitude: {
+          type: 'number',
+          description: 'User\'s latitude coordinate',
+        },
+        longitude: {
+          type: 'number',
+          description: 'User\'s longitude coordinate',
+        },
+      },
+      required: ['query', 'latitude', 'longitude'],
+    },
+  },
+  {
+    name: 'recommend_events',
+    description: 'Get personalized event recommendations based on user interests, location, and context. Use this when the user asks about events, things to do, activities, concerts, shows, or anything happening near them. This provides context-aware recommendations that learn from the user\'s preferences and behavior.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: {
+          type: 'string',
+          description: 'The user\'s recordId (required to identify which user\'s recommendations to get). Always use the recordId from the chat context.',
+        },
+        timeWindow: {
+          type: 'string',
+          description: 'Optional: Time window for events. Examples: "this week", "this weekend", "next week", "today", "tomorrow". If not specified, defaults to next 7 days.',
+        },
+        maxDistance: {
+          type: 'number',
+          description: 'Optional: Maximum distance in kilometers from user location (default: 50km).',
+        },
+        categories: {
+          type: 'string',
+          description: 'Optional: Comma-separated event categories to filter by (e.g., "Music,Arts,Food & Drink").',
+        },
+        reason: {
+          type: 'string',
+          description: 'Brief explanation of why events are needed (e.g., "user asked about events near me this week").',
+        },
+      },
+      required: ['recordId', 'reason'],
     },
   },
 ];
@@ -342,7 +409,8 @@ async function generateChatResponse(
   incomingMessage: string,
   conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [],
   isFirstMessage: boolean = false,
-  threadId: string = ''
+  threadId: string = '',
+  currentUserLocation?: { latitude: number; longitude: number; accuracy?: number; formatted_address?: string } | null
 ): Promise<{ response: string; functionCalls?: Array<{ name: string; arguments: any }>; kendallName?: string }> {
   try {
     // Get agent data from database
@@ -502,6 +570,21 @@ async function generateChatResponse(
     if (patternsContext || memoriesContext || semanticContext) {
       chatSystemPrompt += patternsContext + memoriesContext + semanticContext;
     }
+
+    // Add learned location context (home, work, frequent places)
+    try {
+      const locationContext = await buildLocationContext(agentRecordId);
+      if (locationContext) {
+        chatSystemPrompt += locationContext;
+      }
+    } catch (locationError) {
+      console.warn('[CHAT] Failed to build location context:', locationError);
+    }
+
+    // Add current location if provided
+    if (currentUserLocation && currentUserLocation.latitude && currentUserLocation.longitude) {
+      chatSystemPrompt += `\n=== CURRENT USER LOCATION ===\nThe user is currently at: ${currentUserLocation.formatted_address || `${currentUserLocation.latitude.toFixed(4)}, ${currentUserLocation.longitude.toFixed(4)}`}\nCoordinates: ${currentUserLocation.latitude}, ${currentUserLocation.longitude}\n\nIMPORTANT: Use this location for ALL location-based queries including:\n- Finding nearby restaurants, cafes, shops, etc.\n- Recommending events, activities, and things to do in the area\n- Providing local recommendations based on the user's current location\n\nEVENT RECOMMENDATIONS:\n- When user asks about events, things to do, activities, concerts, shows, or "what's happening", ALWAYS use the recommend_events function\n- The recommend_events function provides personalized, context-aware recommendations that learn from user preferences\n- DO NOT give generic advice like "check Eventbrite or Meetup" - use the recommend_events function instead\n- The function considers user interests, location, schedule preferences, and behavioral patterns\n`;
+    }
     
     // Add first message greeting instructions if this is the first message
     if (isFirstMessage) {
@@ -624,10 +707,12 @@ async function generateChatResponse(
     if (message?.tool_calls && Array.isArray(message.tool_calls)) {
       for (const tc of message.tool_calls) {
         try {
-          const args = typeof tc.function?.arguments === 'string' ? JSON.parse(tc.function.arguments) : tc.function?.arguments;
-          if (tc.function?.name) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const toolCall = tc as any;
+          const args = typeof toolCall.function?.arguments === 'string' ? JSON.parse(toolCall.function.arguments) : toolCall.function?.arguments;
+          if (toolCall.function?.name) {
             functionCalls.push({
-              name: tc.function.name,
+              name: toolCall.function.name,
               arguments: args || {},
             });
           }
@@ -696,7 +781,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { recordId, message, threadId: providedThreadId, clientTimeZone } = body;
+    const { recordId, message, threadId: providedThreadId, clientTimeZone, location } = body;
+
+    // Extract location if provided (from frontend)
+    const userLocation = location && typeof location === 'object' 
+      ? { 
+          latitude: location.latitude, 
+          longitude: location.longitude, 
+          accuracy: location.accuracy,
+          formatted_address: location.formatted_address,
+        } 
+      : null;
 
     // ✅ Validate required fields
     if (!recordId || !message || typeof message !== 'string' || !message.trim()) {
@@ -846,11 +941,16 @@ export async function POST(request: NextRequest) {
         message.trim(),
         conversationHistory,
         isFirstMessage,
-        threadId
+        threadId,
+        userLocation
       );
       agentResponse = responseData.response;
       functionCalls = responseData.functionCalls;
       kendallName = responseData.kendallName;
+      
+      // Log function calls for debugging
+      console.log('[CHAT] AI response generated');
+      console.log('[CHAT] Function calls from AI:', functionCalls?.map(fc => fc.name) || 'none');
     } catch (openaiError) {
       console.error('[API ERROR] Failed to generate chat response:', openaiError);
       const errorMessage = openaiError instanceof Error ? openaiError.message : 'Unknown OpenAI error';
@@ -1700,6 +1800,328 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        // Handle location requests
+        if (fc.name === 'get_user_location') {
+          console.log('[CHAT] AI called get_user_location function');
+          const { reason } = fc.arguments || {};
+          console.log('[CHAT] Location reason:', reason);
+          
+          // Check if Ghost Mode is enabled
+          const { data: privacySettings } = await import('@/lib/supabase').then(m => 
+            m.supabase.from('users').select('location_enabled').eq('record_id', recordId).single()
+          );
+          
+          if (privacySettings && privacySettings.location_enabled === false) {
+            functionResults.push({
+              name: 'get_user_location',
+              result: { 
+                success: false, 
+                error: 'Location sharing is disabled (Ghost Mode). Enable it in settings to use location features.' 
+              },
+            });
+            agentResponse = "I can't access your location because Ghost Mode is enabled. You can turn it off in your settings if you'd like location-based recommendations.";
+            continue;
+          }
+
+          // Check if we already have location from the request
+          if (userLocation && userLocation.latitude && userLocation.longitude) {
+            // Geocode if we don't have an address
+            let address = userLocation.formatted_address;
+            if (!address) {
+              try {
+                const geocodeRes = await fetch(
+                  `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/geocode?latitude=${userLocation.latitude}&longitude=${userLocation.longitude}&permanent=true&userId=${recordId}`
+                );
+                if (geocodeRes.ok) {
+                  const geocodeData = await geocodeRes.json();
+                  address = geocodeData.result?.formatted_address;
+                }
+              } catch (e) {
+                console.warn('[CHAT] Failed to geocode location:', e);
+              }
+            }
+
+            functionResults.push({
+              name: 'get_user_location',
+              result: { 
+                success: true, 
+                latitude: userLocation.latitude,
+                longitude: userLocation.longitude,
+                formatted_address: address || `${userLocation.latitude.toFixed(4)}, ${userLocation.longitude.toFixed(4)}`,
+              },
+            });
+
+            // Save location to database
+            try {
+              await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/location`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: recordId,
+                  latitude: userLocation.latitude,
+                  longitude: userLocation.longitude,
+                  accuracy: userLocation.accuracy,
+                  formatted_address: address,
+                }),
+              });
+            } catch (e) {
+              console.warn('[CHAT] Failed to save location:', e);
+            }
+
+            continue;
+          }
+
+          // Check for last known location
+          try {
+            const locationRes = await fetch(
+              `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/location?userId=${recordId}&type=last`
+            );
+            if (locationRes.ok) {
+              const locationData = await locationRes.json();
+              const lastLocation = locationData.location;
+              
+              // Use if less than 1 hour old
+              if (lastLocation && lastLocation.created_at) {
+                const locationAge = Date.now() - new Date(lastLocation.created_at).getTime();
+                if (locationAge < 60 * 60 * 1000) {
+                  functionResults.push({
+                    name: 'get_user_location',
+                    result: { 
+                      success: true, 
+                      latitude: lastLocation.latitude,
+                      longitude: lastLocation.longitude,
+                      formatted_address: lastLocation.formatted_address || `${lastLocation.latitude.toFixed(4)}, ${lastLocation.longitude.toFixed(4)}`,
+                      cached: true,
+                    },
+                  });
+                  // Location found - continue to next function call or response generation
+                  // The location is now in functionResults and will be used in post-process
+                  continue;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[CHAT] Failed to fetch last location:', e);
+          }
+
+          // Request location from frontend
+          console.log('[CHAT] No location available, returning needs_location: true');
+          functionResults.push({
+            name: 'get_user_location',
+            result: { 
+              success: false, 
+              needs_location: true,
+              reason: reason || 'location-based assistance',
+            },
+          });
+          
+          // Return a special response that tells frontend to request location
+          console.log('[CHAT] Returning needs_location response to frontend');
+          return NextResponse.json({
+            success: true,
+            response: null,
+            needs_location: true,
+            location_reason: reason || 'To help you with that, I need to know your location.',
+            threadId,
+          });
+        }
+
+        // Handle show places nearby
+        if (fc.name === 'show_places_nearby') {
+          const { query, latitude, longitude } = fc.arguments || {};
+          
+          if (!query || !latitude || !longitude) {
+            functionResults.push({
+              name: 'show_places_nearby',
+              result: { success: false, error: 'Missing required parameters' },
+            });
+            continue;
+          }
+
+          try {
+            const searchRes = await fetch(
+              `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/search?query=${encodeURIComponent(query)}&latitude=${latitude}&longitude=${longitude}&limit=10&userId=${recordId}`
+            );
+            
+            if (searchRes.ok) {
+              const searchData = await searchRes.json();
+              
+              functionResults.push({
+                name: 'show_places_nearby',
+                result: { 
+                  success: true, 
+                  places: searchData.results || [],
+                  center: { lat: latitude, lng: longitude },
+                },
+              });
+
+              // Format places for response
+              const places = searchData.results || [];
+              if (places.length > 0) {
+                const placesList = places.slice(0, 5).map((p: any, i: number) => 
+                  `${i + 1}. **${p.name}** - ${p.full_address || p.category || 'No address'}`
+                ).join('\n');
+                agentResponse = `Here are some ${query} near you:\n\n${placesList}\n\nWould you like more details about any of these?`;
+              } else {
+                agentResponse = `I couldn't find any ${query} near your location. Would you like me to search for something else?`;
+              }
+            } else {
+              functionResults.push({
+                name: 'show_places_nearby',
+                result: { success: false, error: 'Search failed' },
+              });
+              agentResponse = "I'm having trouble searching for places right now. Please try again.";
+            }
+          } catch (error) {
+            console.error('[CHAT] Error searching nearby places:', error);
+            functionResults.push({
+              name: 'show_places_nearby',
+              result: { success: false, error: 'Search error' },
+            });
+            agentResponse = "I ran into an error while searching for places. Please try again.";
+          }
+          continue;
+        }
+
+        // Handle event recommendations
+        if (fc.name === 'recommend_events') {
+          const { recordId: eventRecordId, timeWindow, maxDistance, categories, reason } = fc.arguments || {};
+          
+          if (!eventRecordId) {
+            functionResults.push({
+              name: 'recommend_events',
+              result: { success: false, error: 'recordId is required' },
+            });
+            continue;
+          }
+
+          try {
+            // Parse time window
+            let startDate: Date | undefined;
+            let endDate: Date | undefined;
+            
+            if (timeWindow) {
+              const now = new Date();
+              const timeWindowLower = timeWindow.toLowerCase();
+              
+              if (timeWindowLower === 'today') {
+                startDate = new Date(now.setHours(0, 0, 0, 0));
+                endDate = new Date(now.setHours(23, 59, 59, 999));
+              } else if (timeWindowLower === 'tomorrow') {
+                const tomorrow = new Date(now);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                startDate = new Date(tomorrow.setHours(0, 0, 0, 0));
+                endDate = new Date(tomorrow.setHours(23, 59, 59, 999));
+              } else if (timeWindowLower.includes('weekend')) {
+                const day = now.getDay();
+                const daysUntilSaturday = 6 - day;
+                startDate = new Date(now);
+                startDate.setDate(startDate.getDate() + daysUntilSaturday);
+                startDate.setHours(0, 0, 0, 0);
+                endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + 1);
+                endDate.setHours(23, 59, 59, 999);
+              } else if (timeWindowLower.includes('week')) {
+                startDate = new Date(now);
+                endDate = new Date(now);
+                endDate.setDate(endDate.getDate() + 7);
+              }
+            }
+
+            // Get user location if available
+            let userLocation: { latitude: number; longitude: number; formatted_address?: string } | undefined;
+            if (currentUserLocation && currentUserLocation.latitude && currentUserLocation.longitude) {
+              userLocation = {
+                latitude: currentUserLocation.latitude,
+                longitude: currentUserLocation.longitude,
+                formatted_address: currentUserLocation.formatted_address,
+              };
+            }
+
+            // Build API URL
+            const apiUrl = new URL(
+              `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/events/recommend`
+            );
+            apiUrl.searchParams.set('recordId', eventRecordId);
+            apiUrl.searchParams.set('includeExplanations', 'true');
+            
+            if (userLocation) {
+              apiUrl.searchParams.set('latitude', userLocation.latitude.toString());
+              apiUrl.searchParams.set('longitude', userLocation.longitude.toString());
+            }
+            
+            if (maxDistance) {
+              apiUrl.searchParams.set('maxDistance', maxDistance.toString());
+            }
+            
+            if (startDate) {
+              apiUrl.searchParams.set('startDate', startDate.toISOString());
+            }
+            
+            if (endDate) {
+              apiUrl.searchParams.set('endDate', endDate.toISOString());
+            }
+            
+            if (categories) {
+              apiUrl.searchParams.set('categories', categories);
+            }
+
+            const response = await fetch(apiUrl.toString());
+            
+            if (response.ok) {
+              const data = await response.json();
+              const recommendations = data.recommendations || [];
+              
+              functionResults.push({
+                name: 'recommend_events',
+                result: {
+                  success: true,
+                  recommendations: recommendations.map((e: any) => ({
+                    title: e.title,
+                    description: e.description,
+                    category: e.category,
+                    start_date: e.start_date,
+                    location: e.location,
+                    venue: e.venue,
+                    url: e.url,
+                    score: e.score,
+                    explanation: e.explanation,
+                  })),
+                  count: recommendations.length,
+                },
+              });
+
+              // Format response for user
+              if (recommendations.length === 0) {
+                agentResponse = "I couldn't find any events that match your interests right now. Would you like me to search with different criteria?";
+              } else {
+                const eventsList = recommendations.slice(0, 5).map((e: any, i: number) => {
+                  const date = new Date(e.start_date);
+                  const dateStr = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+                  return `${i + 1}. **${e.title}**${e.category ? ` (${e.category})` : ''}\n   ${dateStr}${e.venue ? ` at ${e.venue}` : ''}${e.location ? ` - ${e.location}` : ''}${e.explanation ? `\n   ${e.explanation}` : ''}`;
+                }).join('\n\n');
+                
+                agentResponse = `Here are some events I think you'd enjoy:\n\n${eventsList}\n\n${recommendations.length > 5 ? `And ${recommendations.length - 5} more...` : ''}Would you like more details about any of these?`;
+              }
+            } else {
+              const errorData = await response.json().catch(() => ({}));
+              functionResults.push({
+                name: 'recommend_events',
+                result: { success: false, error: errorData.error || 'Failed to get recommendations' },
+              });
+              agentResponse = "I'm having trouble finding events right now. Please try again in a moment.";
+            }
+          } catch (error) {
+            console.error('[CHAT] Error getting event recommendations:', error);
+            functionResults.push({
+              name: 'recommend_events',
+              result: { success: false, error: 'Recommendation error' },
+            });
+            agentResponse = "I ran into an error while searching for events. Please try again.";
+          }
+          continue;
+        }
+
         // Handle Gmail requests
         if (fc.name === 'get_gmail_messages') {
           try {
@@ -2426,7 +2848,6 @@ export async function POST(request: NextRequest) {
             const relationshipForCallUpdate =
               relationshipFromContext ||
               lastContactLookup?.contact?.relationship ||
-              (typeof extractedRelationship !== 'undefined' ? extractedRelationship : undefined) ||
               undefined;
             
             // Create/update contact BEFORE making call (backup in case phone-only handler failed)
@@ -2532,7 +2953,7 @@ export async function POST(request: NextRequest) {
                         lastContacted: lastContactedTimestamp,
                       });
                       console.log('[CHAT] ✅ Updated existing contact after call (by phone):', {
-                        name: existingContacts[0].name,
+                        name: existingContact.name,
                         phone: normalizedPhone,
                         lastContacted: lastContactedTimestamp,
                       });
@@ -2637,6 +3058,41 @@ export async function POST(request: NextRequest) {
       agentResponse: agentResponse?.substring(0, 50),
       userMessage: message.trim().substring(0, 50)
     });
+    
+    // If location was retrieved but response is generic, regenerate with location context
+    if (functionResults && functionResults.length > 0) {
+      const locationResult = functionResults.find(fr => fr.name === 'get_user_location' && fr.result?.success);
+      const isGenericResponse = agentResponse && (
+        agentResponse.includes("Sounds good, I'll take care of that") ||
+        agentResponse.includes("I'll take care of that") ||
+        agentResponse.length < 50
+      );
+      
+      if (locationResult && isGenericResponse && locationResult.result.latitude) {
+        console.log('[CHAT] Location retrieved but response is generic, regenerating with location context...');
+        try {
+          const locationContext = `User is at: ${locationResult.result.formatted_address || `${locationResult.result.latitude}, ${locationResult.result.longitude}`}`;
+          const regeneratedResponse = await generateChatResponse(
+            recordId,
+            message.trim(),
+            conversationHistory,
+            isFirstMessage,
+            threadId,
+            {
+              latitude: locationResult.result.latitude,
+              longitude: locationResult.result.longitude,
+              formatted_address: locationResult.result.formatted_address,
+            }
+          );
+          if (regeneratedResponse.response && regeneratedResponse.response.length > 50) {
+            agentResponse = regeneratedResponse.response;
+            console.log('[CHAT] ✅ Regenerated response with location context');
+          }
+        } catch (regenerateError) {
+          console.warn('[CHAT] Failed to regenerate response with location:', regenerateError);
+        }
+      }
+    }
     
     if (functionResults && functionResults.length > 0) {
       for (const fr of functionResults) {

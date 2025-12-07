@@ -5,7 +5,7 @@ import { colors } from '@/lib/config';
 
 interface ActiveCallBannerProps {
   callId: string;
-  status: 'ringing' | 'in-progress' | 'ended' | 'cancelled' | 'failed';
+  status: 'ringing' | 'queued' | 'in-progress' | 'ended' | 'cancelled' | 'failed';
   phoneNumber: string;
   contactName?: string;
   startTime: string; // ISO timestamp

@@ -12,4 +12,5 @@ export * from './embedding-tasks';
 // Export scheduled tasks
 export * from './scheduled-tasks';
 
-
+// Export location learning tasks
+export * from './location-learning';

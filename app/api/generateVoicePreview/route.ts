@@ -315,16 +315,17 @@ export async function POST(request: NextRequest) {
       
       // If voice ID doesn't exist, provide helpful error
       if (elevenLabsResponse.status === 404) {
+        const isDirectElevenLabsId = voiceId && voiceId.length >= 20 && /^[a-zA-Z0-9]+$/.test(voiceId);
         console.error('[VOICE PREVIEW API] Voice not found (404):', {
           voiceId: voiceId?.substring(0, 20) + '...',
           elevenLabsVoiceId: elevenLabsVoiceId?.substring(0, 20) + '...',
-          isElevenLabsId,
+          isDirectElevenLabsId,
           hasMapping: !!mapping,
         });
         
         // For generated voices, the voice ID might be a temporary preview ID
         // Try to handle this gracefully
-        if (isElevenLabsId && !mapping) {
+        if (isDirectElevenLabsId && !mapping) {
           // This might be a generated voice ID that doesn't exist yet
           // Return a more helpful error message
           return NextResponse.json(

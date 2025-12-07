@@ -71,7 +71,7 @@ export async function extractPatternsFromMessage(
         console.log('[PATTERN EXTRACTION] Updating existing pattern, increasing confidence from', similarPattern.confidence);
         await upsertUserPattern({
           ...similarPattern,
-          confidence: Math.min(1, similarPattern.confidence + 0.1), // Increase confidence
+          confidence: Math.min(1, (similarPattern.confidence || 0.5) + 0.1), // Increase confidence
           lastObserved: timestamp,
         });
         console.log('[PATTERN EXTRACTION] Successfully updated pattern');

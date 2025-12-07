@@ -27,13 +27,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Race condition safety: Check current status first
-    const currentCall = global.activeCalls[callId];
+    const currentCall = global.activeCalls?.[callId];
     if (currentCall && (currentCall.status === 'ended' || currentCall.status === 'failed')) {
       // Call already ended, just mark as cancelled in cache
-      global.activeCalls[callId] = {
-        ...currentCall,
-        status: 'cancelled',
-      };
+      if (global.activeCalls) {
+        global.activeCalls[callId] = {
+          ...currentCall,
+          status: 'cancelled',
+        };
+      }
       return NextResponse.json({
         success: true,
         message: 'Call was already ended, marked as cancelled',
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest) {
     
     if (result.success) {
       // Update in-memory cache
-      if (global.activeCalls[callId]) {
+      if (global.activeCalls?.[callId]) {
         global.activeCalls[callId] = {
           ...global.activeCalls[callId],
           status: 'cancelled',

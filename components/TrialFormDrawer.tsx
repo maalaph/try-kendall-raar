@@ -649,7 +649,6 @@ export default function TrialFormDrawer({ isOpen, onClose, onSubmit, configurato
                 height: '1px',
                 opacity: 0,
                 pointerEvents: 'none',
-                tabIndex: -1,
               }}
               autoComplete="off"
               tabIndex={-1}

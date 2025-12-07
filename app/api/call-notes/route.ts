@@ -51,11 +51,11 @@ export async function GET(request: NextRequest) {
       success: true,
       notes: callNotes.map(note => ({
         id: note.id,
-        callId: note.callId,
-        callerPhone: note.callerPhone,
+        callId: note.call_id,
+        callerPhone: note.caller_phone,
         note: note.note,
         timestamp: note.timestamp,
-        callDuration: note.callDuration,
+        callDuration: note.call_duration,
         read: note.read,
       })),
     });

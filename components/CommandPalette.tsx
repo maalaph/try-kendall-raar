@@ -15,6 +15,8 @@ interface CommandItem {
 }
 
 interface CommandPaletteProps {
+  recordId?: string;
+  assistantName?: string;
   onActionSelect: (action: string, data?: Record<string, unknown>) => void;
   conversations?: Array<{ id: string; preview: string; timestamp: string }>;
   contacts?: Array<{ id: string; name: string; phone?: string }>;

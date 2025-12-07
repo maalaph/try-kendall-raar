@@ -40,15 +40,18 @@ export async function GET(request: NextRequest) {
       // Try to get recordId from cookie for error redirect
       const cookieStore = await cookies();
       const recordId = cookieStore.get('spotify_oauth_record_id')?.value;
+      const returnUrl = cookieStore.get('spotify_oauth_return_url')?.value || '/integrations';
       const redirectUrl = recordId 
-        ? `/integrations?recordId=${recordId}&oauth_error=${encodeURIComponent(error)}`
-        : `/integrations?oauth_error=${encodeURIComponent(error)}`;
+        ? `${returnUrl}?recordId=${recordId}&oauth_error=${encodeURIComponent(error)}`
+        : `${returnUrl}?oauth_error=${encodeURIComponent(error)}`;
       return NextResponse.redirect(new URL(redirectUrl, request.url));
     }
 
     if (!code) {
+      const cookieStore = await cookies();
+      const returnUrl = cookieStore.get('spotify_oauth_return_url')?.value || '/integrations';
       return NextResponse.redirect(
-        new URL('/integrations?oauth_error=no_code', request.url)
+        new URL(`${returnUrl}?oauth_error=no_code`, request.url)
       );
     }
 
@@ -94,8 +97,9 @@ export async function GET(request: NextRequest) {
           receivedStateTokenLength: stateToken?.length,
           allCookies: cookieStore.getAll().map(c => ({ name: c.name, hasValue: !!c.value })),
         });
+        const returnUrl = cookieStore.get('spotify_oauth_return_url')?.value || '/integrations';
         return NextResponse.redirect(
-          new URL('/integrations?oauth_error=state_mismatch', request.url)
+          new URL(`${returnUrl}?oauth_error=state_mismatch`, request.url)
         );
       } else {
         console.warn('[SPOTIFY OAUTH] State mismatch but recordId recovered from state - proceeding');
@@ -104,8 +108,9 @@ export async function GET(request: NextRequest) {
 
     if (!recordId) {
       console.error('[SPOTIFY OAUTH] No recordId found in cookie or state');
+      const returnUrl = cookieStore.get('spotify_oauth_return_url')?.value || '/integrations';
       return NextResponse.redirect(
-        new URL('/integrations?oauth_error=no_record_id', request.url)
+        new URL(`${returnUrl}?oauth_error=no_record_id`, request.url)
       );
     }
 
@@ -191,27 +196,34 @@ export async function GET(request: NextRequest) {
         stack: updateError.stack,
       });
       // Still redirect but with specific error
+      const returnUrl = cookieStore.get('spotify_oauth_return_url')?.value || '/integrations';
       return NextResponse.redirect(
-        new URL(`/integrations?recordId=${recordId}&oauth_error=airtable_save_failed&error_details=${encodeURIComponent(updateError.message)}`, request.url)
+        new URL(`${returnUrl}?recordId=${recordId}&oauth_error=airtable_save_failed&error_details=${encodeURIComponent(updateError.message)}`, request.url)
       );
     }
+
+    // Get return URL before clearing cookies
+    const returnUrl = cookieStore.get('spotify_oauth_return_url')?.value || '/integrations';
 
     // Clear OAuth cookies
     cookieStore.delete('spotify_oauth_state');
     cookieStore.delete('spotify_oauth_record_id');
+    cookieStore.delete('spotify_oauth_return_url');
 
-    // Redirect back to integrations page with success
-    console.log('[SPOTIFY OAUTH] Redirecting to integrations with success');
+    // Redirect back to return URL with success
+    console.log('[SPOTIFY OAUTH] Redirecting to', returnUrl, 'with success');
     return NextResponse.redirect(
-      new URL(`/integrations?recordId=${recordId}&oauth_success=true`, request.url)
+      new URL(`${returnUrl}?recordId=${recordId}&oauth_success=true`, request.url)
     );
   } catch (error: any) {
     console.error('[SPOTIFY OAUTH] Callback error:', {
       error: error.message,
       stack: error.stack,
     });
+    const cookieStore = await cookies();
+    const returnUrl = cookieStore.get('spotify_oauth_return_url')?.value || '/integrations';
     return NextResponse.redirect(
-      new URL('/integrations?oauth_error=callback_failed', request.url)
+      new URL(`${returnUrl}?oauth_error=callback_failed`, request.url)
     );
   }
 }

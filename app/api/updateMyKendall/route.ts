@@ -136,7 +136,7 @@ export async function PATCH(request: NextRequest) {
     const existingRecord = await getUserRecord(recordId);
     const existingFields = existingRecord.fields;
     const existingAgentId = existingFields.vapi_agent_id;
-    const existingPhoneNumber = existingFields.vapi_number;
+    const existingPhoneNumber = existingFields.vapiNumber;
 
     if (!existingAgentId) {
       return NextResponse.json(
@@ -214,7 +214,8 @@ export async function PATCH(request: NextRequest) {
     // Step 1c: Populate new fields with default content if they're empty (examples, instructions, edgeCases)
     try {
       const currentRecord = await getUserRecord(recordId);
-      const currentFields = currentRecord.fields || {};
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const currentFields = (currentRecord.fields || {}) as any;
       
       // Only populate if fields are empty or missing
       const fieldsToPopulate: Record<string, string> = {};
@@ -458,7 +459,8 @@ Specific Instructions:
         
         try {
           const updatedRecord = await getUserRecord(recordId);
-          const rawContent = updatedRecord.fields?.analyzedFileContent;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rawContent = updatedRecord.fields?.analyzedFileContent as any;
           
           // Convert to string safely, handling all possible types from Airtable
           if (rawContent == null) {
@@ -466,7 +468,7 @@ Specific Instructions:
           } else if (typeof rawContent === 'string') {
             analyzedContent = rawContent;
           } else if (Array.isArray(rawContent)) {
-            analyzedContent = rawContent.map(item => {
+            analyzedContent = rawContent.map((item: any) => {
               if (typeof item === 'string') return item;
               if (typeof item === 'object' && item !== null) {
                 return item.text || item.content || item.value || JSON.stringify(item);

@@ -135,13 +135,13 @@ export async function POST(request: NextRequest) {
     const threadId = await getOrCreateThreadId(recordId);
 
     // Create user message
+    // Note: attachments are currently stored separately or handled in the /send endpoint
     const userMessage = await createChatMessage({
       recordId,
       agentId: String(agentId),
       threadId,
       message: message.trim(),
       role: 'user',
-      attachments: attachments || undefined,
     });
 
     return NextResponse.json({

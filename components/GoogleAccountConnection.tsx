@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { colors } from '@/lib/config';
+import { sanitizeRecordId } from '@/lib/utils';
 
 interface GoogleAccountConnectionProps {
   recordId: string;
@@ -35,7 +36,10 @@ export default function GoogleAccountConnection({ recordId }: GoogleAccountConne
       setTimeout(() => {
         fetchConnectionStatus();
         // Clean URL after final refresh
-        window.history.replaceState({}, '', window.location.pathname + `?recordId=${recordId}`);
+        const cleanRecordId = sanitizeRecordId(recordId);
+        if (cleanRecordId) {
+          window.history.replaceState({}, '', window.location.pathname + `?recordId=${cleanRecordId}`);
+        }
       }, 5000);
     }
     
@@ -49,7 +53,13 @@ export default function GoogleAccountConnection({ recordId }: GoogleAccountConne
   const fetchConnectionStatus = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/auth/google/status?recordId=${encodeURIComponent(recordId)}`);
+      // Sanitize recordId before making API call
+      const cleanRecordId = sanitizeRecordId(recordId);
+      if (!cleanRecordId) {
+        console.error('[GOOGLE CONNECTION] Invalid recordId:', recordId);
+        return;
+      }
+      const response = await fetch(`/api/auth/google/status?recordId=${encodeURIComponent(cleanRecordId)}`);
       if (response.ok) {
         const data = await response.json();
         console.log('[GOOGLE CONNECTION] Status fetched:', data);
@@ -71,7 +81,15 @@ export default function GoogleAccountConnection({ recordId }: GoogleAccountConne
 
   const handleConnect = () => {
     setConnecting(true);
-    window.location.href = `/api/auth/google/authorize?recordId=${encodeURIComponent(recordId)}`;
+    // Sanitize recordId before using it
+    const cleanRecordId = sanitizeRecordId(recordId);
+    if (!cleanRecordId) {
+      console.error('[GOOGLE CONNECTION] Invalid recordId for connection:', recordId);
+      setConnecting(false);
+      return;
+    }
+    const returnUrl = window.location.pathname + (window.location.search || '');
+    window.location.href = `/api/auth/google/authorize?recordId=${encodeURIComponent(cleanRecordId)}&returnUrl=${encodeURIComponent(returnUrl)}`;
   };
 
   const handleDisconnect = async () => {
@@ -81,7 +99,15 @@ export default function GoogleAccountConnection({ recordId }: GoogleAccountConne
 
     setDisconnecting(true);
     try {
-      const response = await fetch(`/api/auth/google/disconnect?recordId=${encodeURIComponent(recordId)}`, {
+      // Sanitize recordId before using it
+      const cleanRecordId = sanitizeRecordId(recordId);
+      if (!cleanRecordId) {
+        console.error('[GOOGLE CONNECTION] Invalid recordId for disconnect:', recordId);
+        alert('Invalid record ID. Please refresh the page.');
+        setDisconnecting(false);
+        return;
+      }
+      const response = await fetch(`/api/auth/google/disconnect?recordId=${encodeURIComponent(cleanRecordId)}`, {
         method: 'POST',
       });
 

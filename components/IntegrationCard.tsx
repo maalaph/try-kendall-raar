@@ -14,7 +14,8 @@ interface IntegrationCardProps {
     secondary?: string;
     tertiary?: string;
   };
-  details?: React.ReactNode;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  details?: React.ReactNode | Record<string, any>;
   isExpanded: boolean;
   onToggle: () => void;
   connected: boolean;
@@ -145,8 +146,8 @@ export default function IntegrationCard({
     }
 
     // If details is already a React node, render it
-    if (typeof details === 'object' && 'type' in details) {
-      return details;
+    if (typeof details === 'object' && 'type' in (details as object)) {
+      return details as React.ReactNode;
     }
 
     // Otherwise, render based on type

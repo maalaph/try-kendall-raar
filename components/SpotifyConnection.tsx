@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { colors } from '@/lib/config';
+import { sanitizeRecordId } from '@/lib/utils';
 
 interface SpotifyConnectionProps {
   recordId: string;
@@ -36,7 +37,10 @@ export default function SpotifyConnection({ recordId }: SpotifyConnectionProps) 
       setTimeout(() => {
         fetchConnectionStatus();
         // Clean URL after final refresh
-        window.history.replaceState({}, '', window.location.pathname + `?recordId=${recordId}`);
+        const cleanRecordId = sanitizeRecordId(recordId);
+        if (cleanRecordId) {
+          window.history.replaceState({}, '', window.location.pathname + `?recordId=${cleanRecordId}`);
+        }
       }, 5000);
     }
     
@@ -50,7 +54,13 @@ export default function SpotifyConnection({ recordId }: SpotifyConnectionProps) 
   const fetchConnectionStatus = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/auth/spotify/status?recordId=${encodeURIComponent(recordId)}`);
+      // Sanitize recordId before making API call
+      const cleanRecordId = sanitizeRecordId(recordId);
+      if (!cleanRecordId) {
+        console.error('[SPOTIFY CONNECTION] Invalid recordId:', recordId);
+        return;
+      }
+      const response = await fetch(`/api/auth/spotify/status?recordId=${encodeURIComponent(cleanRecordId)}`);
       if (response.ok) {
         const data = await response.json();
         console.log('[SPOTIFY CONNECTION] Status fetched:', data);
@@ -73,7 +83,15 @@ export default function SpotifyConnection({ recordId }: SpotifyConnectionProps) 
 
   const handleConnect = () => {
     setConnecting(true);
-    window.location.href = `/api/auth/spotify/authorize?recordId=${encodeURIComponent(recordId)}`;
+    // Sanitize recordId before using it
+    const cleanRecordId = sanitizeRecordId(recordId);
+    if (!cleanRecordId) {
+      console.error('[SPOTIFY CONNECTION] Invalid recordId for connection:', recordId);
+      setConnecting(false);
+      return;
+    }
+    const returnUrl = window.location.pathname + (window.location.search || '');
+    window.location.href = `/api/auth/spotify/authorize?recordId=${encodeURIComponent(cleanRecordId)}&returnUrl=${encodeURIComponent(returnUrl)}`;
   };
 
   const handleDisconnect = async () => {
@@ -83,7 +101,15 @@ export default function SpotifyConnection({ recordId }: SpotifyConnectionProps) 
 
     setDisconnecting(true);
     try {
-      const response = await fetch(`/api/auth/spotify/disconnect?recordId=${encodeURIComponent(recordId)}`, {
+      // Sanitize recordId before using it
+      const cleanRecordId = sanitizeRecordId(recordId);
+      if (!cleanRecordId) {
+        console.error('[SPOTIFY CONNECTION] Invalid recordId for disconnect:', recordId);
+        alert('Invalid record ID. Please refresh the page.');
+        setDisconnecting(false);
+        return;
+      }
+      const response = await fetch(`/api/auth/spotify/disconnect?recordId=${encodeURIComponent(cleanRecordId)}`, {
         method: 'POST',
       });
 

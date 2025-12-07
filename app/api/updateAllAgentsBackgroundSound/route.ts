@@ -36,6 +36,11 @@ export async function POST(request: NextRequest) {
       const fullName = record.fields.fullName || 'Unknown';
       const recordId = record.id;
 
+      if (!agentId) {
+        console.warn(`[MIGRATION] ✗ No agent ID for ${fullName}, skipping`);
+        continue;
+      }
+
       try {
         await updateAgentBackgroundSound(agentId, 'off');
         results.successful++;

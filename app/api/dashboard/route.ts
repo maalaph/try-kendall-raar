@@ -130,7 +130,7 @@ async function fetchCallsData(agentId: string, recordId: string) {
   // Batch lookup contacts for phone numbers
   const allPhones = new Set<string>();
   recentActivity.forEach(call => {
-    if (call.callerPhone) allPhones.add(call.callerPhone);
+    if (call.caller_phone) allPhones.add(call.caller_phone);
   });
 
   const contactMap = new Map<string, string>();
@@ -162,11 +162,11 @@ async function fetchCallsData(agentId: string, recordId: string) {
     details: {
       recentActivity: recentActivity.map(note => ({
         id: note.id,
-        callerPhone: note.callerPhone,
-        callerName: getDisplayName(note.callerPhone),
+        callerPhone: note.caller_phone,
+        callerName: getDisplayName(note.caller_phone),
         note: note.note,
         timestamp: note.timestamp,
-        callDuration: note.callDuration,
+        callDuration: note.call_duration,
         read: note.read,
       })),
     },
@@ -233,7 +233,7 @@ async function fetchSpotifyData(recordId: string) {
     summary: {
       topArtist: insights.topArtists[0]?.name || null,
       topTrack: insights.topTracks[0]?.name || null,
-      mood: insights.mood?.label || null,
+      mood: insights.mood?.mood || null,
     },
     details: {
       topArtists: insights.topArtists.slice(0, 10),

@@ -19,7 +19,7 @@ async function listAllUsers() {
     let offset: string | undefined = undefined;
 
     do {
-      const url = offset ? `${AIRTABLE_API_URL}?offset=${offset}` : AIRTABLE_API_URL;
+      const url: string = offset ? `${AIRTABLE_API_URL}?offset=${offset}` : AIRTABLE_API_URL;
       const response = await fetch(url, {
         method: 'GET',
         headers: getHeaders(),

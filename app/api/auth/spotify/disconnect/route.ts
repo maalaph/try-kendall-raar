@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateUserOAuthTokens } from '@/lib/database';
+import { updateUserRecord } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   try {

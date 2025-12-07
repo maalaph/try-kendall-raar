@@ -1,21 +1,27 @@
 /**
  * Trigger.dev Scheduled Tasks
  * Periodic tasks for learning and consolidation
+ * 
+ * NOTE: These tasks are designed to be scheduled via the Trigger.dev dashboard.
+ * Create schedules in the dashboard that trigger these task IDs:
+ * - "daily-pattern-analysis-task" -> daily at 2 AM UTC
+ * - "weekly-memory-consolidation-task" -> every Monday at 3 AM UTC
+ * - "periodic-embedding-backfill-task" -> every Sunday at 4 AM UTC
  */
 
-import { schedules } from "@trigger.dev/sdk/v3";
+import { task } from "@trigger.dev/sdk/v3";
 import { consolidateMemoriesTask, updatePatternConfidenceTask } from "./learning-loops";
 import { backfillUserEmbeddingsTask } from "./embedding-tasks";
 import { getUserRecord } from "@/lib/database";
 
 /**
  * Daily pattern analysis task
- * Runs every day at 2 AM UTC to analyze patterns and update confidence scores
+ * Schedule via dashboard: cron "0 2 * * *" (2 AM UTC daily)
+ * Analyzes patterns and updates confidence scores for all users
  */
-export const dailyPatternAnalysis = schedules.create({
-  id: "daily-pattern-analysis",
-  cron: "0 2 * * *", // 2 AM UTC daily
-  task: async (payload, { ctx }) => {
+export const dailyPatternAnalysisTask = task({
+  id: "daily-pattern-analysis-task",
+  run: async () => {
     console.log('[TRIGGER] Daily pattern analysis started');
     
     // Note: In a real implementation, you'd fetch all users
@@ -31,12 +37,12 @@ export const dailyPatternAnalysis = schedules.create({
 
 /**
  * Weekly memory consolidation task
- * Runs every Monday at 3 AM UTC to consolidate and clean up memories
+ * Schedule via dashboard: cron "0 3 * * 1" (3 AM UTC every Monday)
+ * Consolidates and cleans up memories for all users
  */
-export const weeklyMemoryConsolidation = schedules.create({
-  id: "weekly-memory-consolidation",
-  cron: "0 3 * * 1", // 3 AM UTC every Monday
-  task: async (payload, { ctx }) => {
+export const weeklyMemoryConsolidationTask = task({
+  id: "weekly-memory-consolidation-task",
+  run: async () => {
     console.log('[TRIGGER] Weekly memory consolidation started');
     
     // Note: In a real implementation, you'd fetch all users
@@ -51,12 +57,12 @@ export const weeklyMemoryConsolidation = schedules.create({
 
 /**
  * Periodic embedding backfill task
- * Runs every Sunday at 4 AM UTC to backfill embeddings for users
+ * Schedule via dashboard: cron "0 4 * * 0" (4 AM UTC every Sunday)
+ * Backfills embeddings for users that might have missing ones
  */
-export const periodicEmbeddingBackfill = schedules.create({
-  id: "periodic-embedding-backfill",
-  cron: "0 4 * * 0", // 4 AM UTC every Sunday
-  task: async (payload, { ctx }) => {
+export const periodicEmbeddingBackfillTask = task({
+  id: "periodic-embedding-backfill-task",
+  run: async () => {
     console.log('[TRIGGER] Periodic embedding backfill started');
     
     // Note: In a real implementation, you'd fetch all users
@@ -68,8 +74,3 @@ export const periodicEmbeddingBackfill = schedules.create({
     };
   },
 });
-
-// Note: schedules.createTask() doesn't exist in v4 API
-// These tasks can be called directly from other tasks or via the task registry
-// For now, we'll export the tasks themselves which can be invoked directly
-

@@ -37,7 +37,7 @@ async function fetchAllAirtableRecords(url: string): Promise<any[]> {
   let offset: string | undefined = undefined;
 
   do {
-    const requestUrl = offset ? `${url}?offset=${offset}` : url;
+    const requestUrl: string = offset ? `${url}?offset=${offset}` : url;
     const response = await fetch(requestUrl, {
       method: 'GET',
       headers: getAirtableHeaders(),

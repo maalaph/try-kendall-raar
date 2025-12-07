@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord, getCallStats, getRecentCallNotes, getUnreadCallNotes, getCallNotes, deleteCallNote } from '@/lib/database';
+import { getUserRecord, getCallStats, getRecentCallNotes, getUnreadCallNotes, getCallNotes, deleteCallNote, getAllCallNotes } from '@/lib/database';
 import { getContactByPhone } from '@/lib/contacts';
 import { formatPhoneNumberToE164 } from '@/lib/vapi';
 
@@ -67,15 +67,15 @@ export async function GET(request: NextRequest) {
     const outboundCalls: any[] = [];
     
     for (const note of allCallNotes) {
-      const normalizedCallerPhone = normalizePhoneForComparison(note.callerPhone || '');
+      const normalizedCallerPhone = normalizePhoneForComparison(note.caller_phone || '');
       const isInbound = normalizedOwnerPhone && normalizedCallerPhone && normalizedCallerPhone === normalizedOwnerPhone;
       
       const callData = {
         id: note.id,
-        callerPhone: note.callerPhone,
+        callerPhone: note.caller_phone,
         note: note.note,
         timestamp: note.timestamp,
-        callDuration: note.callDuration,
+        callDuration: note.call_duration,
         read: note.read,
       };
       
@@ -129,11 +129,11 @@ export async function GET(request: NextRequest) {
       unreadMessages: unreadNotes.length,
       recentActivity: recentActivity.map(note => ({
         id: note.id,
-        callerPhone: note.callerPhone,
-        callerName: getDisplayName(note.callerPhone),
+        callerPhone: note.caller_phone,
+        callerName: getDisplayName(note.caller_phone),
         note: note.note,
         timestamp: note.timestamp,
-        callDuration: note.callDuration,
+        callDuration: note.call_duration,
         read: note.read,
       })),
       inboundCalls: limitedInbound.map(note => ({

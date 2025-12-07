@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Otherwise get all memories (with optional filters)
-    let memories = [];
+    let memories: unknown[] = [];
     try {
       memories = await getUserMemories(recordId, memoryType, importance);
     } catch (error) {

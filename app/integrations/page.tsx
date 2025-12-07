@@ -6,6 +6,7 @@ import ChatNavbar from '@/components/ChatNavbar';
 import GoogleAccountConnection from '@/components/GoogleAccountConnection';
 import SpotifyConnection from '@/components/SpotifyConnection';
 import { colors } from '@/lib/config';
+import { sanitizeRecordId } from '@/lib/utils';
 
 function IntegrationsPageContent() {
   const searchParams = useSearchParams();
@@ -19,14 +20,18 @@ function IntegrationsPageContent() {
       ? localStorage.getItem('myKendallRecordId') 
       : null;
     
-    const finalRecordId = urlRecordId || storedRecordId;
+    // Sanitize both values to remove any query string contamination
+    const sanitizedUrlRecordId = sanitizeRecordId(urlRecordId);
+    const sanitizedStoredRecordId = sanitizeRecordId(storedRecordId);
+    
+    const finalRecordId = sanitizedUrlRecordId || sanitizedStoredRecordId;
     
     if (finalRecordId) {
       setRecordId(finalRecordId);
       setLoading(false);
-      // Store in localStorage if from URL
-      if (urlRecordId && typeof window !== 'undefined') {
-        localStorage.setItem('myKendallRecordId', urlRecordId);
+      // Store in localStorage if from URL (store the sanitized version)
+      if (sanitizedUrlRecordId && typeof window !== 'undefined') {
+        localStorage.setItem('myKendallRecordId', sanitizedUrlRecordId);
       }
     } else {
       setLoading(false);

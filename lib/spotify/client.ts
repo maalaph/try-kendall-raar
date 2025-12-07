@@ -48,11 +48,12 @@ export interface SpotifyAudioFeatures {
  */
 async function getValidAccessToken(recordId: string): Promise<string> {
   const userRecord = await getUserRecord(recordId);
-  const fields = userRecord.fields;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fields = userRecord.fields as any;
 
-  const accessToken = fields['Spotify OAuth Access Token'] as string | undefined;
-  const refreshToken = fields['Spotify OAuth Refresh Token'] as string | undefined;
-  const tokenExpiry = fields['Spotify OAuth Token Expiry'] as string | undefined;
+  const accessToken = fields.spotifyAccessToken as string | undefined;
+  const refreshToken = fields.spotifyRefreshToken as string | undefined;
+  const tokenExpiry = fields.spotifyTokenExpiresAt as string | undefined;
 
   if (!accessToken) {
     throw new Error('Spotify not connected. Please connect your Spotify account first.');

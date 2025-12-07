@@ -11,9 +11,11 @@ import { getUserRecord, updateUserRecord } from '@/lib/database';
  */
 export async function getCalendarClient(userId: string) {
   const userRecord = await getUserRecord(userId);
-  const accessToken = userRecord.fields['Google OAuth Access Token'];
-  const refreshToken = userRecord.fields['Google OAuth Refresh Token'];
-  const tokenExpiry = userRecord.fields['Google OAuth Token Expiry'];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fields = userRecord.fields as any;
+  const accessToken = fields.googleAccessToken;
+  const refreshToken = fields.googleRefreshToken;
+  const tokenExpiry = fields.googleTokenExpiresAt;
 
   if (!accessToken || !refreshToken) {
     throw new Error('Google account not connected. Please connect your Google account first.');

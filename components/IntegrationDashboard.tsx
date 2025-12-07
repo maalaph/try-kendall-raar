@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import IntegrationCard from './IntegrationCard';
 import { colors } from '@/lib/config';
 
+type ErrorType = 'not_connected' | 'error' | 'unknown';
+
 interface DashboardData {
   calls: {
     connected: boolean;
@@ -25,7 +27,7 @@ interface DashboardData {
       }>;
     };
     error?: {
-      type: string;
+      type: ErrorType;
       message?: string;
     };
   } | null;
@@ -51,7 +53,7 @@ interface DashboardData {
       }>;
     };
     error?: {
-      type: string;
+      type: ErrorType;
       message?: string;
     };
   } | null;
@@ -78,7 +80,7 @@ interface DashboardData {
       } | null;
     };
     error?: {
-      type: string;
+      type: ErrorType;
       message?: string;
     };
   } | null;

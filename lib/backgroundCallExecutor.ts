@@ -249,15 +249,15 @@ async function executeDueCalls() {
     
     for (const task of dueTasks) {
       const taskId = task.id;
-      const fields = task.fields || {};
-      const phoneNumber = fields.phone_number;
-      const message = fields.message;
-      const ownerAgentId = fields.owner_agent_id;
-      const callerName = fields.caller_name;
-      const phoneNumberId = fields.phone_number_id; // Get stored phoneNumberId from Airtable
-      const recipientName = fields.recipient_name; // Get recipient name if stored in task
-      const recordId = fields.recordId; // Get recordId for chat relay (optional)
-      const threadId = fields.threadId; // Get threadId for chat relay (optional)
+      // Use flat Supabase structure (not nested Airtable fields)
+      const phoneNumber = task.recipient_phone;
+      const message = task.message;
+      const ownerAgentId = task.agent_id;
+      const callerName = task.caller_name;
+      const phoneNumberId = task.phone_number_id;
+      const recipientName = task.recipient_name;
+      const recordId = task.record_id;
+      const threadId = task.thread_id;
       
       console.log(`[BACKGROUND EXECUTOR] Processing task ${taskId} for ${phoneNumber}`);
       
@@ -278,14 +278,14 @@ async function executeDueCalls() {
       
       let updateResult;
       try {
-        updateResult = await updateScheduledCallTaskAtomically(taskId, 'executing');
+        updateResult = await updateScheduledCallTaskAtomically(taskId, 'pending', { status: 'executing' });
       } catch (error) {
         console.log(`[BACKGROUND EXECUTOR] Task ${taskId} could not be updated to 'executing' (likely already being processed), skipping`);
         continue;
       }
       
       // If update didn't succeed (another instance already claimed it), skip this task
-      if (!updateResult || updateResult.fields?.status !== 'executing') {
+      if (!updateResult || updateResult.status !== 'executing') {
         console.log(`[BACKGROUND EXECUTOR] Task ${taskId} already being processed by another instance, skipping`);
         continue;
       }

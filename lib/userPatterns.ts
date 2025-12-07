@@ -325,7 +325,7 @@ export async function getUserMemories(
     const memories = (result.records || []).map(parseMemoryFromRecord);
     
     // Filter out expired memories client-side as well
-    return memories.filter(m => {
+    return memories.filter((m: any) => {
       if (!m.expiresAt) return true;
       return new Date(m.expiresAt) > new Date();
     });

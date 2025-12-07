@@ -282,13 +282,13 @@ export async function GET(request: NextRequest) {
     
     for (const task of dueTasks) {
       const taskId = task.id;
-      const fields = task.fields || {};
-      const phoneNumber = fields.phone_number;
-      const message = fields.message;
-      const ownerAgentId = fields.owner_agent_id;
-      const callerName = fields.caller_name;
-      const phoneNumberId = fields.phone_number_id; // Get stored phoneNumberId from Airtable
-      const recipientName = fields.recipient_name; // Get recipient name if stored in task
+      // Supabase uses flat structure, not nested fields
+      const phoneNumber = task.recipient_phone;
+      const message = task.message;
+      const ownerAgentId = task.agent_id;
+      const callerName = task.caller_name;
+      const phoneNumberId = task.phone_number_id;
+      const recipientName = task.recipient_name;
       
       if (!phoneNumber || !message || !ownerAgentId) {
         console.warn('[EXECUTE-SCHEDULED-CALLS] Task missing required fields:', taskId);

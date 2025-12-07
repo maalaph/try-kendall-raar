@@ -17,9 +17,10 @@ export async function syncUserSpotifyData(recordId: string): Promise<void> {
     // Check if user has Spotify connected
     const { getUserRecord } = await import('@/lib/database');
     const userRecord = await getUserRecord(recordId);
-    const fields = userRecord.fields;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fields = userRecord.fields as any;
     
-    if (!fields['Spotify Connected']) {
+    if (!fields.spotifyAccessToken) {
       console.log(`[SPOTIFY SYNC] User ${recordId} does not have Spotify connected, skipping`);
       return;
     }
@@ -53,9 +54,11 @@ export async function syncAllUsersSpotifyData(): Promise<void> {
   try {
     console.log('[SPOTIFY SYNC] Starting sync for all users');
     
-    const allUsers = await getAllUserRecords();
-    const spotifyUsers = allUsers.filter(user => 
-      user.fields['Spotify Connected'] === true
+    const allUsersResult = await getAllUserRecords();
+    const allUsers = allUsersResult.records || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const spotifyUsers = allUsers.filter((user: any) => 
+      user.fields?.spotifyAccessToken
     );
     
     console.log(`[SPOTIFY SYNC] Found ${spotifyUsers.length} users with Spotify connected`);

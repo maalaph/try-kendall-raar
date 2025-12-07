@@ -39,14 +39,20 @@ export async function GET(request: NextRequest) {
     // Handle OAuth errors
     if (error) {
       console.error('[GOOGLE OAUTH] OAuth error:', error);
-      return NextResponse.redirect(
-        new URL(`/chat?oauth_error=${encodeURIComponent(error)}`, request.url)
-      );
+      const cookieStore = await cookies();
+      const recordId = cookieStore.get('oauth_record_id')?.value;
+      const returnUrl = cookieStore.get('oauth_return_url')?.value || '/integrations';
+      const redirectUrl = recordId 
+        ? `${returnUrl}?recordId=${recordId}&oauth_error=${encodeURIComponent(error)}`
+        : `${returnUrl}?oauth_error=${encodeURIComponent(error)}`;
+      return NextResponse.redirect(new URL(redirectUrl, request.url));
     }
 
     if (!code) {
+      const cookieStore = await cookies();
+      const returnUrl = cookieStore.get('oauth_return_url')?.value || '/integrations';
       return NextResponse.redirect(
-        new URL('/chat?oauth_error=no_code', request.url)
+        new URL(`${returnUrl}?oauth_error=no_code`, request.url)
       );
     }
 
@@ -55,17 +61,20 @@ export async function GET(request: NextRequest) {
     const storedState = cookieStore.get('oauth_state')?.value;
     const recordId = cookieStore.get('oauth_record_id')?.value;
 
+    const returnUrl = cookieStore.get('oauth_return_url')?.value || '/integrations';
+
     if (!storedState || storedState !== state) {
       console.error('[GOOGLE OAUTH] State mismatch');
-      return NextResponse.redirect(
-        new URL('/chat?oauth_error=state_mismatch', request.url)
-      );
+      const redirectUrl = recordId 
+        ? `${returnUrl}?recordId=${recordId}&oauth_error=state_mismatch`
+        : `${returnUrl}?oauth_error=state_mismatch`;
+      return NextResponse.redirect(new URL(redirectUrl, request.url));
     }
 
     if (!recordId) {
       console.error('[GOOGLE OAUTH] No recordId found in cookie');
       return NextResponse.redirect(
-        new URL('/chat?oauth_error=no_record_id', request.url)
+        new URL(`${returnUrl}?oauth_error=no_record_id`, request.url)
       );
     }
 
@@ -125,27 +134,31 @@ export async function GET(request: NextRequest) {
         stack: updateError.stack,
       });
       // Still redirect but with specific error
+      const returnUrl = cookieStore.get('oauth_return_url')?.value || '/integrations';
       return NextResponse.redirect(
-        new URL(`/chat?recordId=${recordId}&oauth_error=airtable_save_failed&error_details=${encodeURIComponent(updateError.message)}`, request.url)
+        new URL(`${returnUrl}?recordId=${recordId}&oauth_error=airtable_save_failed&error_details=${encodeURIComponent(updateError.message)}`, request.url)
       );
     }
 
-    // Clear OAuth cookies
+    // Clear OAuth cookies (returnUrl already declared above)
     cookieStore.delete('oauth_state');
     cookieStore.delete('oauth_record_id');
+    cookieStore.delete('oauth_return_url');
 
-    // Redirect back to chat with success
-    console.log('[GOOGLE OAUTH] Redirecting to chat with success');
+    // Redirect back to return URL with success
+    console.log('[GOOGLE OAUTH] Redirecting to', returnUrl, 'with success');
     return NextResponse.redirect(
-      new URL(`/chat?recordId=${recordId}&oauth_success=true`, request.url)
+      new URL(`${returnUrl}?recordId=${recordId}&oauth_success=true`, request.url)
     );
   } catch (error: any) {
     console.error('[GOOGLE OAUTH] Callback error:', {
       error: error.message,
       stack: error.stack,
     });
+    const cookieStore = await cookies();
+    const returnUrl = cookieStore.get('oauth_return_url')?.value || '/integrations';
     return NextResponse.redirect(
-      new URL('/chat?oauth_error=callback_failed', request.url)
+      new URL(`${returnUrl}?oauth_error=callback_failed`, request.url)
     );
   }
 }

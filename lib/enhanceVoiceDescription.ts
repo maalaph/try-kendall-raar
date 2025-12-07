@@ -245,7 +245,7 @@ function extractAllElements(description: string): ExtractedElements {
     if (matches) {
       matches.forEach(match => {
         const cleanMatch = match.toLowerCase().trim();
-        if (!elements.timbre?.includes(cleanMatch)) {
+        if (elements.timbre && !elements.timbre.includes(cleanMatch)) {
           elements.timbre.push(cleanMatch);
         }
       });

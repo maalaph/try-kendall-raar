@@ -22,6 +22,8 @@ import { getCheckpointer, getCheckpointConfig } from "./checkpointer";
  */
 export async function createAgentGraph(checkpointer?: any) {
   // Create state graph with proper reducer functions
+  // Using 'as any' to bypass LangGraph v2 API type changes
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const workflow = new StateGraph<AgentState>({
     channels: {
       messages: {
@@ -56,7 +58,7 @@ export async function createAgentGraph(checkpointer?: any) {
         default: () => [],
       },
     },
-  });
+  } as any);
 
   // Add nodes
   workflow.addNode("context_retrieval", contextRetrievalNode);
@@ -64,12 +66,13 @@ export async function createAgentGraph(checkpointer?: any) {
   workflow.addNode("function_execution", functionExecutionNode);
   workflow.addNode("response_generation", responseGenerationNode);
 
-  // Set entry point
-  workflow.setEntryPoint("context_retrieval");
-
-  // Add edges
-  workflow.addEdge("context_retrieval", "function_selection");
-  workflow.addConditionalEdges(
+  // Add edges (using __start__ for entry point in LangGraph v2)
+  // Cast to any to bypass strict typing in newer LangGraph versions
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const graph = workflow as any;
+  graph.addEdge("__start__", "context_retrieval");
+  graph.addEdge("context_retrieval", "function_selection");
+  graph.addConditionalEdges(
     "function_selection",
     shouldCallFunctions,
     {
@@ -77,7 +80,7 @@ export async function createAgentGraph(checkpointer?: any) {
       skip: "response_generation",
     }
   );
-  workflow.addConditionalEdges(
+  graph.addConditionalEdges(
     "function_execution",
     shouldContinue,
     {
@@ -85,7 +88,7 @@ export async function createAgentGraph(checkpointer?: any) {
       end: "response_generation",
     }
   );
-  workflow.addEdge("response_generation", END);
+  graph.addEdge("response_generation", END);
 
   // Compile graph with checkpointer for state persistence
   // If checkpointer is not provided, try to get it (may fail if SUPABASE_DB_URL not set)
@@ -126,7 +129,7 @@ export async function runAgent(
     // If config is provided, state will be persisted and can be resumed later
     const result = await graph.invoke(state, config);
     
-    return result;
+    return result as AgentState;
   } catch (error) {
     console.error('[AGENT] LangGraph execution failed:', error);
     

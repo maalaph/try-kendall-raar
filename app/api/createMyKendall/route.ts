@@ -535,7 +535,11 @@ Specific Instructions:
     if (phoneNumberValue && vapiPhoneNumberId) {
       // Use the new helper function to store all phone number details
       try {
-        await updateCanadianNumberMapping(recordId, phoneNumberValue, vapiPhoneNumberId, twilioSid);
+        await updateCanadianNumberMapping(recordId, {
+          canadianPhone: phoneNumberValue,
+          phoneNumberId: vapiPhoneNumberId,
+          twilioSid: twilioSid,
+        });
       } catch (mappingError) {
         console.error("[AIRTABLE ERROR] Failed to update Canadian number mapping:", mappingError);
         // Fallback to basic update
@@ -590,7 +594,8 @@ Specific Instructions:
         
         try {
           const updatedRecord = await getUserRecord(recordId);
-          const rawContent = updatedRecord.fields?.analyzedFileContent;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rawContent = updatedRecord.fields?.analyzedFileContent as any;
           
           // Convert to string safely, handling all possible types from Airtable
           if (rawContent == null) {
@@ -601,7 +606,7 @@ Specific Instructions:
             analyzedContent = rawContent;
           } else if (Array.isArray(rawContent)) {
             // Array - join with newlines, handling objects in array
-            analyzedContent = rawContent.map(item => {
+            analyzedContent = rawContent.map((item: any) => {
               if (typeof item === 'string') return item;
               if (typeof item === 'object' && item !== null) {
                 // Try to extract text from object properties
@@ -779,7 +784,7 @@ Specific Instructions:
     return NextResponse.json({
       success: true,
       agentId,
-      phoneNumber: phoneData.phone,
+      phoneNumber: phoneData?.phone || null,
       recordId, // Include recordId for potential edit functionality
       editLink: `${baseUrl}/personal-setup?edit=${recordId}`,
       chatLink: `${baseUrl}/chat?recordId=${recordId}`,

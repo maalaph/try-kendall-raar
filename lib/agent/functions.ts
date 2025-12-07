@@ -169,7 +169,7 @@ function initializeFunctions(registry: FunctionRegistry) {
         });
         return {
           success: true,
-          messageId: result.id,
+          messageId: result.messageId,
         };
       } catch (error) {
         if (error instanceof GoogleIntegrationError) {
@@ -188,7 +188,7 @@ function initializeFunctions(registry: FunctionRegistry) {
   registry.register({
     name: 'make_outbound_call',
     description: 'Make an immediate outbound phone call',
-    execute: async (args: { phone_number: string; message: string; caller_name?: string }) => {
+    execute: async (args: { phone_number: string; message: string; caller_name?: string; recordId?: string; threadId?: string }) => {
       try {
         const normalizedPhone = formatPhoneNumberToE164(args.phone_number);
         if (!normalizedPhone) {
@@ -198,10 +198,15 @@ function initializeFunctions(registry: FunctionRegistry) {
           };
         }
 
+        // Create a call request with required fields
+        const callId = `call_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const callRequest = await createOutboundCallRequest({
+          callId,
+          recordId: args.recordId || '',
+          threadId: args.threadId || '',
           phoneNumber: normalizedPhone,
-          message: args.message,
-          callerName: args.caller_name,
+          recipientName: args.caller_name,
+          status: 'pending',
         });
 
         return {
@@ -255,9 +260,9 @@ function initializeFunctions(registry: FunctionRegistry) {
   registry.register({
     name: 'get_spotify_insights',
     description: 'Fetch Spotify analytics for the user',
-    execute: async (args: { timeRange?: string; limit?: number }) => {
+    execute: async (args: { recordId: string; timeRange?: string; limit?: number }) => {
       try {
-        const insights = await fetchSpotifyInsights({
+        const insights = await fetchSpotifyInsights(args.recordId, {
           timeRange: (args.timeRange as any) || 'medium_term',
           limit: args.limit || 10,
         });

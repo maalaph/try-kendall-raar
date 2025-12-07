@@ -84,7 +84,7 @@ async function updateAgentVoice(
   agentId: string,
   voiceConfig: { provider: '11labs' | 'vapi'; voiceId: string },
   originalAgentConfig: any
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; errorMessage?: string }> {
   try {
     // Create minimal update request - only update voice, keep everything else the same
     const requestBody: any = {

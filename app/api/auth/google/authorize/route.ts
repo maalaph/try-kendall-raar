@@ -27,6 +27,10 @@ export async function GET(request: NextRequest) {
     
     // Store state in cookie with recordId for verification on callback
     const cookieStore = await cookies();
+    
+    // Get return URL from query params or default to /integrations
+    const returnUrl = request.nextUrl.searchParams.get('returnUrl') || '/integrations';
+    
     cookieStore.set('oauth_state', state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -35,6 +39,13 @@ export async function GET(request: NextRequest) {
     });
     
     cookieStore.set('oauth_record_id', recordId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 600, // 10 minutes
+    });
+    
+    cookieStore.set('oauth_return_url', returnUrl, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

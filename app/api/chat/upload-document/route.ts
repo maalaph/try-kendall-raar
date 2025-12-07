@@ -86,16 +86,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Create chat message with the uploaded document
+    // Note: Attachments are handled separately via the document processing system
     const chatMessage = await createChatMessage({
       recordId,
       agentId: String(agentId),
       threadId,
-      message: `Uploaded file: ${file.name}`,
+      message: `Uploaded file: ${file.name} (${uploadedFile.url})`,
       role: 'user',
-      attachments: [{
-        url: uploadedFile.url,
-        filename: uploadedFile.filename,
-      }],
     });
 
     // Determine file type

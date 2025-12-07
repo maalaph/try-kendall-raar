@@ -54,7 +54,8 @@ export async function getUserContext(
         return 'No user context available.';
       }
 
-      const fields = userRecord.fields;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fields = userRecord.fields as any;
       
       // NEW: Check for topic-specific fields first
       if (topic && topic.trim()) {

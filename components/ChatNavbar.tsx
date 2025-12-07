@@ -17,6 +17,7 @@ export default function ChatNavbar({ recordId, kendallName = 'Kendall' }: ChatNa
   const isChatPage = pathname === '/chat';
   const isDashboardPage = pathname === '/dashboard';
   const isIntegrationsPage = pathname === '/integrations';
+  const isLocationPage = pathname === '/dashboard/location';
   const [navbarWidth, setNavbarWidth] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('chatNavbarWidth');
@@ -246,6 +247,36 @@ export default function ChatNavbar({ recordId, kendallName = 'Kendall' }: ChatNa
           >
             Integrations
           </button>
+
+          {/* Locations Link */}
+          <Link
+            href={`/dashboard/location?recordId=${encodeURIComponent(recordId)}`}
+            className="transition-all duration-300"
+            style={{
+              color: isLocationPage ? colors.accent : colors.text,
+              textDecoration: 'none',
+              fontFamily: 'var(--font-inter), sans-serif',
+              fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
+              fontWeight: isLocationPage ? 600 : 500,
+              borderBottom: isLocationPage ? `2px solid ${colors.accent}` : '2px solid transparent',
+              paddingBottom: '0.25rem',
+              pointerEvents: 'auto',
+              position: 'relative',
+              zIndex: 20,
+            }}
+            onMouseEnter={(e) => {
+              if (!isLocationPage) {
+                e.currentTarget.style.color = colors.accent;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isLocationPage) {
+                e.currentTarget.style.color = colors.text;
+              }
+            }}
+          >
+            Locations
+          </Link>
 
           {/* Edit Agent Link */}
           <Link

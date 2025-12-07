@@ -84,7 +84,6 @@ export async function POST(request: NextRequest) {
           threadId,
           message: 'Chat started',
           role: 'assistant', // Use 'assistant' instead of 'system' to avoid select field issues
-          messageType: 'text', // Use 'text' instead of 'system' since 'system' isn't an allowed option
         });
         console.log('[API] Created initial placeholder message for thread:', threadId);
       } else {

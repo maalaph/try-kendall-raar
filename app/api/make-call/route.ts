@@ -83,7 +83,7 @@ async function makeVAPICall(
 ): Promise<{ callId: string; status: string }> {
   let owner = await getOwnerInfoByAgentId(assistantId);
   if (!owner) {
-    owner = { fullName: callerName || 'the owner', kendallName: 'Kendall' };
+    owner = { fullName: callerName || 'the owner', kendallName: 'Kendall', mobileNumber: '', recordId: '' };
   }
   const ownerPhone = await getOwnerPhoneByAgentId(assistantId);
   const recipientName = undefined;
@@ -239,7 +239,7 @@ export async function POST(request: NextRequest) {
     // Check if this should be scheduled
     const shouldSchedule = scheduledTimeISO && isFutureTime(scheduledTimeISO);
 
-    if (shouldSchedule) {
+    if (shouldSchedule && scheduledTimeISO) {
       // Schedule the call
       try {
         const task = await createScheduledCallTask({

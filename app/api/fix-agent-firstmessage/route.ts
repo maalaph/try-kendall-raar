@@ -57,18 +57,20 @@ export async function POST(request: NextRequest) {
     }
     
     // Update agent with all existing data (this will remove firstMessage)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fieldsAny = fields as any;
     const result = await updateAgentFromTemplate({
       agentId: agentId,
       fullName: ownerInfo.fullName,
-      nickname: fields.nickname || undefined,
-      kendallName: fields.kendallName || 'guwopski',
+      nickname: fieldsAny.nickname || undefined,
+      kendallName: fieldsAny.kendallName || 'guwopski',
       mobileNumber: ownerInfo.mobileNumber,
-      selectedTraits: Array.isArray(fields.personalityChoices) ? fields.personalityChoices : [],
-      useCaseChoice: fields.useCaseChoice || 'Handling all types of calls across personal, professional, and business contexts.',
-      boundaryChoices: Array.isArray(fields.boundaries) ? fields.boundaries : [],
-      userContextAndRules: fields.userContext || '',
-      forwardCalls: fields.forwardCalls || false,
-      voiceChoice: fields.voiceChoice || undefined,
+      selectedTraits: Array.isArray(fieldsAny.selectedTraits) ? fieldsAny.selectedTraits : (Array.isArray(fieldsAny.personalityChoices) ? fieldsAny.personalityChoices : []),
+      useCaseChoice: fieldsAny.useCaseChoice || 'Handling all types of calls across personal, professional, and business contexts.',
+      boundaryChoices: Array.isArray(fieldsAny.boundaryChoices) ? fieldsAny.boundaryChoices : (Array.isArray(fieldsAny.boundaries) ? fieldsAny.boundaries : []),
+      userContextAndRules: fieldsAny.userContextAndRules || fieldsAny.userContext || '',
+      forwardCalls: fieldsAny.forwardCalls || false,
+      voiceChoice: fieldsAny.voiceChoice || undefined,
       analyzedFileContent: analyzedFileContent || undefined,
       fileUsageInstructions: fileUsageInstructions || undefined,
     });

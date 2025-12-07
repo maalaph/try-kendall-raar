@@ -53,8 +53,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Get patterns and memories (gracefully handle missing tables)
-    let patterns = [];
-    let memories = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let patterns: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let memories: any[] = [];
     
     try {
       patterns = await getUserPatterns(recordId);

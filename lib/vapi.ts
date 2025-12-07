@@ -1616,7 +1616,7 @@ export async function purchaseNumber(assistantId: string, existingPhoneNumber?: 
     // (Phone Numbers / Providers section). Vapi will verify the number exists in that specific account.
     console.log("[VAPI WARNING] Ensure TWILIO_ACCOUNT_SID matches the Account SID in Vapi dashboard settings");
 
-    let phoneNumberToImport: string;
+    let phoneNumberToImport: string = '';
     let twilioSid: string | undefined = undefined;
 
     // If phone number is provided, use it directly

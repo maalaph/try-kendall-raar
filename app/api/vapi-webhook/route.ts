@@ -214,10 +214,12 @@ async function generateSMSResponse(
     if (message?.tool_calls && Array.isArray(message.tool_calls)) {
       for (const tc of message.tool_calls) {
         try {
-          const args = typeof tc.function?.arguments === 'string' ? JSON.parse(tc.function.arguments) : tc.function?.arguments;
-          if (tc.function?.name) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const toolCall = tc as any;
+          const args = typeof toolCall.function?.arguments === 'string' ? JSON.parse(toolCall.function.arguments) : toolCall.function?.arguments;
+          if (toolCall.function?.name) {
             functionCalls.push({
-              name: tc.function.name,
+              name: toolCall.function.name,
               arguments: args || {},
             });
           }
@@ -623,7 +625,7 @@ async function handleVoicemailDetectionEvent(
     payload.assistant_id;
 
   if (detection.category === 'human') {
-    if (callRequest.fields.status !== 'in-call') {
+    if (callRequest.status !== 'in-call') {
       await updateOutboundCallRequest(callId, { status: 'in-call' });
       console.log('[VAPI WEBHOOK] Human detected, call request marked in-call', { callId });
     }
@@ -631,7 +633,7 @@ async function handleVoicemailDetectionEvent(
   }
 
   if (detection.category === 'machine') {
-    const alreadyVoicemail = callRequest.fields.status === 'voicemail';
+    const alreadyVoicemail = callRequest.status === 'voicemail';
     if (!alreadyVoicemail) {
       await updateOutboundCallRequest(callId, { status: 'voicemail' });
       console.log('[VAPI WEBHOOK] Voicemail detected, status updated', { callId, detection: detection.rawType });
@@ -639,10 +641,8 @@ async function handleVoicemailDetectionEvent(
       console.log('[VAPI WEBHOOK] Voicemail detection received but status already voicemail', { callId });
     }
 
-    const recordId = Array.isArray(callRequest.fields.recordId)
-      ? callRequest.fields.recordId[0]
-      : callRequest.fields.recordId;
-    const threadId = callRequest.fields.threadId;
+    const recordId = callRequest.record_id;
+    const threadId = callRequest.thread_id;
 
     if (!alreadyVoicemail && recordId && threadId && assistantId) {
       try {
@@ -652,9 +652,6 @@ async function handleVoicemailDetectionEvent(
           threadId,
           message: 'It went to voicemail, so I left the recorded message and will send the summary when it finishes.',
           role: 'assistant',
-          messageType: 'system',
-          callRequestId: callId,
-          callStatus: 'voicemail',
         });
         console.log('[VAPI WEBHOOK] Posted voicemail detection notice to chat', {
           recordId,
@@ -1832,7 +1829,7 @@ async function handleFunctionCallEvent(
         const topic = args.topic as string | undefined;
         
         // Get user record to find recordId
-        const userRecord = await getUserRecord(assistantId);
+        const userRecord = await getUserRecordByAgentId(assistantId);
         if (!userRecord || !userRecord.id) {
           if (callMetrics) {
             callMetrics.functionFailures++;
@@ -1916,7 +1913,7 @@ async function handleFunctionCallEvent(
         const contactName = args.contactName as string | undefined;
         
         // Get user record to find recordId
-        const userRecord = await getUserRecord(assistantId);
+        const userRecord = await getUserRecordByAgentId(assistantId);
         if (!userRecord || !userRecord.id) {
           if (callMetrics) {
             callMetrics.functionFailures++;
@@ -2005,7 +2002,7 @@ async function handleFunctionCallEvent(
         const query = args.query as string | undefined;
         
         // Get user record to find recordId
-        const userRecord = await getUserRecord(assistantId);
+        const userRecord = await getUserRecordByAgentId(assistantId);
         if (!userRecord || !userRecord.id) {
           if (callMetrics) {
             callMetrics.functionFailures++;
@@ -2940,8 +2937,8 @@ export async function POST(request: NextRequest) {
           chatInitiatedCall = true;
           console.log('[VAPI WEBHOOK] Found chat-initiated call request:', {
             callId,
-            recordId: callRequest.fields.recordId,
-            threadId: callRequest.fields.threadId,
+            recordId: callRequest.record_id,
+            threadId: callRequest.thread_id,
           });
           
           // Extract call results
@@ -2972,11 +2969,9 @@ export async function POST(request: NextRequest) {
             }
           }
           
-          // Get recordId from linked record (first element of array)
-          const recordId = Array.isArray(callRequest.fields.recordId) 
-            ? callRequest.fields.recordId[0] 
-            : callRequest.fields.recordId;
-          const threadId = callRequest.fields.threadId;
+          // Get recordId from linked record
+          const recordId = callRequest.record_id;
+          const threadId = callRequest.thread_id;
           
           // Post message back to chat
           try {

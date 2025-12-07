@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, League_Spartan, Crimson_Pro } from "next/font/google";
 import "./globals.css";
 import { config } from "@/lib/config";
@@ -36,12 +36,13 @@ export const metadata: Metadata = {
     "small business automation",
     ...config.target_market.ideal_clients,
   ].join(", "),
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
-  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({

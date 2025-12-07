@@ -255,8 +255,9 @@ export async function loadMoodPatterns(
 ): Promise<Record<'morning' | 'afternoon' | 'evening' | 'night', MoodPattern> | null> {
   try {
     const userRecord = await getUserRecord(recordId);
-    const fields = userRecord.fields;
-    const patternsJson = fields['Spotify Listening Patterns'] as string | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fields = userRecord.fields as any;
+    const patternsJson = fields.spotifyListeningPatterns as string | undefined;
     
     if (!patternsJson) {
       return null;

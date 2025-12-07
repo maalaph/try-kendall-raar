@@ -3,7 +3,6 @@
  * Individual nodes for the agent workflow
  */
 
-import { Node } from "@langchain/langgraph";
 import type { AgentState } from "./types";
 import { retrieveRelevantContext } from "@/lib/semanticMemory";
 import { getUserPatterns, getUserMemories } from "@/lib/database";
@@ -12,11 +11,14 @@ import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, AIMessage, SystemMessage } from "@langchain/core/messages";
 import { getFunctionRegistry } from "./functions";
 
+// Node function type for LangGraph
+type NodeFunction<T> = (state: T) => Promise<Partial<T>>;
+
 /**
  * Context Retrieval Node
  * Fetches semantic memory, patterns, and conversation history
  */
-export const contextRetrievalNode: Node<AgentState> = async (state: AgentState) => {
+export const contextRetrievalNode: NodeFunction<AgentState> = async (state: AgentState) => {
   try {
     const { recordId, threadId, messages } = state;
     
@@ -89,13 +91,88 @@ export const contextRetrievalNode: Node<AgentState> = async (state: AgentState) 
 
 /**
  * Function Selection Node
- * Determines which functions to call based on context
+ * Determines which functions to call based on context using OpenAI function calling
  */
-export const functionSelectionNode: Node<AgentState> = async (state: AgentState) => {
+export const functionSelectionNode: NodeFunction<AgentState> = async (state: AgentState) => {
   try {
     const { messages, context, systemPrompt, availableFunctions } = state;
     
     if (!availableFunctions || availableFunctions.length === 0) {
+      console.log('[AGENT] No available functions, skipping function selection');
+      return {
+        ...state,
+        functionCalls: [],
+      };
+    }
+
+    // Define full function schemas for OpenAI function calling
+    const functionSchemas = [
+      {
+        name: 'get_user_location',
+        description: 'Get the user\'s current location. ALWAYS use this when the user asks about nearby places, restaurants, directions, recommendations based on location, "what\'s around me", "places near me", coffee shops, or any location-based query.',
+        parameters: {
+          type: 'object',
+          properties: {
+            reason: {
+              type: 'string',
+              description: 'Brief explanation of why location is needed (e.g., "find nearby coffee shops", "get directions")',
+            },
+          },
+          required: ['reason'],
+        },
+      },
+      {
+        name: 'make_outbound_call',
+        description: 'Make an immediate outbound phone call. Only use after you have the person\'s name, phone number, and exact message.',
+        parameters: {
+          type: 'object',
+          properties: {
+            phoneNumber: { type: 'string', description: 'Phone number to call' },
+            contactName: { type: 'string', description: 'Name of person to call' },
+            message: { type: 'string', description: 'Message to deliver' },
+          },
+          required: ['phoneNumber', 'contactName', 'message'],
+        },
+      },
+      {
+        name: 'schedule_outbound_call',
+        description: 'Schedule a call for later.',
+        parameters: {
+          type: 'object',
+          properties: {
+            phoneNumber: { type: 'string' },
+            contactName: { type: 'string' },
+            message: { type: 'string' },
+            scheduledTime: { type: 'string' },
+          },
+          required: ['phoneNumber', 'contactName', 'message', 'scheduledTime'],
+        },
+      },
+      {
+        name: 'show_places_nearby',
+        description: 'Show an interactive map with nearby places.',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Type of place to find' },
+            latitude: { type: 'number' },
+            longitude: { type: 'number' },
+          },
+          required: ['query', 'latitude', 'longitude'],
+        },
+      },
+    ];
+
+    // Filter to only functions that are available
+    const tools = functionSchemas
+      .filter(fn => availableFunctions.some((af: any) => af.name === fn.name))
+      .map(fn => ({
+        type: 'function' as const,
+        function: fn,
+      }));
+
+    if (tools.length === 0) {
+      console.log('[AGENT] No matching function schemas found');
       return {
         ...state,
         functionCalls: [],
@@ -107,44 +184,45 @@ export const functionSelectionNode: Node<AgentState> = async (state: AgentState)
       temperature: 0.3,
     });
 
+    // Bind tools to LLM for proper function calling
+    const llmWithTools = llm.bind({ tools, tool_choice: 'auto' });
+
     // Build messages for function selection
     const systemMsg = systemPrompt 
       ? new SystemMessage(systemPrompt + (context.semanticContext ? `\n\n${context.semanticContext}` : ''))
-      : new SystemMessage("You are a helpful assistant. Determine which functions to call based on the user's request.");
+      : new SystemMessage("You are a helpful assistant. Use the available functions when appropriate to help the user. For location-based queries like 'near me', 'nearby', 'around here', etc., ALWAYS use get_user_location first.");
 
     const selectionMessages = [
       systemMsg,
       ...messages,
-      new HumanMessage("Based on the conversation, which functions should be called? Return a JSON array of function calls with 'name' and 'arguments' fields."),
     ];
 
-    // Use LLM to determine function calls
-    // For now, we'll use a simple approach - in production, use structured outputs
-    const response = await llm.invoke(selectionMessages);
+    console.log('[AGENT] Invoking LLM with tools:', tools.map(t => t.function.name));
+
+    // Use LLM with function calling
+    const response = await llmWithTools.invoke(selectionMessages);
     
-    // Parse function calls from response
-    // This is a simplified version - in production, use structured outputs or function calling
+    // Extract tool calls from response
     let functionCalls: Array<{ name: string; arguments: any }> = [];
     
-    try {
-      const content = response.content.toString();
-      // Try to extract JSON from response
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        functionCalls = JSON.parse(jsonMatch[0]);
-      }
-    } catch (error) {
-      console.warn('[AGENT] Failed to parse function calls from response:', error);
+    // Check for tool_calls in the response (OpenAI format)
+    const toolCalls = (response as any).tool_calls || (response as any).additional_kwargs?.tool_calls;
+    
+    if (toolCalls && Array.isArray(toolCalls)) {
+      console.log('[AGENT] Tool calls detected:', toolCalls.length);
+      functionCalls = toolCalls.map((tc: any) => ({
+        name: tc.function?.name || tc.name,
+        arguments: typeof tc.function?.arguments === 'string' 
+          ? JSON.parse(tc.function.arguments) 
+          : (tc.function?.arguments || tc.arguments || {}),
+      }));
     }
 
-    // Validate function calls against available functions
-    const validFunctionCalls = functionCalls.filter(fc => 
-      availableFunctions.some((af: any) => af.name === fc.name)
-    );
+    console.log('[AGENT] Function calls selected:', functionCalls.map(fc => fc.name));
 
     return {
       ...state,
-      functionCalls: validFunctionCalls,
+      functionCalls,
     };
   } catch (error) {
     console.error('[AGENT] Function selection node failed:', error);
@@ -159,7 +237,7 @@ export const functionSelectionNode: Node<AgentState> = async (state: AgentState)
  * Function Execution Node
  * Executes the selected functions
  */
-export const functionExecutionNode: Node<AgentState> = async (state: AgentState) => {
+export const functionExecutionNode: NodeFunction<AgentState> = async (state: AgentState) => {
   try {
     const { functionCalls, recordId, availableFunctions } = state;
     
@@ -226,7 +304,7 @@ export const functionExecutionNode: Node<AgentState> = async (state: AgentState)
  * Response Generation Node
  * Generates the final response using all context
  */
-export const responseGenerationNode: Node<AgentState> = async (state: AgentState) => {
+export const responseGenerationNode: NodeFunction<AgentState> = async (state: AgentState) => {
   try {
     const { messages, context, systemPrompt, functionResults } = state;
 

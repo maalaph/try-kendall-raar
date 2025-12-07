@@ -1835,6 +1835,8 @@ export async function updateScheduledCallTask(
     scheduled_time?: string;
     phone_number_id?: string;
     message?: string;
+    error_message?: string;
+    call_id?: string;
   }
 ): Promise<ScheduledCall> {
   try {
@@ -1851,6 +1853,12 @@ export async function updateScheduledCallTask(
     }
     if (updates.message) {
       updateData.message = updates.message;
+    }
+    if (updates.error_message !== undefined) {
+      updateData.error_message = updates.error_message;
+    }
+    if (updates.call_id !== undefined) {
+      updateData.call_id = updates.call_id;
     }
 
     const { data: result, error } = await supabase
@@ -2376,7 +2384,7 @@ export async function getOwnerInfoByAgentId(agentId: string): Promise<{
 /**
  * Get user record by agent ID (replaces Airtable getUserRecordByAgentId)
  */
-export async function getUserRecordByAgentId(agentId: string): Promise<{ fields: UserRecord } | null> {
+export async function getUserRecordByAgentId(agentId: string): Promise<{ id: string; fields: UserRecord } | null> {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -2389,6 +2397,7 @@ export async function getUserRecordByAgentId(agentId: string): Promise<{ fields:
     }
 
     return {
+      id: data.record_id || data.id,
       fields: {
         id: data.id,
         record_id: data.record_id,
