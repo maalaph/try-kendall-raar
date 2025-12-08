@@ -195,3 +195,5 @@ COMMENT ON COLUMN user_locations.geom IS 'PostGIS geometry point for spatial que
 COMMENT ON COLUMN user_locations.geocoding_type IS 'temporary = exploration ($0.75/1k), permanent = saved ($5/1k)';
 COMMENT ON COLUMN users.location_enabled IS 'Ghost Mode: when false, AI cannot access location';
 
+
+

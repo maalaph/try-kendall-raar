@@ -55,3 +55,5 @@ echo "   3. Check that VAPI_WEBHOOK_URL is set correctly"
 echo "   4. Run: node verify-env.js"
 
 
+
+

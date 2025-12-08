@@ -412,14 +412,37 @@ export async function getAllChatThreads(recordId: string): Promise<Array<{
   preview: string;
 }>> {
   try {
-    // Get all threads for this user
-    const { data: threads, error: threadsError } = await supabase
+    // Get all threads for this user (exclude deleted ones - soft delete for UI organization only)
+    // Try with deleted filter first, fallback to all threads if column doesn't exist
+    let threads: any[] | null = null;
+    let threadsError: any = null;
+    
+    // First, try querying with deleted filter
+    const filteredQuery = supabase
       .from('threads')
       .select('thread_id, title, updated_at')
       .eq('record_id', recordId)
+      .or('deleted.is.null,deleted.eq.false')
       .order('updated_at', { ascending: false });
-
-    if (threadsError) {
+    
+    const filteredResult = await filteredQuery;
+    threads = filteredResult.data;
+    threadsError = filteredResult.error;
+    
+    // If error is about missing column, retry without the filter
+    if (threadsError && threadsError.message?.includes('column') && threadsError.message?.includes('does not exist')) {
+      const { data: allThreads, error: retryError } = await supabase
+        .from('threads')
+        .select('thread_id, title, updated_at')
+        .eq('record_id', recordId)
+        .order('updated_at', { ascending: false });
+      
+      if (retryError) {
+        throw new Error(`Database error: ${retryError.message}`);
+      }
+      
+      threads = allThreads;
+    } else if (threadsError) {
       throw new Error(`Database error: ${threadsError.message}`);
     }
 
@@ -477,6 +500,68 @@ export async function updateThreadTitle(params: {
     }
   } catch (error) {
     console.error('[DATABASE ERROR] updateThreadTitle failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Mark thread as deleted (soft delete) - keeps data in Supabase for AI learning
+ * This is for UI organization only, data remains available for pattern recognition
+ * 
+ * Note: If the 'deleted' column doesn't exist yet, this will fail silently.
+ * You'll need to add the column to the threads table:
+ *   ALTER TABLE threads ADD COLUMN deleted BOOLEAN DEFAULT false;
+ *   ALTER TABLE threads ADD COLUMN deleted_at TIMESTAMPTZ;
+ */
+export async function markThreadAsDeleted(recordId: string, threadId: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('threads')
+      .update({ deleted: true, deleted_at: new Date().toISOString() })
+      .eq('thread_id', threadId)
+      .eq('record_id', recordId);
+
+    if (error) {
+      // If column doesn't exist, log warning but don't throw (backward compatibility)
+      if (error.message?.includes('column') && error.message?.includes('does not exist')) {
+        console.warn('[DATABASE WARNING] deleted column does not exist in threads table. Thread marking skipped.');
+        return;
+      }
+      throw new Error(`Database error: ${error.message}`);
+    }
+  } catch (error) {
+    console.error('[DATABASE ERROR] markThreadAsDeleted failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Mark multiple threads as deleted (soft delete) - keeps data in Supabase for AI learning
+ * This is for UI organization only, data remains available for pattern recognition
+ * 
+ * Note: If the 'deleted' column doesn't exist yet, this will fail silently.
+ * You'll need to add the column to the threads table:
+ *   ALTER TABLE threads ADD COLUMN deleted BOOLEAN DEFAULT false;
+ *   ALTER TABLE threads ADD COLUMN deleted_at TIMESTAMPTZ;
+ */
+export async function markThreadsAsDeleted(recordId: string, threadIds: string[]): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('threads')
+      .update({ deleted: true, deleted_at: new Date().toISOString() })
+      .in('thread_id', threadIds)
+      .eq('record_id', recordId);
+
+    if (error) {
+      // If column doesn't exist, log warning but don't throw (backward compatibility)
+      if (error.message?.includes('column') && error.message?.includes('does not exist')) {
+        console.warn('[DATABASE WARNING] deleted column does not exist in threads table. Thread marking skipped.');
+        return;
+      }
+      throw new Error(`Database error: ${error.message}`);
+    }
+  } catch (error) {
+    console.error('[DATABASE ERROR] markThreadsAsDeleted failed:', error);
     throw error;
   }
 }

@@ -83,3 +83,5 @@ COMMENT ON TABLE saved_locations IS 'Stores user-defined locations (home, work, 
 -- GRANT ALL ON saved_locations TO authenticated;
 -- GRANT ALL ON saved_locations TO service_role;
 
+
+

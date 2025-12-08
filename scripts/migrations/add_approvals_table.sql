@@ -53,3 +53,5 @@ $$ LANGUAGE plpgsql;
 -- GRANT ALL ON pending_approvals TO authenticated;
 -- GRANT ALL ON pending_approvals TO service_role;
 
+
+

@@ -195,6 +195,58 @@ export async function PATCH(request: NextRequest) {
       decision,
       notes,
     });
+
+    // If purchase was approved, trigger purchase execution (virtual card creation)
+    if (decision === 'approved' && approval.actionType === 'purchase') {
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        
+        // Find the purchase request linked to this approval
+        const { data: purchaseRequest } = await supabase
+          .from('purchase_requests')
+          .select('*')
+          .eq('approval_id', approvalId)
+          .single();
+
+        if (purchaseRequest && purchaseRequest.status === 'pending_approval') {
+          // Update purchase request status to approved
+          await supabase
+            .from('purchase_requests')
+            .update({ status: 'approved' })
+            .eq('id', purchaseRequest.id);
+
+          // Process the approved purchase (create virtual card)
+          const { processApprovedPurchase } = await import('@/lib/purchasing/purchaseProcessor');
+          const cardResult = await processApprovedPurchase(purchaseRequest.id);
+
+          console.log('[APPROVAL] Purchase approved, virtual card created:', {
+            purchaseRequestId: purchaseRequest.id,
+            cardToken: cardResult.cardToken,
+            cardNumber: cardResult.cardNumber,
+          });
+
+          return NextResponse.json({
+            success: true,
+            approval,
+            purchase: {
+              purchase_request_id: purchaseRequest.id,
+              card_created: true,
+              card_number: cardResult.cardNumber,
+            },
+            message: `Purchase approved. Virtual card created ending in ${cardResult.cardNumber}.`,
+          });
+        }
+      } catch (purchaseError) {
+        console.error('[APPROVAL] Error processing approved purchase:', purchaseError);
+        // Don't fail the approval - card creation can be retried
+        return NextResponse.json({
+          success: true,
+          approval,
+          warning: 'Purchase approved, but card creation failed. You may need to retry.',
+          message: `Approval ${decision}`,
+        });
+      }
+    }
     
     return NextResponse.json({
       success: true,
@@ -209,4 +261,6 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
+
+
 

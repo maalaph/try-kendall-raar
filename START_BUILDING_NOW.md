@@ -171,3 +171,5 @@
 **Day 3:** Final polish, handoff  
 **Days 4-30:** You build UI, train, polish, demo prep
 
+
+

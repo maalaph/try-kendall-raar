@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { colors } from '@/lib/config';
-import { Plus, MessageSquare, X, GripVertical, Search, Pencil, Check } from 'lucide-react';
+import { Plus, MessageSquare, X, GripVertical, Search, Pencil, Check, Trash2, CheckSquare, Square } from 'lucide-react';
 
 interface ChatThread {
   threadId: string;
@@ -39,6 +39,9 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [updatingTitle, setUpdatingTitle] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedThreadIds, setSelectedThreadIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const fetchingRef = useRef(false);
   const router = useRouter();
@@ -307,6 +310,91 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
     setShowDeleteConfirm(null);
   };
 
+  // Selection mode handlers
+  const handleToggleSelectionMode = () => {
+    if (selectionMode) {
+      // Exit selection mode
+      setSelectedThreadIds(new Set());
+    }
+    setSelectionMode(!selectionMode);
+  };
+
+  const handleToggleThreadSelection = (threadId: string) => {
+    setSelectedThreadIds(prev => {
+      const next = new Set(prev);
+      if (next.has(threadId)) {
+        next.delete(threadId);
+      } else {
+        next.add(threadId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedThreadIds.size === filteredThreads.length) {
+      // Deselect all
+      setSelectedThreadIds(new Set());
+    } else {
+      // Select all filtered threads
+      setSelectedThreadIds(new Set(filteredThreads.map(t => t.threadId)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedThreadIds.size === 0) return;
+
+    const confirmed = window.confirm(`Delete ${selectedThreadIds.size} thread(s)? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    setBulkDeleting(true);
+
+    try {
+      const response = await fetch('/api/chat/threads/bulk-delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          threadIds: Array.from(selectedThreadIds),
+          recordId,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Remove deleted threads from local state
+          setThreads(prev => prev.filter(t => !selectedThreadIds.has(t.threadId)));
+          
+          // If current thread was deleted, navigate to first remaining thread or new chat
+          if (currentThreadId && selectedThreadIds.has(currentThreadId)) {
+            const remainingThreads = threads.filter(t => !selectedThreadIds.has(t.threadId));
+            if (remainingThreads.length > 0) {
+              router.push(`/chat?recordId=${encodeURIComponent(recordId)}&threadId=${encodeURIComponent(remainingThreads[0].threadId)}`);
+            } else {
+              router.push(`/chat?recordId=${encodeURIComponent(recordId)}`);
+            }
+          }
+          
+          // Clear selection and exit selection mode
+          setSelectedThreadIds(new Set());
+          setSelectionMode(false);
+        } else {
+          alert(data.error || 'Failed to delete threads');
+        }
+      } else {
+        const data = await response.json();
+        alert(data.error || 'Failed to delete threads');
+      }
+    } catch (error) {
+      console.error('Failed to bulk delete threads:', error);
+      alert('Failed to delete threads. Please try again.');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const handleEditTitle = (e: React.MouseEvent, threadId: string, currentTitle: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -478,85 +566,206 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
               opacity: 0.6,
             }}
           />
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 transition-all group relative z-10"
-            style={{ 
-              color: colors.text,
-              padding: '4px 8px',
-              borderRadius: '8px',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.opacity = '0.9';
-              e.currentTarget.style.transform = 'scale(1.05)';
-              e.currentTarget.style.backgroundColor = `${colors.accent}15`;
-              e.currentTarget.style.boxShadow = `0 0 12px ${colors.accent}30`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.opacity = '1';
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            <MessageSquare 
-              size={18} 
-              style={{ 
-                filter: isOpen ? `drop-shadow(0 0 6px ${colors.accent}80)` : 'none',
-                transition: 'filter 0.2s ease',
-              }} 
-            />
-            {isOpen && (
-              <span style={{ 
-                fontFamily: 'var(--font-inter), sans-serif', 
-                fontWeight: 600, 
-                fontSize: '0.9375rem',
-                letterSpacing: '-0.01em',
-                textShadow: `0 0 8px ${colors.accent}40`,
-                transition: 'text-shadow 0.2s ease',
-              }}>
-                Chats
-              </span>
-            )}
-          </button>
-          {isOpen && (
-            <button
-              onClick={(e) => handleNewChat(e)}
-              disabled={creatingThread}
-              className="p-2 rounded-lg transition-all relative group z-10"
-              style={{
-                color: colors.accent,
-                backgroundColor: 'transparent',
-                cursor: creatingThread ? 'wait' : 'pointer',
-                pointerEvents: creatingThread ? 'none' : 'auto',
-                zIndex: 20,
-                opacity: creatingThread ? 0.5 : 1,
-                border: `1px solid ${colors.accent}30`,
-              }}
-              onMouseEnter={(e) => {
-                if (!creatingThread) {
-                  e.currentTarget.style.backgroundColor = `${colors.accent}25`;
-                  e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}50, 0 0 40px ${colors.accent}30`;
-                  e.currentTarget.style.borderColor = colors.accent;
-                  e.currentTarget.style.transform = 'scale(1.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.boxShadow = 'none';
-                e.currentTarget.style.borderColor = `${colors.accent}30`;
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-              title={creatingThread ? 'Creating new chat...' : 'New Chat'}
-            >
-              <Plus 
-                size={18} 
+          
+          {/* Selection mode toolbar */}
+          {selectionMode ? (
+            <div className="flex items-center gap-2 flex-1">
+              <button
+                onClick={handleSelectAll}
+                className="p-1.5 rounded transition-all"
+                style={{
+                  color: colors.text,
+                  backgroundColor: 'transparent',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = `${colors.accent}20`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                title={selectedThreadIds.size === filteredThreads.length ? 'Deselect all' : 'Select all'}
+              >
+                {selectedThreadIds.size === filteredThreads.length && filteredThreads.length > 0 ? (
+                  <CheckSquare size={18} />
+                ) : (
+                  <Square size={18} />
+                )}
+              </button>
+              <span 
+                className="text-sm"
                 style={{ 
-                  filter: `drop-shadow(0 0 4px ${colors.accent}60)`,
-                  transition: 'filter 0.2s ease',
-                }} 
-              />
-            </button>
+                  color: colors.text,
+                  fontFamily: 'var(--font-inter), sans-serif',
+                  opacity: 0.8,
+                }}
+              >
+                {selectedThreadIds.size} selected
+              </span>
+              {selectedThreadIds.size > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="px-3 py-1.5 rounded transition-all flex items-center gap-1.5"
+                  style={{
+                    color: '#ef4444',
+                    backgroundColor: `${colors.accent}15`,
+                    border: `1px solid ${colors.accent}30`,
+                    cursor: bulkDeleting ? 'wait' : 'pointer',
+                    opacity: bulkDeleting ? 0.6 : 1,
+                    marginLeft: 'auto',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!bulkDeleting) {
+                      e.currentTarget.style.backgroundColor = `${colors.accent}25`;
+                      e.currentTarget.style.borderColor = '#ef4444';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = `${colors.accent}15`;
+                    e.currentTarget.style.borderColor = `${colors.accent}30`;
+                  }}
+                >
+                  <Trash2 size={14} />
+                  <span className="text-xs" style={{ fontFamily: 'var(--font-inter), sans-serif' }}>
+                    Delete
+                  </span>
+                </button>
+              )}
+              <button
+                onClick={handleToggleSelectionMode}
+                className="px-2 py-1 rounded text-xs transition-all"
+                style={{
+                  color: colors.text,
+                  backgroundColor: 'transparent',
+                  border: `1px solid ${colors.accent}30`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = `${colors.accent}20`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="flex items-center gap-2 transition-all group relative z-10"
+                style={{ 
+                  color: colors.text,
+                  padding: '4px 8px',
+                  borderRadius: '8px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '0.9';
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.backgroundColor = `${colors.accent}15`;
+                  e.currentTarget.style.boxShadow = `0 0 12px ${colors.accent}30`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <MessageSquare 
+                  size={18} 
+                  style={{ 
+                    filter: isOpen ? `drop-shadow(0 0 6px ${colors.accent}80)` : 'none',
+                    transition: 'filter 0.2s ease',
+                  }} 
+                />
+                {isOpen && (
+                  <span style={{ 
+                    fontFamily: 'var(--font-inter), sans-serif', 
+                    fontWeight: 600, 
+                    fontSize: '0.9375rem',
+                    letterSpacing: '-0.01em',
+                    textShadow: `0 0 8px ${colors.accent}40`,
+                    transition: 'text-shadow 0.2s ease',
+                  }}>
+                    Chats
+                  </span>
+                )}
+              </button>
+              {isOpen && (
+                <>
+                  <button
+                    onClick={(e) => handleNewChat(e)}
+                    disabled={creatingThread}
+                    className="p-2 rounded-lg transition-all relative group z-10"
+                    style={{
+                      color: colors.accent,
+                      backgroundColor: 'transparent',
+                      cursor: creatingThread ? 'wait' : 'pointer',
+                      pointerEvents: creatingThread ? 'none' : 'auto',
+                      zIndex: 20,
+                      opacity: creatingThread ? 0.5 : 1,
+                      border: `1px solid ${colors.accent}30`,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!creatingThread) {
+                        e.currentTarget.style.backgroundColor = `${colors.accent}25`;
+                        e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}50, 0 0 40px ${colors.accent}30`;
+                        e.currentTarget.style.borderColor = colors.accent;
+                        e.currentTarget.style.transform = 'scale(1.1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.borderColor = `${colors.accent}30`;
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                    title={creatingThread ? 'Creating new chat...' : 'New Chat'}
+                  >
+                    <Plus 
+                      size={18} 
+                      style={{ 
+                        filter: `drop-shadow(0 0 4px ${colors.accent}60)`,
+                        transition: 'filter 0.2s ease',
+                      }} 
+                    />
+                  </button>
+                  <button
+                    onClick={handleToggleSelectionMode}
+                    className="p-2 rounded-lg transition-all relative group z-10"
+                    style={{
+                      color: colors.accent,
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer',
+                      zIndex: 20,
+                      border: `1px solid ${colors.accent}30`,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = `${colors.accent}25`;
+                      e.currentTarget.style.boxShadow = `0 0 20px ${colors.accent}50, 0 0 40px ${colors.accent}30`;
+                      e.currentTarget.style.borderColor = colors.accent;
+                      e.currentTarget.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.borderColor = `${colors.accent}30`;
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                    title="Select threads"
+                  >
+                    <CheckSquare 
+                      size={18} 
+                      style={{ 
+                        filter: `drop-shadow(0 0 4px ${colors.accent}60)`,
+                        transition: 'filter 0.2s ease',
+                      }} 
+                    />
+                  </button>
+                </>
+              )}
+            </>
           )}
         </div>
 
@@ -745,6 +954,8 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                   const isDeleting = deletingThreadId === thread.threadId;
                   const showDelete = showDeleteConfirm === thread.threadId;
 
+                  const isSelected = selectedThreadIds.has(thread.threadId);
+
                   return (
                     <div
                       key={thread.threadId}
@@ -756,33 +967,84 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                         zIndex: 100,
                       }}
                     >
+                      {selectionMode && (
+                        <div
+                          className="absolute left-3 top-1/2 -translate-y-1/2 z-50"
+                          style={{ pointerEvents: 'auto' }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleToggleThreadSelection(thread.threadId);
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="p-1 rounded transition-all"
+                            style={{
+                              color: isSelected ? colors.accent : colors.text,
+                              backgroundColor: 'transparent',
+                              cursor: 'pointer',
+                              opacity: isSelected ? 1 : 0.6,
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = `${colors.accent}20`;
+                              e.currentTarget.style.opacity = '1';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                              if (!isSelected) {
+                                e.currentTarget.style.opacity = '0.6';
+                              }
+                            }}
+                          >
+                            {isSelected ? (
+                              <CheckSquare size={18} />
+                            ) : (
+                              <Square size={18} />
+                            )}
+                          </button>
+                        </div>
+                      )}
                       <Link
                         href={`/chat?recordId=${encodeURIComponent(recordId)}&threadId=${encodeURIComponent(thread.threadId)}`}
                         className="w-full text-left p-3.5 transition-all border-l-2 relative block"
                         style={{
-                          background: isActive 
+                          background: isSelected
+                            ? `linear-gradient(90deg, ${colors.accent}30 0%, ${colors.accent}20 100%)`
+                            : isActive 
                             ? `linear-gradient(90deg, ${colors.accent}25 0%, ${colors.accent}15 100%)`
                             : isHovered 
                             ? `linear-gradient(90deg, ${colors.accent}15 0%, ${colors.accent}08 100%)`
                             : 'transparent',
-                          borderLeftColor: isActive ? colors.accent : 'transparent',
-                          borderLeftWidth: isActive ? '3px' : '0px',
+                          borderLeftColor: isActive || isSelected ? colors.accent : 'transparent',
+                          borderLeftWidth: isActive || isSelected ? '3px' : '0px',
                           color: colors.text,
                           opacity: isDeleting ? 0.5 : 1,
-                          cursor: showDelete || isDeleting ? 'default' : 'pointer',
-                          pointerEvents: showDelete || isDeleting ? 'none' : 'auto',
+                          cursor: showDelete || isDeleting || selectionMode ? 'default' : 'pointer',
+                          pointerEvents: showDelete || isDeleting || selectionMode ? 'none' : 'auto',
                           zIndex: 101,
                           position: 'relative',
                           borderRadius: '0 8px 8px 0',
                           margin: '2px 8px',
+                          paddingLeft: selectionMode ? '44px' : '14px',
                           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                          boxShadow: isActive 
+                          boxShadow: isSelected
+                            ? `0 0 25px ${colors.accent}30, inset 0 0 20px ${colors.accent}15`
+                            : isActive 
                             ? `0 0 20px ${colors.accent}20, inset 0 0 20px ${colors.accent}10`
                             : isHovered
                             ? `0 0 15px ${colors.accent}15`
                             : 'none',
-                          transform: isHovered && !isActive ? 'translateX(2px)' : 'translateX(0)',
+                          transform: isHovered && !isActive && !selectionMode ? 'translateX(2px)' : 'translateX(0)',
                           textDecoration: 'none',
+                        }}
+                        onClick={(e) => {
+                          if (selectionMode) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleToggleThreadSelection(thread.threadId);
+                            return;
+                          }
                         }}
                         onMouseEnter={(e) => {
                           if (!isActive && !showDelete && !isDeleting) {
@@ -794,19 +1056,28 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                             e.currentTarget.style.boxShadow = 'none';
                           }
                         }}
-                        onClick={(e) => {
+                        onMouseDown={(e) => {
+                          if (selectionMode) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleToggleThreadSelection(thread.threadId);
+                            return;
+                          }
                           if (showDelete || isDeleting) {
                             e.preventDefault();
                             e.stopPropagation();
                             return;
                           }
-                          // Fallback navigation if Link doesn't work
-                          const link = e.currentTarget;
-                          setTimeout(() => {
-                            if (window.location.pathname === '/chat' && !window.location.search.includes(`threadId=${encodeURIComponent(thread.threadId)}`)) {
-                              handleThreadClick(thread.threadId);
-                            }
-                          }, 100);
+                        }}
+                        onMouseUp={(e) => {
+                          if (!selectionMode && !showDelete && !isDeleting) {
+                            // Fallback navigation if Link doesn't work
+                            setTimeout(() => {
+                              if (window.location.pathname === '/chat' && !window.location.search.includes(`threadId=${encodeURIComponent(thread.threadId)}`)) {
+                                handleThreadClick(thread.threadId);
+                              }
+                            }, 100);
+                          }
                         }}
                       >
                         <div className="flex items-start justify-between gap-2 mb-1.5 relative">
@@ -917,7 +1188,7 @@ export default function ChatListSidebar({ recordId, currentThreadId }: ChatListS
                               >
                                 {thread.title}
                               </span>
-                              {isHovered && !showDelete && (
+                              {isHovered && !showDelete && !selectionMode && (
                                 <div className="flex items-center gap-1 flex-shrink-0" style={{ position: 'absolute', right: 0, top: 0 }}>
                                   <button
                                     type="button"

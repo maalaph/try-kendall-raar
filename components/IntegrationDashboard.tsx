@@ -84,6 +84,21 @@ interface DashboardData {
       message?: string;
     };
   } | null;
+  financial: {
+    connected: boolean;
+    summary?: {
+      accountsCount: number;
+      totalBalance: number;
+      totalAvailable: number;
+      transactionsCount: number;
+      pendingCount: number;
+    };
+    details?: any;
+    error?: {
+      type: ErrorType;
+      message?: string;
+    };
+  } | null;
 }
 
 interface IntegrationDashboardProps {
@@ -93,7 +108,7 @@ interface IntegrationDashboardProps {
 export default function IntegrationDashboard({ recordId }: IntegrationDashboardProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [expandedCard, setExpandedCard] = useState<'calls' | 'emails' | 'spotify' | null>(null);
+  const [expandedCard, setExpandedCard] = useState<'calls' | 'emails' | 'spotify' | 'financial' | null>(null);
 
   const fetchDashboardData = async () => {
     try {
@@ -119,7 +134,7 @@ export default function IntegrationDashboard({ recordId }: IntegrationDashboardP
     return () => clearInterval(interval);
   }, [recordId]);
 
-  const handleCardToggle = (type: 'calls' | 'emails' | 'spotify') => {
+  const handleCardToggle = (type: 'calls' | 'emails' | 'spotify' | 'financial') => {
     setExpandedCard(expandedCard === type ? null : type);
   };
 
@@ -182,6 +197,26 @@ export default function IntegrationDashboard({ recordId }: IntegrationDashboardP
         secondary: data.spotify?.error?.type === 'not_connected' ? 'Not connected' : 'Unable to load Spotify',
       };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const financialSummary = data.financial?.summary
+    ? {
+        primary: formatCurrency(data.financial.summary.totalBalance),
+        secondary: `${data.financial.summary.accountsCount} account${data.financial.summary.accountsCount !== 1 ? 's' : ''}`,
+        tertiary: `${data.financial.summary.transactionsCount} transactions`,
+      }
+    : {
+        primary: 'Not connected',
+        secondary: data.financial?.error?.type === 'not_connected' ? 'Connect bank account' : 'Unable to load financial data',
+      };
+
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" style={{ paddingTop: '2rem', paddingBottom: '4rem' }}>
       <h1
@@ -196,7 +231,7 @@ export default function IntegrationDashboard({ recordId }: IntegrationDashboardP
         Dashboard
       </h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Calls Card */}
         <IntegrationCard
           type="calls"
@@ -233,6 +268,19 @@ export default function IntegrationDashboard({ recordId }: IntegrationDashboardP
           connected={data.spotify?.connected ?? false}
           error={data.spotify?.error}
           connectUrl={`/integrations?recordId=${encodeURIComponent(recordId)}`}
+        />
+
+        {/* Financial Card */}
+        <IntegrationCard
+          type="financial"
+          title="Financial"
+          summary={financialSummary}
+          details={data.financial}
+          isExpanded={expandedCard === 'financial'}
+          onToggle={() => handleCardToggle('financial')}
+          connected={data.financial?.connected ?? false}
+          error={data.financial?.error}
+          connectUrl={`/dashboard/financial?recordId=${encodeURIComponent(recordId)}`}
         />
       </div>
     </div>

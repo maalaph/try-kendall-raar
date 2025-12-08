@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserRecord, updateThreadTitle } from '@/lib/database';
+import { getUserRecord, updateThreadTitle, markThreadAsDeleted } from '@/lib/database';
 
 const CHAT_MESSAGES_API_URL = process.env.AIRTABLE_BASE_ID && process.env.AIRTABLE_CHAT_MESSAGES_TABLE_ID
   ? `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_CHAT_MESSAGES_TABLE_ID}`
@@ -139,6 +139,15 @@ export async function DELETE(
           // Continue with other batches even if one fails
         }
       }
+    }
+
+    // Mark thread as deleted in Supabase (soft delete - keeps data for AI learning)
+    // This is for UI organization only, the data remains for pattern recognition
+    try {
+      await markThreadAsDeleted(recordId, threadId);
+    } catch (threadDeleteError) {
+      console.error('[API ERROR] Failed to mark thread as deleted in Supabase:', threadDeleteError);
+      // Continue even if marking fails - messages are already deleted from Airtable
     }
 
     return NextResponse.json({
