@@ -100,3 +100,5 @@ COMMENT ON COLUMN location_suggestions.status IS 'pending = waiting for user res
 COMMENT ON COLUMN location_suggestions.confidence_score IS 'Confidence score from clustering (0-1)';
 COMMENT ON COLUMN location_suggestions.visit_count IS 'Number of times user visited this location';
 
+
+

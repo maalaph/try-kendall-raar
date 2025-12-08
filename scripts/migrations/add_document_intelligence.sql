@@ -108,3 +108,5 @@ EXECUTE FUNCTION update_user_profile_from_document();
 -- GRANT ALL ON documents TO authenticated;
 -- GRANT ALL ON documents TO service_role;
 
+
+

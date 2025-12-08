@@ -305,3 +305,5 @@ export function extractSkillsQuick(content: string): string[] {
   return found;
 }
 
+
+

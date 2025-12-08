@@ -290,6 +290,110 @@ const CHAT_FUNCTIONS = [
       required: ['recordId', 'reason'],
     },
   },
+  {
+    name: 'get_financial_summary',
+    description: 'Get financial overview including account balances, recent transactions, and spending summary. Use this when the user asks about their finances, spending, bank accounts, or "how much did I spend". Returns current balances, recent transactions, and spending patterns.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: {
+          type: 'string',
+          description: 'The user\'s recordId (required). Always use the recordId from the chat context.',
+        },
+        timeRange: {
+          type: 'string',
+          enum: ['today', 'week', 'month', 'year'],
+          description: 'Optional time range for transactions. Defaults to "month" if not specified.',
+        },
+      },
+      required: ['recordId'],
+    },
+  },
+  {
+    name: 'analyze_spending',
+    description: 'Analyze spending patterns by category, merchant, or time period. Use this when the user asks about spending trends, "where did my money go", or wants insights about their spending habits. Provides categorized spending breakdown and patterns.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: {
+          type: 'string',
+          description: 'The user\'s recordId (required).',
+        },
+        category: {
+          type: 'string',
+          description: 'Optional: Filter by specific category (e.g., "Food and Drink", "Transportation").',
+        },
+        timeRange: {
+          type: 'string',
+          enum: ['week', 'month', '3months', 'year'],
+          description: 'Time range for analysis. Defaults to "month".',
+        },
+      },
+      required: ['recordId'],
+    },
+  },
+  {
+    name: 'detect_subscriptions',
+    description: 'Identify recurring subscriptions and recurring charges from transaction history. Use this proactively to notify the user about subscriptions, or when they ask "what subscriptions do I have" or "cancel my subscriptions".',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: {
+          type: 'string',
+          description: 'The user\'s recordId (required).',
+        },
+      },
+      required: ['recordId'],
+    },
+  },
+  {
+    name: 'initiate_purchase',
+    description: 'Initiate a purchase workflow. Use this when the user wants to buy something. This will create an approval request and prepare a virtual card for the purchase. ONLY call this when you have the item name, merchant, and approximate price.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: {
+          type: 'string',
+          description: 'The user\'s recordId (required to identify which user is making the purchase). Always use the recordId from the chat context.',
+        },
+        item_name: {
+          type: 'string',
+          description: 'The name/description of the item to purchase (REQUIRED)',
+        },
+        merchant: {
+          type: 'string',
+          description: 'The merchant/store name where the purchase will be made (REQUIRED)',
+        },
+        amount: {
+          type: 'number',
+          description: 'The purchase amount in dollars (e.g., 29.99 for $29.99) (REQUIRED)',
+        },
+        item_url: {
+          type: 'string',
+          description: 'Optional: URL of the product/item page',
+        },
+      },
+      required: ['recordId', 'item_name', 'merchant', 'amount'],
+    },
+  },
+  {
+    name: 'execute_purchase',
+    description: 'Execute a previously approved purchase. Use this after a purchase has been approved to create the virtual card and complete the purchase. This function should only be called by the system after approval, not directly by users.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: {
+          type: 'string',
+          description: 'The user\'s recordId',
+        },
+        purchase_request_id: {
+          type: 'string',
+          description: 'The purchase request ID from the approval workflow',
+        },
+      },
+      required: ['recordId', 'purchase_request_id'],
+    },
+  },
 ];
 
 const TIMEZONE_OFFSET_REGEX = /([zZ]|[+\-]\d{2}:?\d{2})$/;
@@ -2122,6 +2226,184 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
+        // Handle Financial Summary
+        if (fc.name === 'get_financial_summary') {
+          try {
+            const args = fc.arguments || {};
+            const financialRecordId = args.recordId || recordId;
+            const timeRange = args.timeRange || 'month';
+
+            if (!financialRecordId) {
+              functionResults.push({
+                name: 'get_financial_summary',
+                result: { success: false, error: 'recordId is required' },
+              });
+              continue;
+            }
+
+            // Get base URL from request headers
+            const protocol = request.headers.get('x-forwarded-proto') || 'http';
+            const host = request.headers.get('host') || 'localhost:3000';
+            const baseUrl = `${protocol}://${host}`;
+            
+            const response = await fetch(`${baseUrl}/api/financial/summary?recordId=${financialRecordId}&timeRange=${timeRange}`);
+            const data = await response.json();
+
+            if (data.success) {
+              functionResults.push({
+                name: 'get_financial_summary',
+                result: { success: true, summary: data.summary },
+              });
+
+              const { accounts, totalBalance, recentTransactions, spending } = data.summary;
+              let summaryText = `You have ${accounts.length} bank account${accounts.length !== 1 ? 's' : ''} with a total balance of $${totalBalance.toFixed(2)}.\n`;
+              
+              if (recentTransactions.length > 0) {
+                summaryText += `Recent transactions:\n`;
+                recentTransactions.slice(0, 5).forEach((tx: any) => {
+                  const amount = Math.abs(tx.amount / 100);
+                  const sign = tx.amount < 0 ? '-' : '+';
+                  summaryText += `• ${tx.merchant_name || tx.name}: ${sign}$${amount.toFixed(2)}\n`;
+                });
+              }
+
+              if (spending) {
+                summaryText += `\nThis ${timeRange}, you've spent $${spending.total.toFixed(2)} across ${spending.categories.length} categories.`;
+              }
+
+              agentResponse = summaryText;
+            } else {
+              throw new Error(data.error || 'Failed to get financial summary');
+            }
+          } catch (error: any) {
+            console.error('[CHAT] Error getting financial summary:', error);
+            functionResults.push({
+              name: 'get_financial_summary',
+              result: { success: false, error: error.message || 'Failed to get financial summary' },
+            });
+            agentResponse = "I'm having trouble accessing your financial data. Make sure you've connected your bank account in the dashboard.";
+          }
+          continue;
+        }
+
+        // Handle Spending Analysis
+        if (fc.name === 'analyze_spending') {
+          try {
+            const args = fc.arguments || {};
+            const financialRecordId = args.recordId || recordId;
+            const timeRange = args.timeRange || 'month';
+            const category = args.category;
+
+            if (!financialRecordId) {
+              functionResults.push({
+                name: 'analyze_spending',
+                result: { success: false, error: 'recordId is required' },
+              });
+              continue;
+            }
+
+            // Get base URL from request headers
+            const protocol = request.headers.get('x-forwarded-proto') || 'http';
+            const host = request.headers.get('host') || 'localhost:3000';
+            const baseUrl = `${protocol}://${host}`;
+            
+            let url = `${baseUrl}/api/financial/analyze?recordId=${financialRecordId}&timeRange=${timeRange}`;
+            if (category) {
+              url += `&category=${encodeURIComponent(category)}`;
+            }
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.success) {
+              functionResults.push({
+                name: 'analyze_spending',
+                result: { success: true, analysis: data.analysis },
+              });
+
+              const { totalSpent, byCategory, topMerchants } = data.analysis;
+              let analysisText = `This ${timeRange}, you've spent $${totalSpent.toFixed(2)}.\n\n`;
+
+              if (byCategory && byCategory.length > 0) {
+                analysisText += `Spending by category:\n`;
+                byCategory.slice(0, 5).forEach((cat: any) => {
+                  analysisText += `• ${cat.category}: $${cat.amount.toFixed(2)} (${cat.percentage.toFixed(1)}%)\n`;
+                });
+              }
+
+              if (topMerchants && topMerchants.length > 0) {
+                analysisText += `\nTop merchants:\n`;
+                topMerchants.slice(0, 3).forEach((merchant: any) => {
+                  analysisText += `• ${merchant.name}: $${merchant.amount.toFixed(2)}\n`;
+                });
+              }
+
+              agentResponse = analysisText;
+            } else {
+              throw new Error(data.error || 'Failed to analyze spending');
+            }
+          } catch (error: any) {
+            console.error('[CHAT] Error analyzing spending:', error);
+            functionResults.push({
+              name: 'analyze_spending',
+              result: { success: false, error: error.message || 'Failed to analyze spending' },
+            });
+            agentResponse = "I couldn't analyze your spending right now. Make sure you have connected accounts and transactions synced.";
+          }
+          continue;
+        }
+
+        // Handle Subscription Detection
+        if (fc.name === 'detect_subscriptions') {
+          try {
+            const args = fc.arguments || {};
+            const financialRecordId = args.recordId || recordId;
+
+            if (!financialRecordId) {
+              functionResults.push({
+                name: 'detect_subscriptions',
+                result: { success: false, error: 'recordId is required' },
+              });
+              continue;
+            }
+
+            // Get base URL from request headers
+            const protocol = request.headers.get('x-forwarded-proto') || 'http';
+            const host = request.headers.get('host') || 'localhost:3000';
+            const baseUrl = `${protocol}://${host}`;
+            
+            const response = await fetch(`${baseUrl}/api/financial/subscriptions?recordId=${financialRecordId}`);
+            const data = await response.json();
+
+            if (data.success) {
+              functionResults.push({
+                name: 'detect_subscriptions',
+                result: { success: true, subscriptions: data.subscriptions },
+              });
+
+              if (data.subscriptions.length > 0) {
+                let subText = `I found ${data.subscriptions.length} recurring subscription${data.subscriptions.length !== 1 ? 's' : ''}:\n\n`;
+                data.subscriptions.forEach((sub: any) => {
+                  subText += `• ${sub.merchant_name}: $${sub.amount.toFixed(2)}/${sub.frequency} (charged on ${sub.next_charge_date})\n`;
+                });
+                agentResponse = subText;
+              } else {
+                agentResponse = "I didn't find any recurring subscriptions in your recent transactions.";
+              }
+            } else {
+              throw new Error(data.error || 'Failed to detect subscriptions');
+            }
+          } catch (error: any) {
+            console.error('[CHAT] Error detecting subscriptions:', error);
+            functionResults.push({
+              name: 'detect_subscriptions',
+              result: { success: false, error: error.message || 'Failed to detect subscriptions' },
+            });
+            agentResponse = "I couldn't check for subscriptions right now.";
+          }
+          continue;
+        }
+
         // Handle Gmail requests
         if (fc.name === 'get_gmail_messages') {
           try {
@@ -2385,6 +2667,112 @@ export async function POST(request: NextRequest) {
               console.error('[CHAT] Error sending Gmail:', error);
               agentResponse = "I encountered an error while trying to send the email. Please try again.";
             }
+          }
+          continue;
+        }
+
+        // Handle purchase initiation
+        if (fc.name === 'initiate_purchase') {
+          try {
+            const { initiatePurchase } = await import('@/lib/purchasing/purchaseProcessor');
+            const { recordId: purchaseRecordId, item_name, merchant, amount, item_url } = fc.arguments || {};
+            
+            // Always use the recordId from request context
+            const purchaseUserId = recordId;
+            
+            if (!item_name || !merchant || !amount) {
+              agentResponse = "I need the item name, merchant, and amount to initiate a purchase. Can you provide those details?";
+              continue;
+            }
+
+            // Convert amount to cents
+            const amountInCents = Math.round(parseFloat(String(amount)) * 100);
+
+            if (isNaN(amountInCents) || amountInCents <= 0) {
+              agentResponse = "I need a valid purchase amount. Please provide the price in dollars (e.g., 29.99).";
+              continue;
+            }
+
+            // Create purchase request (triggers approval workflow)
+            const purchaseRequest = await initiatePurchase({
+              userId: purchaseUserId,
+              item: {
+                name: item_name,
+                merchant: merchant,
+                amount: amountInCents,
+                currency: 'USD',
+                url: item_url,
+              },
+              threadId,
+              context: {
+                original_message: message,
+              },
+            });
+
+            functionResults.push({
+              name: 'initiate_purchase',
+              result: {
+                success: true,
+                purchase_request_id: purchaseRequest.id,
+                approval_id: purchaseRequest.approvalId,
+                status: 'pending_approval',
+                message: `Purchase request created. Approval required for $${(amountInCents / 100).toFixed(2)} purchase.`,
+              },
+            });
+
+            agentResponse = `I've created a purchase request for **${item_name}** from **${merchant}** for **$${(amountInCents / 100).toFixed(2)}**. This requires your approval before I can proceed. Please review and approve in your dashboard.`;
+          } catch (error) {
+            console.error('[CHAT] Error initiating purchase:', error);
+            agentResponse = "I encountered an error while creating the purchase request. Please try again.";
+            functionResults.push({
+              name: 'initiate_purchase',
+              result: {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+              },
+            });
+          }
+          continue;
+        }
+
+        // Handle purchase execution (after approval)
+        if (fc.name === 'execute_purchase') {
+          try {
+            const { processApprovedPurchase } = await import('@/lib/purchasing/purchaseProcessor');
+            const { recordId: execRecordId, purchase_request_id } = fc.arguments || {};
+            
+            // Always use the recordId from request context
+            const execUserId = recordId;
+            
+            if (!purchase_request_id) {
+              agentResponse = "I need the purchase request ID to execute the purchase.";
+              continue;
+            }
+
+            // Process approved purchase: Create virtual card
+            const cardResult = await processApprovedPurchase(purchase_request_id);
+
+            functionResults.push({
+              name: 'execute_purchase',
+              result: {
+                success: true,
+                card_token: cardResult.cardToken,
+                card_number: cardResult.cardNumber,
+                message: `Virtual card created: •••• ${cardResult.cardNumber}`,
+              },
+            });
+
+            agentResponse = `✅ Purchase approved! I've created a virtual card ending in ${cardResult.cardNumber}. The card is ready to use for this purchase.`;
+          } catch (error) {
+            console.error('[CHAT] Error executing purchase:', error);
+            agentResponse = "I encountered an error while processing the purchase. Please try again.";
+            functionResults.push({
+              name: 'execute_purchase',
+              result: {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
+              },
+            });
           }
           continue;
         }

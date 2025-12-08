@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { colors } from '@/lib/config';
-import { Phone, Mail, Music, ChevronDown, ExternalLink } from 'lucide-react';
+import { Phone, Mail, Music, CreditCard, ChevronDown, ExternalLink } from 'lucide-react';
 
-export type IntegrationType = 'calls' | 'emails' | 'spotify';
+export type IntegrationType = 'calls' | 'emails' | 'spotify' | 'financial';
 
 interface IntegrationCardProps {
   type: IntegrationType;
@@ -73,6 +73,8 @@ export default function IntegrationCard({
         return <Mail {...iconProps} />;
       case 'spotify':
         return <Music {...iconProps} />;
+      case 'financial':
+        return <CreditCard {...iconProps} />;
       default:
         return null;
     }
@@ -158,6 +160,8 @@ export default function IntegrationCard({
         return renderEmailsDetails(details as any);
       case 'spotify':
         return renderSpotifyDetails(details as any);
+      case 'financial':
+        return renderFinancialDetails(details as any);
       default:
         return null;
     }
@@ -452,6 +456,112 @@ export default function IntegrationCard({
         {topArtists.length === 0 && topTracks.length === 0 && (
           <div className="text-center py-4" style={{ color: colors.text, opacity: 0.5 }}>
             No listening data available
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderFinancialDetails = (data: any) => {
+    const summary = data?.summary || {};
+    
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+      }).format(amount);
+    };
+
+    return (
+      <div className="space-y-4">
+        <div
+          className="p-4 rounded-lg"
+          style={{
+            backgroundColor: `${colors.accent}10`,
+            border: `1px solid ${colors.accent}25`,
+          }}
+        >
+          <p
+            className="text-sm mb-1"
+            style={{ color: colors.text, opacity: 0.7 }}
+          >
+            Total Balance
+          </p>
+          <p
+            className="text-2xl font-semibold"
+            style={{ color: colors.accent }}
+          >
+            {summary.totalBalance ? formatCurrency(summary.totalBalance) : '—'}
+          </p>
+          {summary.totalAvailable && summary.totalAvailable !== summary.totalBalance && (
+            <p
+              className="text-xs mt-1"
+              style={{ color: colors.text, opacity: 0.5 }}
+            >
+              Available: {formatCurrency(summary.totalAvailable)}
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div
+            className="p-3 rounded-lg"
+            style={{
+              backgroundColor: `${colors.accent}08`,
+              border: `1px solid ${colors.accent}20`,
+            }}
+          >
+            <p
+              className="text-xs mb-1"
+              style={{ color: colors.text, opacity: 0.6 }}
+            >
+              Accounts
+            </p>
+            <p
+              className="text-lg font-semibold"
+              style={{ color: colors.text }}
+            >
+              {summary.accountsCount || 0}
+            </p>
+          </div>
+
+          <div
+            className="p-3 rounded-lg"
+            style={{
+              backgroundColor: `${colors.accent}08`,
+              border: `1px solid ${colors.accent}20`,
+            }}
+          >
+            <p
+              className="text-xs mb-1"
+              style={{ color: colors.text, opacity: 0.6 }}
+            >
+              Transactions
+            </p>
+            <p
+              className="text-lg font-semibold"
+              style={{ color: colors.text }}
+            >
+              {summary.transactionsCount || 0}
+            </p>
+          </div>
+        </div>
+
+        {summary.pendingCount > 0 && (
+          <div
+            className="p-3 rounded-lg"
+            style={{
+              backgroundColor: `${colors.accent}15`,
+              border: `1px solid ${colors.accent}30`,
+            }}
+          >
+            <p
+              className="text-sm"
+              style={{ color: colors.accent }}
+            >
+              {summary.pendingCount} pending transaction{summary.pendingCount !== 1 ? 's' : ''}
+            </p>
           </div>
         )}
       </div>

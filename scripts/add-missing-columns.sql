@@ -4,3 +4,5 @@ ADD COLUMN IF NOT EXISTS message_type TEXT DEFAULT 'text' CHECK (message_type IN
 ADD COLUMN IF NOT EXISTS read BOOLEAN DEFAULT false;
 
 
+
+

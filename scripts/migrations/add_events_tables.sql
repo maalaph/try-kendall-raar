@@ -237,3 +237,5 @@ COMMENT ON TABLE event_outcomes IS 'Whether users actually attended events (veri
 -- GRANT ALL ON event_interactions TO authenticated;
 -- GRANT ALL ON event_outcomes TO authenticated;
 
+
+

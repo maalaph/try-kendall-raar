@@ -372,3 +372,5 @@ export async function buildLocationContext(userId: string): Promise<string> {
   return `\n=== LEARNED LOCATIONS ===\n${parts.join('\n')}\nUse this information to provide personalized location-based assistance.\n`;
 }
 
+
+

@@ -31,3 +31,5 @@ TRIGGER_PROJECT_ID=proj_hsneehqxymxjwpkwntec
 - ✅ Both of you can work simultaneously
 - ✅ Same setup works for deployment
 
+
+

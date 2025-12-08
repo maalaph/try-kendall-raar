@@ -51,10 +51,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all integration data in parallel
-    const [callsData, emailsData, spotifyData] = await Promise.allSettled([
+    const [callsData, emailsData, spotifyData, financialData] = await Promise.allSettled([
       fetchCallsData(String(agentId), recordId),
       fetchEmailsData(recordId),
       fetchSpotifyData(recordId),
+      fetchFinancialData(recordId),
     ]);
 
     // Process calls data
@@ -101,11 +102,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Process Financial data
+    let financial = null;
+    if (financialData.status === 'fulfilled') {
+      financial = financialData.value;
+    } else {
+      const error = financialData.reason;
+      console.error('[DASHBOARD] Financial data error:', error);
+      financial = { connected: false, error: 'unknown', message: 'Failed to fetch financial data' };
+    }
+
     return NextResponse.json({
       success: true,
       calls,
       emails,
       spotify,
+      financial,
     });
   } catch (error) {
     console.error('[API ERROR] GET /api/dashboard failed:', error);
@@ -239,6 +251,84 @@ async function fetchSpotifyData(recordId: string) {
       topArtists: insights.topArtists.slice(0, 10),
       topTracks: insights.topTracks.slice(0, 10),
       mood: insights.mood,
+    },
+  };
+}
+
+/**
+ * Fetch Financial data
+ */
+async function fetchFinancialData(recordId: string) {
+  const { supabase } = await import('@/lib/supabase');
+
+  // Get connected accounts count
+  const { data: items, error: itemsError } = await supabase
+    .from('plaid_items')
+    .select('id')
+    .eq('user_id', recordId)
+    .eq('status', 'active');
+
+  if (itemsError) {
+    throw new Error(`Failed to fetch Plaid items: ${itemsError.message}`);
+  }
+
+  const connectedAccounts = items?.length || 0;
+
+  if (connectedAccounts === 0) {
+    return {
+      connected: false,
+      error: {
+        type: 'not_connected' as const,
+        message: 'No bank accounts connected',
+      },
+    };
+  }
+
+  // Get accounts summary
+  const { data: accounts, error: accountsError } = await supabase
+    .from('bank_accounts')
+    .select('balance_current, balance_available, type')
+    .eq('user_id', recordId)
+    .eq('status', 'active')
+    .in('plaid_item_id', items?.map((item) => item.id) || []);
+
+  if (accountsError) {
+    throw new Error(`Failed to fetch accounts: ${accountsError.message}`);
+  }
+
+  // Calculate total balances
+  let totalBalance = 0;
+  let totalAvailable = 0;
+  accounts?.forEach((acc: any) => {
+    if (acc.balance_current) totalBalance += Number(acc.balance_current) / 100;
+    if (acc.balance_available) totalAvailable += Number(acc.balance_available) / 100;
+  });
+
+  // Get recent transactions count
+  const { count: transactionsCount } = await supabase
+    .from('transactions')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', recordId)
+    .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+
+  // Get pending transactions count
+  const { count: pendingCount } = await supabase
+    .from('transactions')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', recordId)
+    .eq('pending', true);
+
+  return {
+    connected: true,
+    summary: {
+      accountsCount: connectedAccounts,
+      totalBalance,
+      totalAvailable,
+      transactionsCount: transactionsCount || 0,
+      pendingCount: pendingCount || 0,
+    },
+    details: {
+      accounts: accounts?.length || 0,
     },
   };
 }
