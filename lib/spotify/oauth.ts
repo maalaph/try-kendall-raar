@@ -15,7 +15,7 @@ export const SPOTIFY_SCOPES = [
 
 export const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID!;
 export const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET!;
-export const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:3000/api/auth/spotify/callback';
+export const SPOTIFY_REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'http://127.0.0.1:4000/api/auth/spotify/callback';
 
 /**
  * Generate OAuth authorization URL

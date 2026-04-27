@@ -1934,7 +1934,7 @@ export async function POST(request: NextRequest) {
             if (!address) {
               try {
                 const geocodeRes = await fetch(
-                  `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/geocode?latitude=${userLocation.latitude}&longitude=${userLocation.longitude}&permanent=true&userId=${recordId}`
+                  `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000'}/api/geocode?latitude=${userLocation.latitude}&longitude=${userLocation.longitude}&permanent=true&userId=${recordId}`
                 );
                 if (geocodeRes.ok) {
                   const geocodeData = await geocodeRes.json();
@@ -1957,7 +1957,7 @@ export async function POST(request: NextRequest) {
 
             // Save location to database
             try {
-              await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/location`, {
+              await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000'}/api/location`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1978,7 +1978,7 @@ export async function POST(request: NextRequest) {
           // Check for last known location
           try {
             const locationRes = await fetch(
-              `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/location?userId=${recordId}&type=last`
+              `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000'}/api/location?userId=${recordId}&type=last`
             );
             if (locationRes.ok) {
               const locationData = await locationRes.json();
@@ -2044,7 +2044,7 @@ export async function POST(request: NextRequest) {
 
           try {
             const searchRes = await fetch(
-              `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/search?query=${encodeURIComponent(query)}&latitude=${latitude}&longitude=${longitude}&limit=10&userId=${recordId}`
+              `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000'}/api/search?query=${encodeURIComponent(query)}&latitude=${latitude}&longitude=${longitude}&limit=10&userId=${recordId}`
             );
             
             if (searchRes.ok) {
@@ -2144,7 +2144,7 @@ export async function POST(request: NextRequest) {
 
             // Build API URL
             const apiUrl = new URL(
-              `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/events/recommend`
+              `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000'}/api/events/recommend`
             );
             apiUrl.searchParams.set('recordId', eventRecordId);
             apiUrl.searchParams.set('includeExplanations', 'true');
@@ -2243,7 +2243,7 @@ export async function POST(request: NextRequest) {
 
             // Get base URL from request headers
             const protocol = request.headers.get('x-forwarded-proto') || 'http';
-            const host = request.headers.get('host') || 'localhost:3000';
+            const host = request.headers.get('host') || 'localhost:4000';
             const baseUrl = `${protocol}://${host}`;
             
             const response = await fetch(`${baseUrl}/api/financial/summary?recordId=${financialRecordId}&timeRange=${timeRange}`);
@@ -2304,7 +2304,7 @@ export async function POST(request: NextRequest) {
 
             // Get base URL from request headers
             const protocol = request.headers.get('x-forwarded-proto') || 'http';
-            const host = request.headers.get('host') || 'localhost:3000';
+            const host = request.headers.get('host') || 'localhost:4000';
             const baseUrl = `${protocol}://${host}`;
             
             let url = `${baseUrl}/api/financial/analyze?recordId=${financialRecordId}&timeRange=${timeRange}`;
@@ -2369,7 +2369,7 @@ export async function POST(request: NextRequest) {
 
             // Get base URL from request headers
             const protocol = request.headers.get('x-forwarded-proto') || 'http';
-            const host = request.headers.get('host') || 'localhost:3000';
+            const host = request.headers.get('host') || 'localhost:4000';
             const baseUrl = `${protocol}://${host}`;
             
             const response = await fetch(`${baseUrl}/api/financial/subscriptions?recordId=${financialRecordId}`);
@@ -2864,7 +2864,7 @@ export async function POST(request: NextRequest) {
                   
                   if (normalizedPhone) {
                     // Call the make-call API
-                    const makeCallResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/make-call`, {
+                    const makeCallResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000'}/api/make-call`, {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
@@ -3283,7 +3283,7 @@ export async function POST(request: NextRequest) {
             }
 
             // Call the make-call API
-            const makeCallResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/make-call`, {
+            const makeCallResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000'}/api/make-call`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

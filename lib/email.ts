@@ -64,7 +64,7 @@ export async function sendKendallWelcomeEmail({
     // Get base URL from environment or use relative URL
     // Priority: NEXT_PUBLIC_BASE_URL > https://VERCEL_URL > localhost
     // ✅ Fix: Properly prioritize NEXT_PUBLIC_BASE_URL over VERCEL_URL
-    let baseUrl = 'http://localhost:3000';
+    let baseUrl = 'http://localhost:4000';
     if (process.env.NEXT_PUBLIC_BASE_URL) {
       baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
     } else if (process.env.VERCEL_URL) {
@@ -183,7 +183,7 @@ export async function sendBusinessTrialWelcomeEmail({
     const transporter = createTransporter();
 
     // Get base URL from environment or use relative URL
-    let baseUrl = 'http://localhost:3000';
+    let baseUrl = 'http://localhost:4000';
     if (process.env.NEXT_PUBLIC_BASE_URL) {
       baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
     } else if (process.env.VERCEL_URL) {

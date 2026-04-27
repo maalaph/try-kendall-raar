@@ -88,7 +88,7 @@ export async function clusterUserLocations(
       // Geocode the centroid
       try {
         const geocodeResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/geocode?latitude=${raw.centroid_lat}&longitude=${raw.centroid_lng}&permanent=true&userId=${userId}`
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:4000'}/api/geocode?latitude=${raw.centroid_lat}&longitude=${raw.centroid_lng}&permanent=true&userId=${userId}`
         );
         if (geocodeResponse.ok) {
           const geocodeData = await geocodeResponse.json();

@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Start Ngrok with the pooled domain
-# This script starts Ngrok pointing to your local Next.js server on port 3000
+# This script starts Ngrok pointing to your local Next.js server on port 4000
 
 DOMAIN="raar-dev.ngrok.app"
-PORT=3000
+PORT=4000
 
 echo "🚀 Starting Ngrok..."
 echo "   Domain: $DOMAIN"
@@ -22,7 +22,7 @@ if ! command -v ngrok &> /dev/null; then
     exit 1
 fi
 
-# Check if port 3000 is in use
+# Check if port 4000 is in use
 if ! lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
     echo "⚠️  Warning: Nothing is listening on port $PORT"
     echo "   Make sure your Next.js dev server is running: npm run dev"
