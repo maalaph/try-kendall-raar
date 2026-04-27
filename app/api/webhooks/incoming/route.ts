@@ -9,7 +9,7 @@ import { createLogger } from '@/lib/logger';
 const logger = createLogger('WEBHOOKS');
 
 export interface WebhookPayload {
-  source: 'gmail' | 'calendar' | 'spotify' | 'stripe' | 'custom';
+  source: 'gmail' | 'calendar' | 'spotify' | 'custom';
   event: string;
   data: Record<string, any>;
   timestamp?: string;
@@ -56,9 +56,6 @@ export async function POST(request: NextRequest) {
         break;
       case 'spotify':
         result = await handleSpotifyWebhook(payload, log);
-        break;
-      case 'stripe':
-        result = await handleStripeWebhook(payload, request, log);
         break;
       default:
         result = await handleCustomWebhook(payload, source, log);
@@ -192,50 +189,6 @@ async function handleSpotifyWebhook(
   } catch (error) {
     log.error('Spotify webhook handler error', error);
     return { success: false, message: 'Failed to process Spotify notification' };
-  }
-}
-
-/**
- * Handle Stripe webhooks (for future payment integration)
- */
-async function handleStripeWebhook(
-  payload: any,
-  request: NextRequest,
-  log: ReturnType<typeof createLogger>
-): Promise<{ success: boolean; message?: string }> {
-  try {
-    // Verify Stripe signature
-    const signature = request.headers.get('stripe-signature');
-    if (!signature) {
-      log.warn('Stripe webhook: Missing signature');
-      return { success: false, message: 'Missing signature' };
-    }
-    
-    // TODO: Verify with Stripe SDK
-    // const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    
-    log.info('Stripe event received', {
-      type: payload.type,
-      id: payload.id,
-    });
-    
-    // Handle different event types
-    switch (payload.type) {
-      case 'checkout.session.completed':
-        // Handle successful payment
-        break;
-      case 'customer.subscription.updated':
-        // Handle subscription change
-        break;
-      case 'invoice.payment_failed':
-        // Handle failed payment
-        break;
-    }
-    
-    return { success: true, message: 'Stripe event processed' };
-  } catch (error) {
-    log.error('Stripe webhook handler error', error);
-    return { success: false, message: 'Failed to process Stripe event' };
   }
 }
 

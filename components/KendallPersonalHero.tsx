@@ -5,8 +5,6 @@ import { colors } from '@/lib/config';
 import { Briefcase, Megaphone, Phone, Sparkles, Shield, Zap } from 'lucide-react';
 import SimpleDot from './SimpleDot';
 
-const BUY_PERSONAL_URL = process.env.NEXT_PUBLIC_KENDALL_PERSONAL_URL || 'https://buy.stripe.com/cNi14n8968x6gOB8LocQU00';
-
 interface Star {
   id: number;
   x: number;
@@ -81,7 +79,7 @@ export default function KendallPersonalHero() {
   }, []);
 
   const handleBuyClick = () => {
-    window.open(BUY_PERSONAL_URL, '_blank');
+    window.location.href = '/personal-setup';
   };
 
   return (
@@ -367,7 +365,7 @@ export default function KendallPersonalHero() {
                 }}
               >
                 <span style={{ position: 'relative', zIndex: 2, fontWeight: 700 }}>
-                  BUY NOW
+                  CUSTOMIZE MY KENDALL
                 </span>
               </button>
 

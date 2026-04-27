@@ -6,8 +6,6 @@ import { colors } from '@/lib/config';
 import { businessTypesData } from '@/lib/businessTypes';
 import { ChevronDown, ChevronUp, Info } from 'lucide-react';
 
-const BUY_PERSONAL_URL = process.env.NEXT_PUBLIC_KENDALL_PERSONAL_URL || 'https://buy.stripe.com/cNi14n8968x6gOB8LocQU00';
-
 // Add-on prices (matching PricingSummary)
 const addOnPrices: Record<string, number> = {
   'reminder-confirmation': 99.99,
@@ -95,7 +93,7 @@ export default function PricingPage() {
   };
 
   const handlePersonalBuyClick = () => {
-    window.open(BUY_PERSONAL_URL, '_blank');
+    window.location.href = '/personal-setup';
   };
 
   // Business pricing packages
@@ -306,7 +304,7 @@ export default function PricingPage() {
                   }}
                 >
                   <span style={{ position: 'relative', zIndex: 2, fontWeight: 700 }}>
-                    BUY NOW
+                    CUSTOMIZE MY KENDALL
                   </span>
                 </button>
                 <p
@@ -811,7 +809,7 @@ export default function PricingPage() {
                   }}
                 >
                   <span style={{ position: 'relative', zIndex: 2, fontWeight: 700 }}>
-                    BUY NOW
+                    CUSTOMIZE MY KENDALL
                   </span>
                 </button>
                 <p
