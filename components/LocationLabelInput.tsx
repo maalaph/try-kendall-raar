@@ -151,7 +151,6 @@ export default function LocationLabelInput({
           type="text"
           value={inputValue}
           onChange={handleInputChange}
-          onFocus={() => setShowSuggestions(true)}
           placeholder={placeholder}
           disabled={disabled}
           className="w-full pl-10 pr-4 py-2.5 text-sm transition-all duration-200 focus:outline-none"
@@ -162,6 +161,7 @@ export default function LocationLabelInput({
             borderRadius: '0',
           }}
           onFocus={(e) => {
+            setShowSuggestions(true);
             if (!disabled) {
               e.currentTarget.style.borderColor = colors.accent;
             }
